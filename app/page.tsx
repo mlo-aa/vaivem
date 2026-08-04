@@ -14,7 +14,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ButtonLink } from '@/components/ui/button-link'
 import { MarketingHeader } from '@/components/marketing/marketing-header'
 import { MarketingFooter } from '@/components/marketing/marketing-footer'
 import { ClaimCardPreview } from '@/components/claim-card-preview'
@@ -95,13 +95,13 @@ export default function LandingPage() {
                 regional payment rails such as PIX.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Button size="lg" render={<Link href="/signup" />}>
+                <ButtonLink size="lg" href="/signup">
                   Create a ClaimLink
                   <ArrowRight data-icon="inline-end" />
-                </Button>
-                <Button size="lg" variant="outline" render={<Link href="/claim/demo-active" />}>
+                </ButtonLink>
+                <ButtonLink size="lg" variant="outline" href="/claim/demo-active">
                   View demo claim
-                </Button>
+                </ButtonLink>
               </div>
               <p className="mt-6 text-sm text-muted-foreground">
                 No wallet installs · Sponsored accounts · Cash out in 1–5 minutes
@@ -190,10 +190,10 @@ export default function LandingPage() {
                 Drop ClaimLink into your product and let your users send USDC that anyone can claim
                 or cash out. Full REST API, typed SDK, and webhooks.
               </p>
-              <Button className="mt-8" variant="secondary" render={<Link href="/developers" />}>
+              <ButtonLink className="mt-8" variant="secondary" href="/developers">
                 Read the docs
                 <ArrowRight data-icon="inline-end" />
-              </Button>
+              </ButtonLink>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/25 p-1.5 shadow-2xl">
               <div className="flex items-center gap-1.5 px-3 py-2.5">
@@ -245,13 +245,13 @@ export default function LandingPage() {
                 link.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Button size="lg" render={<Link href="/signup" />}>
+                <ButtonLink size="lg" href="/signup">
                   Create a ClaimLink
                   <ArrowRight data-icon="inline-end" />
-                </Button>
-                <Button size="lg" variant="outline" render={<Link href="/dashboard" />}>
+                </ButtonLink>
+                <ButtonLink size="lg" variant="outline" href="/dashboard">
                   Explore the dashboard
-                </Button>
+                </ButtonLink>
               </div>
             </div>
           </div>

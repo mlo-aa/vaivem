@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { ButtonLink } from '@/components/ui/button-link'
 import { Logo } from '@/components/logo'
 import { cn } from '@/lib/utils'
@@ -66,10 +65,12 @@ export function MarketingHeader() {
             </Link>
           ))}
           <div className="mt-2 flex flex-col gap-2">
-            <Button variant="outline" render={<Link href="/login" />}>
+            <ButtonLink variant="outline" href="/login" onClick={() => setOpen(false)}>
               Log in
-            </Button>
-            <Button render={<Link href="/signup" />}>Create a ClaimLink</Button>
+            </ButtonLink>
+            <ButtonLink href="/signup" onClick={() => setOpen(false)}>
+              Create a ClaimLink
+            </ButtonLink>
           </div>
         </nav>
       </div>
