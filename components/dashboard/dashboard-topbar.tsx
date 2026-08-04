@@ -112,14 +112,16 @@ export function DashboardTopbar({ title }: { title: string }) {
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{currentUser.name}</span>
-                <span className="text-xs font-normal text-muted-foreground">
-                  {currentUser.email}
-                </span>
-              </div>
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{currentUser.name}</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {currentUser.email}
+                  </span>
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
