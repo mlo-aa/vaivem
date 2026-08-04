@@ -75,7 +75,7 @@ const CODE = `const claim = await claimlink.create({
 
 export default function LandingPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col overflow-x-clip bg-background">
       <MarketingHeader />
 
       <main className="flex-1">
