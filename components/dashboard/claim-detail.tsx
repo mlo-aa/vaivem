@@ -81,7 +81,7 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <Link
-        href="/dashboard/claims"
+        href="/dashboard"
         className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />

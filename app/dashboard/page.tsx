@@ -1,103 +1,87 @@
-import Link from 'next/link'
-import { ArrowRight, CheckCircle2, Clock, Link2, Wallet } from 'lucide-react'
+'use client'
+
+import { useMemo, useState } from 'react'
+import { Search } from 'lucide-react'
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
-import { StatCards, type Stat } from '@/components/dashboard/stat-cards'
-import { PayoutChart } from '@/components/dashboard/payout-chart'
 import { ClaimsTable } from '@/components/dashboard/claims-table'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '@/components/ui/input-group'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { claims } from '@/lib/mock-data'
-import { formatUSDC, isActiveStatus } from '@/lib/format'
+import { isActiveStatus } from '@/lib/format'
 
-const totalSent = claims.reduce((sum, c) => sum + c.amount, 0)
-const claimed = claims.filter((c) => ['claimed', 'cashing_out', 'completed'].includes(c.status))
-const active = claims.filter((c) => isActiveStatus(c.status))
-const completed = claims.filter((c) => c.status === 'completed')
-const claimRate = Math.round((claimed.length / claims.length) * 100)
-
-const stats: Stat[] = [
-  {
-    label: 'Total sent',
-    value: formatUSDC(totalSent),
-    sublabel: `Across ${claims.length} claims`,
-    delta: { value: '18.2%', positive: true },
-    icon: Wallet,
-  },
-  {
-    label: 'Active claims',
-    value: String(active.length),
-    sublabel: 'Awaiting recipient action',
-    icon: Link2,
-  },
-  {
-    label: 'Claim rate',
-    value: `${claimRate}%`,
-    sublabel: 'Links opened and claimed',
-    delta: { value: '4.1%', positive: true },
-    icon: CheckCircle2,
-  },
-  {
-    label: 'Avg. time to claim',
-    value: '3h 12m',
-    sublabel: 'From share to cash-out',
-    delta: { value: '11m', positive: true },
-    icon: Clock,
-  },
-]
+type Filter = 'all' | 'active' | 'completed' | 'refunded'
 
 export default function DashboardPage() {
-  const recent = [...claims].slice(0, 5)
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<Filter>('all')
+
+  const filtered = useMemo(() => {
+    return claims.filter((c) => {
+      const matchesQuery =
+        query.trim() === '' ||
+        c.recipientName.toLowerCase().includes(query.toLowerCase()) ||
+        c.token.toLowerCase().includes(query.toLowerCase()) ||
+        c.purpose.toLowerCase().includes(query.toLowerCase())
+      const matchesFilter =
+        filter === 'all'
+          ? true
+          : filter === 'active'
+            ? isActiveStatus(c.status)
+            : filter === 'completed'
+              ? c.status === 'completed'
+              : ['refunded', 'expired', 'cancelled'].includes(c.status)
+      return matchesQuery && matchesFilter
+    })
+  }, [query, filter])
+
   return (
     <>
-      <DashboardTopbar title="Overview" />
-      <main className="flex-1 space-y-6 p-4 sm:p-6">
-        <StatCards stats={stats} />
-
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <PayoutChart />
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>This month</CardTitle>
-              <CardDescription>Payout summary for your organization</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <SummaryRow label="Completed payouts" value={String(completed.length)} />
-              <SummaryRow label="Funds locked on Stellar" value={formatUSDC(totalSent)} />
-              <SummaryRow
-                label="Refunded / expired"
-                value={String(
-                  claims.filter((c) => ['refunded', 'expired'].includes(c.status)).length,
-                )}
-              />
-              <SummaryRow label="Recipients reached" value={String(claims.length)} />
-            </CardContent>
-          </Card>
+      <DashboardTopbar title="Claims" />
+      <main className="flex-1 space-y-5 p-4 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <InputGroup className="sm:max-w-xs">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="Search recipient, token, purpose"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </InputGroup>
+          <ToggleGroup
+            value={filter}
+            onValueChange={(v) => v && setFilter(v as Filter)}
+            className="w-fit"
+          >
+            <ToggleGroupItem value="all">All</ToggleGroupItem>
+            <ToggleGroupItem value="active">Active</ToggleGroupItem>
+            <ToggleGroupItem value="completed">Completed</ToggleGroupItem>
+            <ToggleGroupItem value="refunded">Closed</ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold tracking-tight">Recent claims</h2>
-            <Link
-              href="/dashboard/claims"
-              className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              View all
-              <ArrowRight className="size-4" />
-            </Link>
-          </div>
-          <ClaimsTable claims={recent} />
-        </section>
+        {filtered.length > 0 ? (
+          <ClaimsTable claims={filtered} />
+        ) : (
+          <Empty className="rounded-xl border border-dashed border-border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Search />
+              </EmptyMedia>
+              <EmptyTitle>No claims found</EmptyTitle>
+              <EmptyDescription>
+                Try adjusting your search or filters to find what you&apos;re looking for.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
       </main>
     </>
-  )
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-semibold tabular-nums">{value}</span>
-    </div>
   )
 }

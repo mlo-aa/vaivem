@@ -7,7 +7,7 @@ import { claims as seedClaims } from "./mock-data"
 // claims created through the wizard are added here (and mirrored to
 // sessionStorage) so the detail route can resolve freshly minted tokens
 // without a persistent backend.
-const SESSION_KEY = "claimlink.created-claims"
+const SESSION_KEY = "vaivem.created-claims"
 
 function readSession(): Claim[] {
   if (typeof window === "undefined") return []

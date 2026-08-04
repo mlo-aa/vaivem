@@ -36,12 +36,12 @@ import { cn } from '@/lib/utils'
 import {
   createClaim,
   fundClaim,
-  getQuote,
+  getFundingUsdc,
   type CreateClaimInput,
 } from '@/lib/services'
 import { formatDisplay, formatUSDC } from '@/lib/format'
 import { saveClaim } from '@/lib/claim-store'
-import type { Claim, DisplayCurrency, ProtectionType, Quote } from '@/lib/types'
+  import type { Claim, DisplayCurrency, ProtectionType } from '@/lib/types'
 
 const PURPOSES = [
   'Hackathon prize',
@@ -102,24 +102,29 @@ export function CreateWizard() {
   const [allowStellar, setAllowStellar] = useState(true)
   const [allowPix, setAllowPix] = useState(true)
 
-  const [quote, setQuote] = useState<Quote | null>(null)
+  const [fundingUsdc, setFundingUsdc] = useState<number | null>(null)
   const [quoting, setQuoting] = useState(false)
   const [fundStep, setFundStep] = useState(0)
   const [claim, setClaim] = useState<Claim | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const numericAmount = Number.parseFloat(amount) || 0
+  // Rate is only meaningful when converting from BRL; USD funds 1:1.
+  const fundingRate =
+    currency === 'BRL' && fundingUsdc && fundingUsdc > 0
+      ? numericAmount / fundingUsdc
+      : 1
 
-  // Refresh the quote whenever the amount or currency changes (debounced).
+  // Recompute the USDC to lock whenever amount or currency changes (debounced).
   useEffect(() => {
     if (numericAmount <= 0) {
-      setQuote(null)
+      setFundingUsdc(null)
       return
     }
     setQuoting(true)
     const handle = setTimeout(async () => {
-      const q = await getQuote(numericAmount, currency)
-      setQuote(q)
+      const usdc = await getFundingUsdc(numericAmount, currency)
+      setFundingUsdc(usdc)
       setQuoting(false)
     }, 450)
     return () => clearTimeout(handle)
@@ -194,7 +199,7 @@ export function CreateWizard() {
             <div>
               <h2 className="font-semibold">Locking funds on Stellar</h2>
               <p className="text-sm text-muted-foreground">
-                Securing {formatUSDC(quote?.destinationAmount ?? 0)} for {recipientName}
+                Securing {formatUSDC(fundingUsdc ?? 0)} for {recipientName}
               </p>
             </div>
           </div>
@@ -212,7 +217,7 @@ export function CreateWizard() {
             <CheckCircle2 className="size-7" />
           </span>
           <div>
-            <h2 className="text-xl font-semibold">Your ClaimLink is live</h2>
+            <h2 className="text-xl font-semibold">Your claim link is live</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatDisplay(claim.displayAmount, claim.displayCurrency)} is locked and ready to
               share.
@@ -487,12 +492,12 @@ export function CreateWizard() {
               <span className="text-xs font-medium uppercase tracking-wide">Live quote</span>
             </div>
             <div>
-              <p className="text-sm text-navy-foreground/70">Recipient receives</p>
+              <p className="text-sm text-navy-foreground/70">You lock</p>
               {quoting ? (
                 <Skeleton className="mt-1 h-9 w-40 bg-white/10" />
               ) : (
                 <p className="text-3xl font-semibold tabular-nums">
-                  {formatUSDC(quote?.destinationAmount ?? 0)}
+                  {formatUSDC(fundingUsdc ?? 0)}
                 </p>
               )}
               <p className="mt-1 text-sm text-navy-foreground/60">
@@ -503,17 +508,18 @@ export function CreateWizard() {
             </div>
             <div className="flex flex-col gap-2 border-t border-white/10 pt-4 text-sm">
               <QuoteRow
-                label="Exchange rate"
-                value={quote ? `1 USD ≈ ${quote.exchangeRate} ${currency === 'BRL' ? 'BRL' : 'USD'}` : '—'}
+                label="Reference rate"
+                value={
+                  currency === 'BRL' && fundingUsdc
+                    ? `1 USDC ≈ ${fundingRate.toFixed(4)} BRL`
+                    : '1 USDC = 1 USD'
+                }
               />
               <QuoteRow
-                label="Provider fee (1.4%)"
-                value={quote ? formatUSDC(quote.providerFee) : '—'}
+                label="Cash-out fee"
+                value="0.20% (paid at claim)"
               />
-              <QuoteRow
-                label="Network fee"
-                value={quote ? formatUSDC(quote.networkFee) : '—'}
-              />
+              <QuoteRow label="Network fee" value="Sponsored" />
             </div>
             <div className="rounded-lg bg-white/5 p-3">
               <div className="flex items-center gap-2">

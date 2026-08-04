@@ -3,7 +3,7 @@ import { MarketingFooter } from "@/components/marketing/marketing-footer"
 import { DevelopersView } from "@/components/developers/developers-view"
 
 export const metadata = {
-  title: "Developers · ClaimLink",
+  title: "Developers · Vaivém",
   description: "Integrate walletless USDC payouts with a single REST API.",
 }
 

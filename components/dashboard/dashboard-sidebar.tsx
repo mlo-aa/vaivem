@@ -2,25 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-  LayoutDashboard,
-  Link2,
-  Layers,
-  Wallet,
-  Code2,
-  Settings,
-  LifeBuoy,
-} from 'lucide-react'
+import { Link2, Plus, Code2, LifeBuoy } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { cn } from '@/lib/utils'
 
 const NAV = [
-  { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Claims', href: '/dashboard/claims', icon: Link2 },
-  { label: 'Batch payouts', href: '/dashboard/batch', icon: Layers },
-  { label: 'Wallet', href: '/wallet', icon: Wallet },
+  { label: 'Claims', href: '/dashboard', icon: Link2 },
+  { label: 'Create claim', href: '/dashboard/create', icon: Plus },
   { label: 'Developers', href: '/developers', icon: Code2 },
-  { label: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
 export function DashboardSidebar() {
@@ -28,7 +17,7 @@ export function DashboardSidebar() {
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-sidebar lg:flex">
       <div className="flex h-16 items-center px-6">
-        <Link href="/dashboard" aria-label="ClaimLink dashboard">
+        <Link href="/dashboard" aria-label="Vaivém dashboard">
           <Logo />
         </Link>
       </div>
@@ -57,7 +46,7 @@ export function DashboardSidebar() {
       </nav>
       <div className="border-t border-border p-3">
         <a
-          href="mailto:support@claimlink.app"
+          href="mailto:support@vaivem.app"
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
         >
           <LifeBuoy className="size-4.5 shrink-0" />

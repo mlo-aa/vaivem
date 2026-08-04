@@ -47,7 +47,7 @@ export function Logo({ className, showWordmark = true, wordmarkClassName }: Logo
       <LogoMark className="size-8" />
       {showWordmark && (
         <span className={cn('text-lg font-semibold tracking-tight text-foreground', wordmarkClassName)}>
-          ClaimLink
+          Vaivém
         </span>
       )}
     </span>

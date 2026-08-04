@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 
 export function SharePanel({ token, amountLabel }: { token: string; amountLabel: string }) {
   const [copied, setCopied] = useState(false)
-  const url = `https://claimlink.app/br/${token}`
+  const url = `https://vaivem.app/br/${token}`
 
   async function copy() {
     try {

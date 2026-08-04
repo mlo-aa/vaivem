@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'ClaimLink — Send USDC with a link',
+  title: 'Vaivém — Send USDC with a link',
   description:
     'Create walletless payouts that recipients can claim on Stellar or withdraw through regional payment rails such as PIX.',
   generator: 'v0.app',
