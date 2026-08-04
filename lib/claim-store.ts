@@ -39,6 +39,14 @@ export function getAllClaims(): Claim[] {
   return [...readSession(), ...seedClaims]
 }
 
+// Mark a claim as viewed (recipient opened the link) if it hasn't progressed.
+export function markViewed(token: string) {
+  const claim = findClaim(token)
+  if (claim && claim.status === "shared") {
+    saveClaim({ ...claim, status: "viewed" })
+  }
+}
+
 export function findClaim(token: string): Claim | null {
   const lower = token.toLowerCase()
   return getAllClaims().find((c) => c.token.toLowerCase() === lower) ?? null
