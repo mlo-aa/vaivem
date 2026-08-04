@@ -19,7 +19,7 @@ export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" aria-label="ClaimLink home">
+        <Link href="/" aria-label="Vaivém home">
           <Logo />
         </Link>
 
@@ -36,10 +36,10 @@ export function MarketingHeader() {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
-          <ButtonLink variant="ghost" href="/login">
-            Log in
+          <ButtonLink variant="ghost" href="/developers">
+            Developers
           </ButtonLink>
-          <ButtonLink href="/signup">Create a ClaimLink</ButtonLink>
+          <ButtonLink href="/dashboard">Open dashboard</ButtonLink>
         </div>
 
         <button
@@ -65,11 +65,11 @@ export function MarketingHeader() {
             </Link>
           ))}
           <div className="mt-2 flex flex-col gap-2">
-            <ButtonLink variant="outline" href="/login" onClick={() => setOpen(false)}>
-              Log in
+            <ButtonLink variant="outline" href="/developers" onClick={() => setOpen(false)}>
+              Developers
             </ButtonLink>
-            <ButtonLink href="/signup" onClick={() => setOpen(false)}>
-              Create a ClaimLink
+            <ButtonLink href="/dashboard" onClick={() => setOpen(false)}>
+              Open dashboard
             </ButtonLink>
           </div>
         </nav>

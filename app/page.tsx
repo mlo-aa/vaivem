@@ -61,11 +61,11 @@ const TRUST = [
   {
     icon: Wallet,
     title: 'Walletless by design',
-    body: 'Recipients never install anything. ClaimLink sponsors the account and the trustline.',
+    body: 'Recipients never install anything. Vaivém sponsors the account and the trustline.',
   },
 ]
 
-const CODE = `const claim = await claimlink.create({
+const CODE = `const claim = await vaivem.create({
   amount: "100",
   asset: "USDC",
   country: "BR",
@@ -95,8 +95,8 @@ export default function LandingPage() {
                 regional payment rails such as PIX.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <ButtonLink size="lg" href="/signup">
-                  Create a ClaimLink
+                <ButtonLink size="lg" href="/dashboard">
+                  Create a claim link
                   <ArrowRight data-icon="inline-end" />
                 </ButtonLink>
                 <ButtonLink size="lg" variant="outline" href="/claim/demo-active">
@@ -126,7 +126,7 @@ export default function LandingPage() {
                 From payout to payday in three steps
               </h2>
               <p className="mt-3 text-pretty text-muted-foreground">
-                ClaimLink handles the crypto so your recipients never have to think about it.
+                Vaivém handles the crypto so your recipients never have to think about it.
               </p>
             </div>
             <div className="mt-10 grid gap-4 md:grid-cols-3">
@@ -155,7 +155,7 @@ export default function LandingPage() {
                   One link for every kind of payout
                 </h2>
                 <p className="mt-3 text-pretty text-muted-foreground">
-                  Teams use ClaimLink to move money to people who don&apos;t have — or don&apos;t
+                  Teams use Vaivém to move money to people who don&apos;t have — or don&apos;t
                   want — a crypto wallet.
                 </p>
               </div>
@@ -187,7 +187,7 @@ export default function LandingPage() {
                 Payouts in a few lines of code
               </h2>
               <p className="mt-4 max-w-md text-pretty leading-relaxed text-navy-foreground/70">
-                Drop ClaimLink into your product and let your users send USDC that anyone can claim
+                Drop Vaivém into your product and let your users send USDC that anyone can claim
                 or cash out. Full REST API, typed SDK, and webhooks.
               </p>
               <ButtonLink className="mt-8" variant="secondary" href="/developers">
@@ -241,12 +241,12 @@ export default function LandingPage() {
                 Send your first walletless payout today
               </h2>
               <p className="max-w-md text-pretty text-muted-foreground">
-                Create a protected ClaimLink in under a minute. Your recipient claims it with just a
+                Create a protected claim link in under a minute. Your recipient claims it with just a
                 link.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <ButtonLink size="lg" href="/signup">
-                  Create a ClaimLink
+                <ButtonLink size="lg" href="/dashboard">
+                  Create a claim link
                   <ArrowRight data-icon="inline-end" />
                 </ButtonLink>
                 <ButtonLink size="lg" variant="outline" href="/dashboard">

@@ -23,17 +23,15 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ButtonLink } from '@/components/ui/button-link'
 import { Logo } from '@/components/logo'
+import { DemoBadge } from '@/components/demo-badge'
 import { currentOrg, currentUser } from '@/lib/mock-data'
 import { formatUSDC } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const MOBILE_NAV = [
-  { label: 'Overview', href: '/dashboard' },
-  { label: 'Claims', href: '/dashboard/claims' },
-  { label: 'Batch payouts', href: '/dashboard/batch' },
-  { label: 'Wallet', href: '/wallet' },
+  { label: 'Claims', href: '/dashboard' },
+  { label: 'Create claim', href: '/dashboard/create' },
   { label: 'Developers', href: '/developers' },
-  { label: 'Settings', href: '/dashboard/settings' },
 ]
 
 function initials(name: string) {
@@ -89,6 +87,7 @@ export function DashboardTopbar({ title }: { title: string }) {
           </SheetContent>
         </Sheet>
         <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+        <DemoBadge className="hidden sm:inline-flex" />
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
@@ -124,13 +123,9 @@ export function DashboardTopbar({ title }: { title: string }) {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem render={<Link href="/wallet" />}>Recipient wallet</DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/developers" />}>Developers</DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/" />}>View public site</DropdownMenuItem>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link href="/" />}>Log out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

@@ -1,9 +1,11 @@
 import type { ClaimStatus } from './types'
 
 // USD -> BRL reference rate used across the mocked quoting engine.
-export const USD_TO_BRL = 5.045
-export const PROVIDER_FEE_PCT = 0.014 // 1.4%
-export const NETWORK_FEE_USDC = 0.02
+// Measured against the Etherfuse sandbox.
+export const USD_TO_BRL = 5.13193556
+// Etherfuse provider fee: 20 basis points (0.20%).
+export const PROVIDER_FEE_BPS = 20
+export const PROVIDER_FEE_PCT = PROVIDER_FEE_BPS / 10000 // 0.0020
 
 export function formatUSDC(value: number): string {
   return `${value.toLocaleString('en-US', {

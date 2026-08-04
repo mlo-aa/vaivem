@@ -47,7 +47,7 @@ export function ClaimLoader({ token }: { token: string }) {
           <CardHeader>
             <p className="text-lg font-semibold text-foreground">Link not found</p>
             <p className="text-sm text-muted-foreground">
-              This ClaimLink doesn&apos;t exist or has been removed.
+              This claim link doesn&apos;t exist or has been removed.
             </p>
           </CardHeader>
         </Card>

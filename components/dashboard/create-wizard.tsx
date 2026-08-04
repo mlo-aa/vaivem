@@ -212,7 +212,7 @@ export function CreateWizard() {
             <CheckCircle2 className="size-7" />
           </span>
           <div>
-            <h2 className="text-xl font-semibold">Your ClaimLink is live</h2>
+            <h2 className="text-xl font-semibold">Your claim link is live</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatDisplay(claim.displayAmount, claim.displayCurrency)} is locked and ready to
               share.

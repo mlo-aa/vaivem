@@ -265,7 +265,7 @@ export function mockApiResponse(amount: string) {
     token,
     status: 'funded',
     amount: { asset: 'USDC', value: amount },
-    claimUrl: `https://claimlink.app/br/${token}`,
+    claimUrl: `https://vaivem.app/br/${token}`,
     stellarTransactionHash: randomTxHash(),
     createdAt: new Date().toISOString(),
   }

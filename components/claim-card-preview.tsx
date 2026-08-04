@@ -16,7 +16,7 @@ export function ClaimCardPreview({ className }: { className?: string }) {
           <span className="flex size-7 items-center justify-center rounded-lg bg-navy text-navy-foreground">
             <Sparkles className="size-4 text-brand" />
           </span>
-          <span className="text-sm font-medium">ClaimLink</span>
+            <span className="text-sm font-medium">Vaivém</span>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/15 px-2.5 py-1 text-xs font-medium text-[color-mix(in_oklab,var(--brand),black_40%)]">
           <ShieldCheck className="size-3.5" />

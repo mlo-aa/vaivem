@@ -1,4 +1,4 @@
-// Core domain types for ClaimLink.
+// Core domain types for Vaivém.
 // These mirror the eventual database schema (Supabase-ready) so the UI never
 // needs to change when real Stellar / PIX / auth adapters are wired in.
 
@@ -20,7 +20,9 @@ export type PayoutMethod = 'stellar' | 'pix' | null
 
 export type DisplayCurrency = 'BRL' | 'USD'
 
-export type PixKeyType = 'cpf' | 'email' | 'phone' | 'random'
+export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'random'
+
+export type KycStatus = 'not_started' | 'pending' | 'approved' | 'rejected'
 
 export type ClaimEventType =
   | 'created'
@@ -72,6 +74,7 @@ export interface Claim {
   displayAmount: number // amount in display currency (BRL/USD)
   asset: 'USDC'
   status: ClaimStatus
+  kycStatus?: KycStatus
   protectionType: ProtectionType
   expiresAt: string
   createdAt: string
@@ -93,14 +96,17 @@ export interface ClaimEvent {
 }
 
 export interface Quote {
-  sourceAmount: number
-  sourceCurrency: string
-  destinationAmount: number
-  destinationCurrency: string
-  exchangeRate: number
-  providerFee: number
-  networkFee: number
-  expiresAt: string
+  quoteId: string
+  sourceAmount: string
+  destinationAmount: string
+  exchangeRate: string // post-fee rate actually applied
+  etherfuseMidMarketRate: string
+  nominalRate: string
+  feeBps: string
+  feeAmount: string // denominated in the SOURCE asset (USDC), not fiat
+  requiresSwap: boolean
+  createdAt: string
+  expiresAt: string // exactly 2 minutes after createdAt
 }
 
 export interface Wallet {

@@ -62,7 +62,7 @@ export function MarketingFooter() {
           ))}
         </div>
         <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-border pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center">
-          <p>© {new Date().getFullYear()} ClaimLink. Not a bank. USDC is issued by Circle.</p>
+          <p>© {new Date().getFullYear()} Vaivém. Not a bank. USDC is issued by Circle.</p>
           <p>Powered by Stellar</p>
         </div>
       </div>

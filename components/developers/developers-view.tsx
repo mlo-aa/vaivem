@@ -24,7 +24,7 @@ const ENDPOINTS = [
   { method: "POST", path: "/v1/webhooks", desc: "Subscribe to payout events" },
 ]
 
-const CURL = `curl https://api.claimlink.app/v1/claims \\
+  const CURL = `curl https://api.vaivem.app/v1/claims \\
   -H "Authorization: Bearer sk_live_••••" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -34,9 +34,9 @@ const CURL = `curl https://api.claimlink.app/v1/claims \\
     "protection": "email"
   }'`
 
-const NODE = `import { ClaimLink } from "@claimlink/node"
+  const NODE = `import { Vaivem } from "@vaivem/node"
 
-const client = new ClaimLink(process.env.CLAIMLINK_KEY)
+  const client = new Vaivem(process.env.VAIVEM_KEY)
 
 const claim = await client.claims.create({
   amount: "500",
