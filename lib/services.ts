@@ -1,25 +1,24 @@
 import type {
-  BatchRecipient,
   Claim,
   DisplayCurrency,
+  KycStatus,
   PixPayout,
   Quote,
   Wallet,
 } from './types'
 import { claims as seedClaims, currentOrg, currentUser } from './mock-data'
-import {
-  NETWORK_FEE_USDC,
-  PROVIDER_FEE_PCT,
-  USD_TO_BRL,
-} from './format'
+import { USD_TO_BRL } from './format'
 import {
   authAdapter,
-  mantecaAdapter,
+  etherfuseAdapter,
   randomStellarAddress,
   randomToken,
   randomTxHash,
   stellarAdapter,
 } from './adapters'
+
+// Quote lifetime enforced by Etherfuse: exactly 2 minutes.
+export const QUOTE_TTL_MS = 120_000
 
 // Simulated network latency so loading states are exercised in the demo.
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -43,44 +42,40 @@ export interface CreateClaimInput {
 
 // --- Quoting ---------------------------------------------------------------
 
-// Returns a live-style quote converting a display amount to USDC (or vice versa).
-export async function getQuote(
+// Convert a sender's display amount (BRL or USD) into the USDC to lock.
+// Used by the create flow; returns a plain number since it isn't a settlement.
+export async function getFundingUsdc(
   amount: number,
   displayCurrency: DisplayCurrency,
-): Promise<Quote> {
-  await delay(500)
-  // TODO(manteca/etherfuse): fetch a real FX quote here.
-  const jitter = 1 + (Math.random() - 0.5) * 0.004
-  const rate = displayCurrency === 'BRL' ? USD_TO_BRL * jitter : 1
-  const usdc =
-    displayCurrency === 'BRL'
-      ? Math.round((amount / rate) * 100) / 100
-      : amount
-  const providerFee = Math.round(usdc * PROVIDER_FEE_PCT * 100) / 100
-  return {
-    sourceAmount: amount,
-    sourceCurrency: displayCurrency,
-    destinationAmount: usdc,
-    destinationCurrency: 'USDC',
-    exchangeRate: Math.round(rate * 1000) / 1000,
-    providerFee,
-    networkFee: NETWORK_FEE_USDC,
-    expiresAt: new Date(Date.now() + 60_000).toISOString(),
-  }
+): Promise<number> {
+  await delay(400)
+  const rate = displayCurrency === 'BRL' ? USD_TO_BRL : 1
+  const usdc = displayCurrency === 'BRL' ? amount / rate : amount
+  return Math.round(usdc * 100) / 100
 }
 
+// Etherfuse USDC -> BRL settlement quote. All monetary values are strings and
+// the provider fee is denominated in USDC (the source asset). Valid 2 minutes.
 export async function getPixQuote(usdc: number): Promise<Quote> {
   await delay(600)
-  const { rate, fee, brl } = await mantecaAdapter.getPixQuote(usdc)
+  const q = await etherfuseAdapter.getQuote(usdc)
+  const createdAt = new Date()
+  const expiresAt = new Date(createdAt.getTime() + QUOTE_TTL_MS)
+  const feeAmount = Number(q.feeAmountUsdc)
+  const netUsdc = usdc - feeAmount
+  const brl = netUsdc * Number(q.effectiveRate)
   return {
-    sourceAmount: usdc,
-    sourceCurrency: 'USDC',
-    destinationAmount: brl,
-    destinationCurrency: 'BRL',
-    exchangeRate: rate,
-    providerFee: fee,
-    networkFee: 0,
-    expiresAt: new Date(Date.now() + 90_000).toISOString(),
+    quoteId: q.quoteId,
+    sourceAmount: usdc.toFixed(6),
+    destinationAmount: brl.toFixed(2),
+    exchangeRate: q.effectiveRate,
+    etherfuseMidMarketRate: q.midMarketRate,
+    nominalRate: q.nominalRate,
+    feeBps: q.feeBps,
+    feeAmount: q.feeAmountUsdc,
+    requiresSwap: q.requiresSwap,
+    createdAt: createdAt.toISOString(),
+    expiresAt: expiresAt.toISOString(),
   }
 }
 
@@ -89,7 +84,7 @@ export async function getPixQuote(usdc: number): Promise<Quote> {
 export async function createClaim(input: CreateClaimInput): Promise<Claim> {
   await delay(700)
   const token = randomToken()
-  const quote = await getQuote(input.amount, input.displayCurrency)
+  const usdc = await getFundingUsdc(input.amount, input.displayCurrency)
   const claim: Claim = {
     id: `clm_${token}`,
     token,
@@ -98,11 +93,12 @@ export async function createClaim(input: CreateClaimInput): Promise<Claim> {
     recipientName: input.recipientName,
     recipientEmail: input.recipientEmail ?? null,
     recipientCountry: input.recipientCountry,
-    amount: quote.destinationAmount,
+    amount: usdc,
     displayCurrency: input.displayCurrency,
     displayAmount: input.amount,
     asset: 'USDC',
     status: 'draft',
+    kycStatus: 'not_started',
     protectionType: input.protectionType,
     expiresAt: new Date(Date.now() + input.expirationDays * 86400000).toISOString(),
     createdAt: new Date().toISOString(),
@@ -166,6 +162,30 @@ export async function verifyRecipient(code: string): Promise<{ ok: boolean }> {
   return authAdapter.verifyOtp(code)
 }
 
+// --- KYC (required before a PIX cash-out) ----------------------------------
+
+export interface KycInput {
+  fullName: string
+  taxId: string // CPF or CNPJ
+  dateOfBirth: string
+}
+
+// Etherfuse requires an approved KYC record before settling to a bank/PIX key.
+// The mock approves any well-formed CPF/CNPJ and rejects the reserved all-zero id.
+export async function submitKyc(
+  input: KycInput,
+  onStep?: (step: number) => void,
+): Promise<{ status: KycStatus }> {
+  const steps = 3
+  for (let i = 1; i <= steps; i++) {
+    await delay(700)
+    onStep?.(i)
+  }
+  const digits = input.taxId.replace(/\D/g, '')
+  const valid = (digits.length === 11 || digits.length === 14) && !/^0+$/.test(digits)
+  return { status: valid ? 'approved' : 'rejected' }
+}
+
 // --- Wallet ----------------------------------------------------------------
 
 export async function createEmbeddedWallet(
@@ -214,19 +234,19 @@ export async function initiatePixWithdrawal(
     await delay(850)
     onStep?.(i)
   }
-  const { reference } = await mantecaAdapter.createPixOrder()
+  const { reference } = await etherfuseAdapter.createPixOrder()
   return {
     id: `pxo_${randomToken().toLowerCase()}`,
     claimId: 'clm_demo',
     cpf: input.cpf,
     pixKeyType: input.pixKeyType,
     maskedPixKey: input.pixKey,
-    amountBRL: quote.destinationAmount,
+    amountBRL: Number(quote.destinationAmount),
     amountUSDC: input.amountUSDC,
-    exchangeRate: quote.exchangeRate,
-    fee: quote.providerFee,
+    exchangeRate: Number(quote.exchangeRate),
+    fee: Number(quote.feeAmount),
     status: 'completed',
-    provider: 'Manteca',
+    provider: 'Etherfuse',
     reference,
     createdAt: new Date().toISOString(),
   }
@@ -235,26 +255,6 @@ export async function initiatePixWithdrawal(
 export async function getWithdrawalStatus(): Promise<PixPayout['status']> {
   await delay(400)
   return 'completed'
-}
-
-// --- Batch -----------------------------------------------------------------
-
-export async function createBatchClaims(
-  recipients: BatchRecipient[],
-  onProgress?: (done: number, total: number) => void,
-): Promise<{ token: string; recipient: string; amount: string }[]> {
-  const results: { token: string; recipient: string; amount: string }[] = []
-  for (let i = 0; i < recipients.length; i++) {
-    await delay(250)
-    const token = randomToken()
-    results.push({
-      token,
-      recipient: recipients[i].recipient_name,
-      amount: recipients[i].amount,
-    })
-    onProgress?.(i + 1, recipients.length)
-  }
-  return results
 }
 
 // Exposed for the developer playground so mocked responses feel real.

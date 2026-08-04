@@ -47,7 +47,7 @@ export function ClaimDetailLoader({ token }: { token: string }) {
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <ButtonLink href="/dashboard/claims" variant="outline">
+          <ButtonLink href="/dashboard" variant="outline">
             <ArrowLeft data-icon="inline-start" />
             Back to claims
           </ButtonLink>

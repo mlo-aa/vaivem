@@ -33,28 +33,41 @@ export const stellarAdapter = {
 }
 
 // ---------------------------------------------------------------------------
-// Manteca adapter — LATAM ramp / PIX settlement provider
+// Etherfuse adapter — USDC -> BRL PIX ramp (primary settlement provider)
 // ---------------------------------------------------------------------------
-export const mantecaAdapter = {
-  // TODO(manteca): call Manteca's quote + order endpoints with API credentials.
-  async getPixQuote(usdc: number): Promise<{ rate: number; fee: number; brl: number }> {
-    const rate = 5.045 - Math.random() * 0.03
-    const gross = usdc * rate
-    const fee = Math.round(gross * 0.014 * 100) / 100
-    return { rate: Math.round(rate * 1000) / 1000, fee, brl: Math.round((gross - fee) * 100) / 100 }
+//
+// Etherfuse quotes are returned as decimal strings to preserve precision, and
+// the provider fee is charged in the SOURCE asset (USDC), not in fiat.
+export interface EtherfuseQuote {
+  quoteId: string
+  midMarketRate: string // Etherfuse reference USD/BRL
+  nominalRate: string // rate before fee
+  effectiveRate: string // rate after the fee is applied
+  feeBps: string
+  feeAmountUsdc: string
+  requiresSwap: boolean
+}
+
+export const etherfuseAdapter = {
+  // TODO(etherfuse): call the Etherfuse quote endpoint with API credentials.
+  // Fee is 20 bps on the USDC notional; BRL is derived from the net USDC.
+  async getQuote(usdc: number): Promise<EtherfuseQuote> {
+    // Small jitter around the sandbox mid-market rate.
+    const mid = 5.13193556 + (Math.random() - 0.5) * 0.01
+    const feeBps = 20
+    const feeAmountUsdc = (usdc * feeBps) / 10000
+    return {
+      quoteId: `qt_${randomId(16)}`,
+      midMarketRate: mid.toFixed(8),
+      nominalRate: mid.toFixed(8),
+      effectiveRate: mid.toFixed(8), // fee taken from USDC, so BRL rate is unchanged
+      feeBps: String(feeBps),
+      feeAmountUsdc: feeAmountUsdc.toFixed(6),
+      requiresSwap: false,
+    }
   },
   async createPixOrder(): Promise<{ reference: string }> {
     return { reference: `pix_${randomId(6).toUpperCase()}` }
-  },
-}
-
-// ---------------------------------------------------------------------------
-// Etherfuse adapter — alternative stablecoin ramp / yield rails
-// ---------------------------------------------------------------------------
-export const etherfuseAdapter = {
-  // TODO(etherfuse): integrate Etherfuse ramp endpoints as a fallback provider.
-  async getQuote(usdc: number): Promise<{ rate: number; fee: number }> {
-    return { rate: 5.03, fee: Math.round(usdc * 0.012 * 100) / 100 }
   },
 }
 

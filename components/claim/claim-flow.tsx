@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowRight,
@@ -8,6 +8,7 @@ import {
   Banknote,
   Building2,
   Lock,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Wallet,
@@ -30,15 +31,46 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ProcessSteps } from "@/components/process-steps"
-import { formatBRL, formatDisplay, formatUSDC, maskEmail } from "@/lib/format"
-import { getPixQuote, initiatePixWithdrawal } from "@/lib/services"
+import { formatBRL, formatUSDC, formatDisplay, maskEmail } from "@/lib/format"
+import { getPixQuote, initiatePixWithdrawal, submitKyc } from "@/lib/services"
 import { saveClaim } from "@/lib/claim-store"
-import type { Claim, PixKeyType, Quote } from "@/lib/types"
+import type { Claim, KycStatus, PixKeyType, Quote } from "@/lib/types"
 
 type Rail = "pix" | "stellar"
-type Stage = "unlock" | "choose" | "cashout" | "processing" | "done"
+type Stage = "unlock" | "choose" | "kyc" | "cashout" | "processing" | "done"
 
 const DEMO_CODE = "482913"
+
+// PIX key validators keyed by type. Kept intentionally lightweight for the demo.
+function digitsOnly(v: string) {
+  return v.replace(/\D/g, "")
+}
+function validatePixKey(type: PixKeyType, key: string): string | null {
+  const v = key.trim()
+  if (!v) return "Enter your PIX key."
+  switch (type) {
+    case "cpf":
+      return digitsOnly(v).length === 11 ? null : "CPF must have 11 digits."
+    case "cnpj":
+      return digitsOnly(v).length === 14 ? null : "CNPJ must have 14 digits."
+    case "email":
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : "Enter a valid email PIX key."
+    case "phone":
+      return digitsOnly(v).length >= 10 ? null : "Enter a valid phone PIX key."
+    case "random":
+      return v.length >= 8 ? null : "Random keys are at least 8 characters."
+    default:
+      return null
+  }
+}
+
+const PIX_KEY_LABEL: Record<PixKeyType, string> = {
+  cpf: "CPF",
+  cnpj: "CNPJ",
+  email: "Email",
+  phone: "Phone",
+  random: "Random key",
+}
 
 export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
   const router = useRouter()
@@ -48,9 +80,16 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
   const [error, setError] = useState<string | null>(null)
   const [rail, setRail] = useState<Rail>("pix")
 
+  // KYC fields
+  const [kycStatus, setKycStatus] = useState<KycStatus>(initialClaim.kycStatus ?? "not_started")
+  const [kycName, setKycName] = useState(initialClaim.recipientName)
+  const [kycTaxId, setKycTaxId] = useState("")
+  const [kycDob, setKycDob] = useState("")
+  const [kycStep, setKycStep] = useState(0)
+  const [kycSubmitting, setKycSubmitting] = useState(false)
+
   // PIX fields
   const [fullName, setFullName] = useState(initialClaim.recipientName)
-  const [cpf, setCpf] = useState("")
   const [pixKeyType, setPixKeyType] = useState<PixKeyType>("cpf")
   const [pixKey, setPixKey] = useState("")
   // Stellar field
@@ -58,6 +97,7 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
 
   const [pixQuote, setPixQuote] = useState<Quote | null>(null)
   const [loadingQuote, setLoadingQuote] = useState(false)
+  const [secondsLeft, setSecondsLeft] = useState(0)
   const [processStep, setProcessStep] = useState(0)
 
   const senderLabel = "Aurora Studios"
@@ -70,22 +110,36 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
     [claim],
   )
 
-  // Fetch a live PIX quote when the recipient reaches cash-out with PIX selected.
+  const brlAmount = pixQuote ? Number(pixQuote.destinationAmount) : null
+
+  // Fetch (or refresh) a live PIX quote. Etherfuse quotes are valid 2 minutes.
+  const refreshQuote = useCallback(async () => {
+    setLoadingQuote(true)
+    const q = await getPixQuote(claim.amount)
+    setPixQuote(q)
+    setLoadingQuote(false)
+  }, [claim.amount])
+
+  // Load the first quote when the recipient reaches PIX cash-out.
   useEffect(() => {
-    let active = true
-    if (stage === "cashout" && rail === "pix" && !pixQuote) {
-      setLoadingQuote(true)
-      getPixQuote(claim.amount).then((q) => {
-        if (active) {
-          setPixQuote(q)
-          setLoadingQuote(false)
-        }
-      })
+    if (stage === "cashout" && rail === "pix" && !pixQuote && !loadingQuote) {
+      void refreshQuote()
     }
-    return () => {
-      active = false
+  }, [stage, rail, pixQuote, loadingQuote, refreshQuote])
+
+  // Drive the countdown off the quote's expiry and auto-refresh when it lapses.
+  useEffect(() => {
+    if (stage !== "cashout" || rail !== "pix" || !pixQuote) return
+    const tick = () => {
+      const diff = new Date(pixQuote.expiresAt).getTime() - Date.now()
+      const s = Math.max(0, Math.floor(diff / 1000))
+      setSecondsLeft(s)
+      if (s <= 0 && !loadingQuote) void refreshQuote()
     }
-  }, [stage, rail, pixQuote, claim.amount])
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [stage, rail, pixQuote, loadingQuote, refreshQuote])
 
   function handleUnlock() {
     setError(null)
@@ -96,19 +150,65 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
     setStage("choose")
   }
 
+  // PIX requires an approved KYC record before we can settle to a bank.
+  function handleContinueFromChoose() {
+    setError(null)
+    if (rail === "pix" && kycStatus !== "approved") {
+      setStage("kyc")
+    } else {
+      setStage("cashout")
+    }
+  }
+
+  async function handleSubmitKyc() {
+    setError(null)
+    if (kycName.trim().length < 2) {
+      setError("Enter your full legal name.")
+      return
+    }
+    const idLen = digitsOnly(kycTaxId).length
+    if (idLen !== 11 && idLen !== 14) {
+      setError("Enter a valid CPF (11 digits) or CNPJ (14 digits).")
+      return
+    }
+    if (!kycDob) {
+      setError("Enter your date of birth.")
+      return
+    }
+    setKycSubmitting(true)
+    setKycStep(0)
+    const { status } = await submitKyc(
+      { fullName: kycName, taxId: kycTaxId, dateOfBirth: kycDob },
+      (s) => setKycStep(s),
+    )
+    setKycSubmitting(false)
+    setKycStatus(status)
+    if (status === "approved") {
+      setClaim((c) => ({ ...c, kycStatus: "approved" }))
+      setStage("cashout")
+    } else {
+      setError("We couldn't verify that identity. Check the details and try again.")
+    }
+  }
+
   async function handleClaim() {
     setError(null)
     if (rail === "pix") {
-      if (pixKey.trim().length < 4) {
-        setError("Enter a valid PIX key.")
+      const keyError = validatePixKey(pixKeyType, pixKey)
+      if (keyError) {
+        setError(keyError)
         return
       }
-      if (!pixQuote) return
+      if (!pixQuote || secondsLeft <= 0) {
+        void refreshQuote()
+        setError("Your quote expired. We refreshed it — confirm the new amount.")
+        return
+      }
       setStage("processing")
       const payout = await initiatePixWithdrawal(
         {
           fullName,
-          cpf: cpf || "000.000.000-00",
+          cpf: kycTaxId || "000.000.000-00",
           pixKeyType,
           pixKey,
           amountUSDC: claim.amount,
@@ -169,7 +269,7 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
           <ShieldCheck />
           <AlertTitle>Need the funds?</AlertTitle>
           <AlertDescription>
-            Contact {senderLabel} and ask them to send you a new ClaimLink.
+            Contact {senderLabel} and ask them to send you a new claim link.
           </AlertDescription>
         </Alert>
       </StatusCard>
@@ -271,7 +371,7 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
             </Button>
             <p className="flex items-center gap-1.5 text-center text-xs text-muted-foreground">
               <ShieldCheck className="size-3.5" />
-              Secured by ClaimLink escrow on Stellar
+              Secured by Vaivém escrow on Stellar
             </p>
           </CardFooter>
         </Card>
@@ -304,11 +404,80 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
             </div>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" size="lg" onClick={() => setStage("cashout")}>
+            <Button className="w-full" size="lg" onClick={handleContinueFromChoose}>
               Continue
               <ArrowRight data-icon="inline-end" />
             </Button>
           </CardFooter>
+        </Card>
+      ) : null}
+
+      {stage === "kyc" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BadgeCheck className="size-4 text-brand" />
+              Verify your identity
+            </CardTitle>
+            <CardDescription>
+              Brazilian regulations require a quick identity check before a PIX
+              cash-out. This is a one-time step.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {kycSubmitting ? (
+              <ProcessSteps
+                current={kycStep}
+                steps={["Submitting details", "Checking against registry", "Approving payout"]}
+              />
+            ) : (
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="kyc-name">Full legal name</FieldLabel>
+                  <Input
+                    id="kyc-name"
+                    value={kycName}
+                    onChange={(e) => setKycName(e.target.value)}
+                    placeholder="As it appears on your ID"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="kyc-taxid">CPF or CNPJ</FieldLabel>
+                  <Input
+                    id="kyc-taxid"
+                    value={kycTaxId}
+                    onChange={(e) => setKycTaxId(e.target.value)}
+                    placeholder="000.000.000-00"
+                    inputMode="numeric"
+                  />
+                  <FieldDescription>Individuals use CPF; businesses use CNPJ.</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="kyc-dob">Date of birth</FieldLabel>
+                  <Input
+                    id="kyc-dob"
+                    type="date"
+                    value={kycDob}
+                    onChange={(e) => setKycDob(e.target.value)}
+                  />
+                </Field>
+              </FieldGroup>
+            )}
+            {error ? (
+              <p className="mt-3 text-center text-sm text-destructive">{error}</p>
+            ) : null}
+          </CardContent>
+          {!kycSubmitting ? (
+            <CardFooter className="flex-col gap-2">
+              <Button className="w-full" size="lg" onClick={handleSubmitKyc}>
+                Verify and continue
+                <ArrowRight data-icon="inline-end" />
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={() => { setError(null); setStage("choose") }}>
+                Back
+              </Button>
+            </CardFooter>
+          ) : null}
         </Card>
       ) : null}
 
@@ -335,6 +504,7 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
                       <SelectContent>
                         <SelectGroup>
                           <SelectItem value="cpf">CPF</SelectItem>
+                          <SelectItem value="cnpj">CNPJ</SelectItem>
                           <SelectItem value="email">Email</SelectItem>
                           <SelectItem value="phone">Phone</SelectItem>
                           <SelectItem value="random">Random key</SelectItem>
@@ -346,7 +516,13 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
                     <FieldLabel htmlFor="pix-key">PIX key</FieldLabel>
                     <Input
                       id="pix-key"
-                      placeholder={pixKeyType === "email" ? "you@email.com" : "Your PIX key"}
+                      placeholder={
+                        pixKeyType === "email"
+                          ? "you@email.com"
+                          : pixKeyType === "phone"
+                            ? "+55 11 90000-0000"
+                            : `Your ${PIX_KEY_LABEL[pixKeyType]}`
+                      }
                       value={pixKey}
                       onChange={(e) => setPixKey(e.target.value)}
                     />
@@ -371,24 +547,54 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
             </FieldGroup>
 
             <Separator className="my-4" />
-            <dl className="flex flex-col gap-2 text-sm">
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">You receive</dt>
-                <dd className="font-medium text-foreground">
-                  {rail === "stellar" ? (
-                    formatUSDC(claim.amount)
-                  ) : loadingQuote || !pixQuote ? (
-                    <Skeleton className="h-4 w-20" />
-                  ) : (
-                    formatBRL(pixQuote.destinationAmount)
-                  )}
-                </dd>
+            {rail === "stellar" ? (
+              <dl className="flex flex-col gap-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <dt className="text-muted-foreground">You receive</dt>
+                  <dd className="font-medium text-foreground">{formatUSDC(claim.amount)}</dd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <dt className="text-muted-foreground">Network fee</dt>
+                  <dd className="font-medium text-brand">Sponsored</dd>
+                </div>
+              </dl>
+            ) : loadingQuote || !pixQuote ? (
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-5 w-full" />
+                <Skeleton className="h-4 w-2/3" />
               </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">Fee</dt>
-                <dd className="font-medium text-brand">Paid by sender</dd>
-              </div>
-            </dl>
+            ) : (
+              <dl className="flex flex-col gap-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <dt className="text-muted-foreground">You receive</dt>
+                  <dd className="font-semibold text-foreground">{formatBRL(brlAmount ?? 0)}</dd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <dt className="text-muted-foreground">Etherfuse rate</dt>
+                  <dd className="tabular-nums text-foreground">
+                    1 USDC = {Number(pixQuote.exchangeRate).toFixed(4)} BRL
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <dt className="text-muted-foreground">
+                    Provider fee ({(Number(pixQuote.feeBps) / 100).toFixed(2)}%)
+                  </dt>
+                  <dd className="tabular-nums text-foreground">
+                    {formatUSDC(Number(pixQuote.feeAmount))}
+                  </dd>
+                </div>
+                <div className="mt-1 flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">
+                  <dt className="flex items-center gap-1.5 text-muted-foreground">
+                    <RefreshCw className={`size-3.5 ${loadingQuote ? "animate-spin" : ""}`} />
+                    Quote refreshes in
+                  </dt>
+                  <dd className="font-mono font-medium tabular-nums text-foreground">
+                    {String(Math.floor(secondsLeft / 60)).padStart(1, "0")}:
+                    {String(secondsLeft % 60).padStart(2, "0")}
+                  </dd>
+                </div>
+              </dl>
+            )}
             {error ? (
               <p className="mt-3 text-center text-sm text-destructive">{error}</p>
             ) : null}
@@ -404,8 +610,8 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
               Claim{" "}
               {rail === "stellar"
                 ? formatUSDC(claim.amount)
-                : pixQuote
-                  ? formatBRL(pixQuote.destinationAmount)
+                : brlAmount !== null
+                  ? formatBRL(brlAmount)
                   : localAmount}
             </Button>
             <Button
@@ -460,7 +666,7 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
             <CardDescription>
               {rail === "stellar"
                 ? `${formatUSDC(claim.amount)} is being sent to your Stellar wallet.`
-                : `${pixQuote ? formatBRL(pixQuote.destinationAmount) : localAmount} is landing in your account now.`}
+                : `${brlAmount !== null ? formatBRL(brlAmount) : localAmount} is landing in your account now.`}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
@@ -470,8 +676,8 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
                 <span className="font-medium text-foreground">
                   {rail === "stellar"
                     ? formatUSDC(claim.amount)
-                    : pixQuote
-                      ? formatBRL(pixQuote.destinationAmount)
+                    : brlAmount !== null
+                      ? formatBRL(brlAmount)
                       : localAmount}
                 </span>
               </div>
@@ -498,23 +704,14 @@ export function ClaimFlow({ claim: initialClaim }: { claim: Claim }) {
               <Building2 />
               <AlertTitle>Want to send money too?</AlertTitle>
               <AlertDescription>
-                Create your own ClaimLink and pay anyone with just a link.
+                Create your own claim link and pay anyone with just a link.
               </AlertDescription>
             </Alert>
           </CardContent>
           <CardFooter className="flex-col gap-2">
-            {rail === "stellar" ? (
-              <Button className="w-full" size="lg" onClick={() => router.push("/wallet")}>
-                <Wallet data-icon="inline-start" />
-                Open my wallet
-              </Button>
-            ) : (
-              <Button className="w-full" size="lg" onClick={() => router.push("/signup")}>
-                Create a free ClaimLink account
-              </Button>
-            )}
-            <Button variant="ghost" className="w-full" onClick={() => router.push("/")}>
-              Done
+            <Button className="w-full" size="lg" onClick={() => router.push("/")}>
+              Explore Vaivém
+              <ArrowRight data-icon="inline-end" />
             </Button>
           </CardFooter>
         </Card>

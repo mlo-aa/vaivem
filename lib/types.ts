@@ -143,13 +143,4 @@ export interface WalletActivity {
   timestamp: string
 }
 
-export interface BatchRecipient {
-  recipient_name: string
-  recipient_email: string
-  amount: string
-  currency: string
-  country: string
-  note?: string
-  expiration_days?: string
-  errors?: string[]
-}
+
