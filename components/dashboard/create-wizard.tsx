@@ -40,6 +40,7 @@ import {
   type CreateClaimInput,
 } from '@/lib/services'
 import { formatDisplay, formatUSDC } from '@/lib/format'
+import { saveClaim } from '@/lib/claim-store'
 import type { Claim, DisplayCurrency, ProtectionType, Quote } from '@/lib/types'
 
 const PURPOSES = [
@@ -175,7 +176,10 @@ export function CreateWizard() {
     }
     const created = await createClaim(input)
     const funded = await fundClaim(created, (s) => setFundStep(s))
-    setClaim(funded)
+    // Link is published and awaiting the recipient -> shared.
+    const shared: Claim = { ...funded, status: 'shared' }
+    setClaim(shared)
+    saveClaim(shared)
     setStage('done')
   }
 

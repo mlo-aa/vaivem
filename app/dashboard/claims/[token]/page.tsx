@@ -1,7 +1,5 @@
-import { notFound } from 'next/navigation'
-import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
-import { ClaimDetail } from '@/components/dashboard/claim-detail'
-import { claims } from '@/lib/mock-data'
+import { DashboardTopbar } from "@/components/dashboard/dashboard-topbar"
+import { ClaimDetailLoader } from "@/components/dashboard/claim-detail-loader"
 
 export default async function ClaimDetailPage({
   params,
@@ -9,14 +7,12 @@ export default async function ClaimDetailPage({
   params: Promise<{ token: string }>
 }) {
   const { token } = await params
-  const claim = claims.find((c) => c.token.toLowerCase() === token.toLowerCase())
-  if (!claim) notFound()
 
   return (
     <>
       <DashboardTopbar title="Claim details" />
       <main className="flex-1 p-4 sm:p-6">
-        <ClaimDetail claim={claim} />
+        <ClaimDetailLoader token={token} />
       </main>
     </>
   )

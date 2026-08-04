@@ -18,7 +18,7 @@ export function StatusBadge({
   status: ClaimStatus
   className?: string
 }) {
-  const meta = STATUS_META[status]
+  const meta = STATUS_META[status] ?? { label: status, tone: 'muted' }
   return (
     <span
       className={cn(
