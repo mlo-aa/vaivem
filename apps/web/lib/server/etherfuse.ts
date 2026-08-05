@@ -102,14 +102,17 @@ export function createQuote(params: {
   targetAsset: string
   sourceAmount: string
   customerId?: string
+  /** When set, used as quoteId (and later as orderId). Otherwise a UUID is generated. */
+  quoteId?: string
 }) {
   if (!ORG_ID && !params.customerId) {
     throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
   }
+  const quoteId = params.quoteId ?? crypto.randomUUID()
   return request<RawQuote>("/ramp/quote", {
     method: "POST",
     body: JSON.stringify({
-      quoteId: crypto.randomUUID(),
+      quoteId,
       customerId: params.customerId ?? ORG_ID,
       blockchain: "stellar",
       quoteAssets: {
@@ -120,4 +123,67 @@ export function createQuote(params: {
       sourceAmount: params.sourceAmount,
     }),
   })
+}
+
+export interface OfframpOrderResult {
+  offramp: {
+    orderId: string
+    withdrawAnchorAccount: string
+    withdrawMemo: string
+    withdrawMemoType: "hash" | string
+  }
+}
+
+/**
+ * Creates an offramp order. orderId MUST equal quoteId (verified against sandbox).
+ * Field is `publicKey` — not `walletAddress`.
+ */
+export function createOrder(params: {
+  quoteId: string
+  bankAccountId: string
+  publicKey: string
+  customerId?: string
+  useAnchor?: boolean
+}) {
+  if (!ORG_ID && !params.customerId) {
+    throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
+  }
+  return request<OfframpOrderResult>("/ramp/order", {
+    method: "POST",
+    body: JSON.stringify({
+      orderId: params.quoteId,
+      quoteId: params.quoteId,
+      customerId: params.customerId ?? ORG_ID,
+      bankAccountId: params.bankAccountId,
+      publicKey: params.publicKey,
+      useAnchor: params.useAnchor ?? true,
+    }),
+  })
+}
+
+export interface RampOrderStatus {
+  orderId?: string
+  status: string
+  [key: string]: unknown
+}
+
+/** Poll until status === "completed" (caller loops). */
+export function getOrder(orderId: string) {
+  return request<RampOrderStatus>(`/ramp/order/${encodeURIComponent(orderId)}`)
+}
+
+export function getEtherfuseOrgId(): string | undefined {
+  return ORG_ID
+}
+
+export function getUsdcAssetId(): string {
+  return process.env.ETHERFUSE_USDC_ASSET ?? SANDBOX_ASSETS.USDC
+}
+
+export function requireBankAccountId(): string {
+  const id = process.env.ETHERFUSE_BRL_BANK_ACCOUNT_ID
+  if (!id) {
+    throw new EtherfuseError("ETHERFUSE_BRL_BANK_ACCOUNT_ID no configurada", 500)
+  }
+  return id
 }

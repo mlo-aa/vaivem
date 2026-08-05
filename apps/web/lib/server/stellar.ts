@@ -18,6 +18,7 @@ import {
   Claimant,
   Transaction,
   FeeBumpTransaction,
+  Memo,
 } from "@stellar/stellar-sdk"
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org"
@@ -81,6 +82,58 @@ function getSponsorKeypair() {
 
 function getUsdcAsset() {
   return new Asset("USDC", getConfig().usdcIssuer)
+}
+
+/** Etherfuse-issued USDC (sandbox circle issuer), not self-issued test USDC. */
+function getEtherfuseUsdcAsset() {
+  const raw =
+    process.env.ETHERFUSE_USDC_ASSET ??
+    "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+  const [code, issuer] = raw.includes(":") ? raw.split(":") : ["USDC", raw]
+  if (!issuer) {
+    throw new StellarError("ETHERFUSE_USDC_ASSET must be CODE:ISSUER or an issuer pubkey")
+  }
+  return new Asset(code, issuer)
+}
+
+export function getSponsorPublicKey(): string {
+  return getSponsorKeypair().publicKey()
+}
+
+/**
+ * Pay the Etherfuse withdraw anchor with an exact hash memo.
+ * Memo must be Memo.hash(Buffer.from(withdrawMemo, "base64")) — wrong memo
+ * causes Etherfuse to auto-refund.
+ */
+export async function payAnchor(
+  destination: string,
+  memoBase64: string,
+  amount: string,
+): Promise<{ hash: string }> {
+  const sponsor = getSponsorKeypair()
+  const asset = getEtherfuseUsdcAsset()
+  const server = getServer()
+  const memo = Memo.hash(Buffer.from(memoBase64, "base64"))
+
+  const acc = await server.loadAccount(sponsor.publicKey())
+  const tx = new TransactionBuilder(acc, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(
+      Operation.payment({
+        destination,
+        asset,
+        amount: String(amount),
+      }),
+    )
+    .addMemo(memo)
+    .setTimeout(120)
+    .build()
+
+  tx.sign(sponsor)
+  const res = await submitTransaction(tx, "payAnchor")
+  return { hash: res.hash }
 }
 
 function extractResultCodes(err: unknown): StellarError["resultCodes"] | undefined {

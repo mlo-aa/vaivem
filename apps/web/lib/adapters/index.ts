@@ -107,9 +107,20 @@ export const etherfuseAdapter = {
     return res.json()
   },
 
-  // TODO(etherfuse): crear la orden real de off-ramp con useAnchor: true.
-  async createPixOrder(): Promise<{ reference: string }> {
-    return { reference: `pix_${randomId(6).toUpperCase()}` }
+  /**
+   * Live offramp: quote → order → Stellar pay-to-anchor (server-side).
+   * Returns Etherfuse orderId as `reference`. Poll /api/payouts/[orderId] for completion.
+   */
+  async createPixOrder(amountUSDC: number): Promise<{ reference: string }> {
+    const base = process.env.NEXT_PUBLIC_VAIVEM_API_BASE ?? ""
+    const res = await fetch(`${base}/api/payouts/pix`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: amountUSDC }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error ?? "pix order failed")
+    return { reference: data.orderId as string }
   },
 }
 

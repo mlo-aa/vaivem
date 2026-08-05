@@ -222,7 +222,7 @@ export async function initiatePixWithdrawal(
     await delay(850)
     onStep?.(i)
   }
-  const { reference } = await etherfuseAdapter.createPixOrder()
+  const { reference } = await etherfuseAdapter.createPixOrder(input.amountUSDC)
   return {
     id: `pxo_${randomToken().toLowerCase()}`,
     claimId: 'clm_demo',
