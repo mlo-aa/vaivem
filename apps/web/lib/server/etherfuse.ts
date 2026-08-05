@@ -172,6 +172,27 @@ export function getOrder(orderId: string) {
   return request<RampOrderStatus>(`/ramp/order/${encodeURIComponent(orderId)}`)
 }
 
+/**
+ * Turns an upstream 4xx into something a user can act on.
+ * Etherfuse often answers with no body, in which case `request` only knows the status.
+ */
+export function describeUpstreamError(
+  status: number,
+  providerMessage: string,
+  amountUsdc?: number,
+): string {
+  if (status === 401 || status === 403) {
+    return "The payment provider rejected our credentials. Check the Etherfuse API key."
+  }
+  const bare = !providerMessage.trim() || /^Etherfuse \d+$/.test(providerMessage.trim())
+  if (!bare) return providerMessage
+  if (status === 424) {
+    const amount = amountUsdc != null ? `${amountUsdc.toFixed(2)} USDC` : "this amount"
+    return `The payment provider couldn't quote ${amount}. Try a different amount — the supported minimum is 1.00 USDC.`
+  }
+  return `The payment provider rejected this request (${status}).`
+}
+
 export function getEtherfuseOrgId(): string | undefined {
   return ORG_ID
 }

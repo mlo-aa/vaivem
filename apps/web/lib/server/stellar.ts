@@ -37,6 +37,71 @@ export class StellarError extends Error {
   }
 }
 
+export type StellarFailureCode =
+  | "insufficient_balance"
+  | "no_trustline"
+  | "no_destination"
+  | "stale_sequence"
+  | "submit_timeout"
+  | "submit_failed"
+
+/**
+ * Horizon result codes → plain language.
+ *
+ * Wording matters: the kit classifies a failed payout from the message it gets
+ * back, so these must not contain "already", "expir" or "funded", which map to
+ * unrelated failure screens.
+ */
+export function describeStellarFailure(err: unknown): {
+  code: StellarFailureCode
+  message: string
+} {
+  const raw = err instanceof Error ? err.message : String(err)
+  const codes = err instanceof StellarError ? err.resultCodes : undefined
+  const haystack = [codes?.transaction ?? "", ...(codes?.operations ?? []), raw]
+    .join(" ")
+    .toLowerCase()
+
+  if (haystack.includes("op_underfunded")) {
+    return {
+      code: "insufficient_balance",
+      message:
+        "The sender wallet has insufficient Etherfuse-issued USDC to cover this payout. Top up the sponsor wallet and try again.",
+    }
+  }
+  if (haystack.includes("op_no_trust")) {
+    return {
+      code: "no_trustline",
+      message:
+        "The destination account has no trustline for this USDC asset, so it cannot receive the payout.",
+    }
+  }
+  if (haystack.includes("op_no_destination")) {
+    return {
+      code: "no_destination",
+      message: "The payout destination account does not exist on the network.",
+    }
+  }
+  if (haystack.includes("tx_bad_seq")) {
+    return {
+      code: "stale_sequence",
+      message:
+        "The payment was built on a stale account sequence and was not applied. Nothing was sent — try again.",
+    }
+  }
+  if (haystack.includes("tx_too_late")) {
+    return {
+      code: "submit_timeout",
+      message:
+        "The payment timed out before reaching the network. Nothing was sent — try again.",
+    }
+  }
+  return {
+    code: "submit_failed",
+    message: raw || "The payment could not be submitted to the network.",
+  }
+}
+
 export interface AccountBalance {
   asset: string
   balance: string
@@ -307,6 +372,52 @@ export async function claimBalance(
   bump.sign(sponsor)
 
   const res = await submitTransaction(bump, "claimBalance")
+  return { hash: res.hash }
+}
+
+/**
+ * Non-custodial Stellar path: claim the claimable balance and immediately
+ * forward USDC to the recipient's own address in the same fee-bumped tx.
+ * After this, delete the hosted secret — we must not retain a key that
+ * controls funds the recipient owns.
+ */
+export async function claimAndForward(
+  balanceId: string,
+  recipientSecret: string,
+  destinationPublicKey: string,
+  amount: string,
+): Promise<{ hash: string }> {
+  const sponsor = getSponsorKeypair()
+  const recipient = Keypair.fromSecret(recipientSecret)
+  const USDC = getUsdcAsset()
+  const server = getServer()
+
+  const acc = await server.loadAccount(recipient.publicKey())
+  const inner = new TransactionBuilder(acc, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(Operation.claimClaimableBalance({ balanceId }))
+    .addOperation(
+      Operation.payment({
+        destination: destinationPublicKey,
+        asset: USDC,
+        amount: String(amount),
+      }),
+    )
+    .setTimeout(120)
+    .build()
+  inner.sign(recipient)
+
+  const bump = TransactionBuilder.buildFeeBumpTransaction(
+    sponsor,
+    (Number(BASE_FEE) * 3).toString(),
+    inner,
+    NETWORK_PASSPHRASE,
+  )
+  bump.sign(sponsor)
+
+  const res = await submitTransaction(bump, "claimAndForward")
   return { hash: res.hash }
 }
 

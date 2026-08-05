@@ -1,13 +1,15 @@
 import type {
   Claim,
+  ClaimStatus,
   DisplayCurrency,
   KycStatus,
   PixPayout,
   Quote,
   Wallet,
-} from './types'
-import { claims as seedClaims, currentOrg, currentUser } from './mock-data'
-import { USD_TO_BRL } from './format'
+} from "./types"
+import { currentOrg, currentUser } from "./mock-data"
+import { USD_TO_BRL } from "./format"
+import { isBelowMinimum, minAmountMessage } from "./limits"
 import {
   authAdapter,
   etherfuseAdapter,
@@ -15,22 +17,26 @@ import {
   randomToken,
   randomTxHash,
   stellarAdapter,
-} from './adapters'
+} from "./adapters"
 
-// Quote lifetime enforced by Etherfuse: exactly 2 minutes.
 export const QUOTE_TTL_MS = 120_000
 
-// Simulated network latency so loading states are exercised in the demo.
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+function apiBase() {
+  return process.env.NEXT_PUBLIC_VAIVEM_API_BASE ?? ""
+}
 
 export interface CreateClaimInput {
   amount: number
   displayCurrency: DisplayCurrency
+  /** Precomputed USDC to lock — must match the wizard display. */
+  fundingUsdc?: number
   recipientCountry: string
   purpose: string
   reference?: string
   message?: string
-  protectionType: 'public' | 'email' | 'code'
+  protectionType: "public" | "email" | "code"
   recipientName: string
   recipientEmail?: string
   recipientPhone?: string
@@ -40,42 +46,112 @@ export interface CreateClaimInput {
   allowPix: boolean
 }
 
-// --- Quoting ---------------------------------------------------------------
+/** API list/detail row → Claim UI model */
+export function mapApiClaim(row: Record<string, unknown>): Claim {
+  const token = String(row.token)
+  const amount = Number(row.amount)
+  const displayAmount = Number(row.displayAmount ?? amount)
+  const displayCurrency = (row.displayCurrency === "USD" ? "USD" : "BRL") as DisplayCurrency
+  return {
+    id: `clm_${token}`,
+    token,
+    senderId: currentUser.id,
+    organizationId: currentOrg.id,
+    recipientName: String(row.recipientName ?? ""),
+    recipientEmail: row.recipientEmail != null ? String(row.recipientEmail) : null,
+    recipientCountry: String(row.country ?? "BR"),
+    amount,
+    displayCurrency,
+    displayAmount,
+    asset: "USDC",
+    status: (row.status as ClaimStatus) ?? "shared",
+    kycStatus: "not_started",
+    protectionType: (row.protectionType as Claim["protectionType"]) ?? "public",
+    expiresAt: String(
+      row.expiresAt ?? new Date(Number(row.deadline) * 1000).toISOString(),
+    ),
+    createdAt: String(row.createdAt ?? new Date().toISOString()),
+    claimedAt: row.claimedAt != null ? String(row.claimedAt) : null,
+    payoutMethod: (row.payoutMethod as Claim["payoutMethod"]) ?? null,
+    message: row.message != null ? String(row.message) : null,
+    purpose: String(row.purpose ?? "Payout"),
+    reference: row.reference != null ? String(row.reference) : null,
+    stellarTransactionHash: row.txHash != null ? String(row.txHash) : null,
+    withdrawalReference: row.payoutOrderId != null ? String(row.payoutOrderId) : null,
+  }
+}
 
-// Convert a sender's display amount (BRL or USD) into the USDC to lock.
-// Used by the create flow; returns a plain number since it isn't a settlement.
 export async function getFundingUsdc(
   amount: number,
   displayCurrency: DisplayCurrency,
 ): Promise<number> {
   await delay(400)
-  const rate = displayCurrency === 'BRL' ? USD_TO_BRL : 1
-  const usdc = displayCurrency === 'BRL' ? amount / rate : amount
+  const rate = displayCurrency === "BRL" ? USD_TO_BRL : 1
+  const usdc = displayCurrency === "BRL" ? amount / rate : amount
   return Math.round(usdc * 100) / 100
 }
 
-// Etherfuse USDC -> BRL settlement quote. All monetary values are strings and
-// the provider fee is denominated in USDC (the source asset). Valid 2 minutes.
 export async function getPixQuote(usdc: number, country: "BR" | "MX" = "BR"): Promise<Quote> {
-  const base = process.env.NEXT_PUBLIC_VAIVEM_API_BASE ?? ""
-  const res = await fetch(`${base}/api/quote`, {
+  if (isBelowMinimum(usdc)) {
+    throw new Error(minAmountMessage(country === "MX" ? "MXN" : "BRL"))
+  }
+  const res = await fetch(`${apiBase()}/api/quote`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ amount: usdc, country }),
   })
-  if (!res.ok) throw new Error("Quote request failed")
-  return res.json()
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new Error(data?.message ?? data?.error ?? "Quote request failed")
+  }
+  return data as Quote
 }
 
-// --- Claims ----------------------------------------------------------------
+/**
+ * Funds on-chain + persists server-side. USDC amount must match what the wizard displayed.
+ */
+export async function createClaim(
+  input: CreateClaimInput,
+  onStep?: (step: number) => void,
+): Promise<Claim> {
+  const usdc =
+    input.fundingUsdc != null
+      ? Math.round(input.fundingUsdc * 100) / 100
+      : await getFundingUsdc(input.amount, input.displayCurrency)
+  onStep?.(1)
+  onStep?.(2)
 
-export async function createClaim(input: CreateClaimInput): Promise<Claim> {
-  await delay(700)
-  const token = randomToken()
-  const usdc = await getFundingUsdc(input.amount, input.displayCurrency)
-  const claim: Claim = {
-    id: `clm_${token}`,
-    token,
+  const res = await fetch(`${apiBase()}/api/claims/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount: usdc,
+      displayAmount: input.amount,
+      displayCurrency: input.displayCurrency,
+      country: input.recipientCountry,
+      senderName: currentOrg.name,
+      recipientName: input.recipientName,
+      recipientEmail: input.recipientEmail ?? null,
+      message: input.message ?? null,
+      protectionType: input.protectionType,
+      accessCode: input.accessCode ?? null,
+      expirationDays: input.expirationDays,
+      purpose: input.purpose,
+      reference: input.reference ?? null,
+      // The server only enforces the provider minimum when PIX is on offer.
+      allowPix: input.allowPix,
+      allowStellar: input.allowStellar,
+    }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.message ?? data.error ?? "create claim failed")
+
+  onStep?.(3)
+  onStep?.(4)
+
+  return {
+    id: `clm_${data.token}`,
+    token: String(data.token),
     senderId: currentUser.id,
     organizationId: currentOrg.id,
     recipientName: input.recipientName,
@@ -84,64 +160,126 @@ export async function createClaim(input: CreateClaimInput): Promise<Claim> {
     amount: usdc,
     displayCurrency: input.displayCurrency,
     displayAmount: input.amount,
-    asset: 'USDC',
-    status: 'draft',
-    kycStatus: 'not_started',
+    asset: "USDC",
+    status: "shared",
+    kycStatus: "not_started",
     protectionType: input.protectionType,
-    expiresAt: new Date(Date.now() + input.expirationDays * 86400000).toISOString(),
+    expiresAt: new Date(Number(data.deadline) * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     claimedAt: null,
     payoutMethod: null,
     message: input.message ?? null,
     purpose: input.purpose,
     reference: input.reference ?? null,
-    stellarTransactionHash: null,
+    stellarTransactionHash: data.hash ? String(data.hash) : null,
     withdrawalReference: null,
   }
-  return claim
 }
 
-// Simulate funding a claim on Stellar. Emits progress via a callback.
+/** @deprecated Prefer createClaim which funds + stores in one call. */
 export async function fundClaim(
   claim: Claim,
   onStep?: (step: number) => void,
 ): Promise<Claim> {
   const steps = 4
   for (let i = 1; i <= steps; i++) {
-    await delay(800)
+    await delay(400)
     onStep?.(i)
   }
-  const { hash } = await stellarAdapter.lockFunds()
-  return { ...claim, status: 'funded', stellarTransactionHash: hash }
+  const { hash } = await stellarAdapter.lockFunds(claim.amount.toFixed(2))
+  return { ...claim, status: "funded", stellarTransactionHash: hash }
+}
+
+export async function listClaims(): Promise<Claim[]> {
+  const res = await fetch(`${apiBase()}/api/claims`)
+  if (!res.ok) throw new Error("Failed to list claims")
+  const data = await res.json()
+  return (data.claims as Record<string, unknown>[]).map(mapApiClaim)
 }
 
 export async function getClaim(token: string): Promise<Claim | null> {
-  await delay(500)
-  const found = seedClaims.find((c) => c.token.toLowerCase() === token.toLowerCase())
-  return found ?? null
+  const res = await fetch(
+    `${apiBase()}/api/claims/by-token/${encodeURIComponent(token)}`,
+  )
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error("Failed to load claim")
+  const pub = await res.json()
+
+  // Public endpoint omits dashboard fields — merge with list when available.
+  try {
+    const list = await listClaims()
+    const full = list.find((c) => c.token.toUpperCase() === token.toUpperCase())
+    if (full) return full
+  } catch {
+    // fall through to public shape
+  }
+
+  return mapApiClaim({
+    ...pub,
+    purpose: "Payout",
+    recipientEmail: null,
+    createdAt: new Date(Number(pub.deadline) * 1000 - 7 * 86400000).toISOString(),
+    claimedAt: null,
+    payoutMethod: null,
+    txHash: null,
+    payoutOrderId: null,
+  })
+}
+
+/** Public recipient view — never includes secrets. */
+export async function getPublicClaim(token: string): Promise<{
+  token: string
+  senderName: string
+  amount: number
+  country: string
+  message: string | null
+  status: ClaimStatus
+  deadline: number
+  protectionType: Claim["protectionType"]
+  requiresCode: boolean
+  expiresAt?: string
+  recipientName?: string
+} | null> {
+  const res = await fetch(
+    `${apiBase()}/api/claims/by-token/${encodeURIComponent(token)}`,
+  )
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error("Failed to load claim")
+  return res.json()
+}
+
+async function patchClaim(
+  token: string,
+  body: { action: string; days?: number },
+): Promise<Claim> {
+  const res = await fetch(
+    `${apiBase()}/api/claims/by-token/${encodeURIComponent(token)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  )
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.message ?? data.error ?? "update failed")
+  return mapApiClaim(data.claim as Record<string, unknown>)
 }
 
 export async function cancelClaim(claim: Claim): Promise<Claim> {
-  await delay(600)
-  return { ...claim, status: 'cancelled' }
+  return patchClaim(claim.token, { action: "cancel" })
 }
 
 export async function refundClaim(claim: Claim): Promise<Claim> {
-  await delay(700)
-  const { hash } = await stellarAdapter.refundFunds()
-  return { ...claim, status: 'refunded', stellarTransactionHash: hash }
+  // Server reads balanceId from the stored record — not lastBalanceId in memory.
+  return patchClaim(claim.token, { action: "refund" })
 }
 
 export async function extendExpiration(claim: Claim, days: number): Promise<Claim> {
-  await delay(500)
-  return { ...claim, expiresAt: new Date(Date.now() + days * 86400000).toISOString() }
+  return patchClaim(claim.token, { action: "extend", days })
 }
-
-// --- Recipient verification ------------------------------------------------
 
 export async function sendVerificationCode(): Promise<{ sent: true }> {
   await delay(700)
-  // TODO(auth): trigger a real one-time code via email/SMS provider.
   return { sent: true }
 }
 
@@ -150,16 +288,12 @@ export async function verifyRecipient(code: string): Promise<{ ok: boolean }> {
   return authAdapter.verifyOtp(code)
 }
 
-// --- KYC (required before a PIX cash-out) ----------------------------------
-
 export interface KycInput {
   fullName: string
-  taxId: string // CPF or CNPJ
+  taxId: string
   dateOfBirth: string
 }
 
-// Etherfuse requires an approved KYC record before settling to a bank/PIX key.
-// The mock approves any well-formed CPF/CNPJ and rejects the reserved all-zero id.
 export async function submitKyc(
   input: KycInput,
   onStep?: (step: number) => void,
@@ -169,12 +303,10 @@ export async function submitKyc(
     await delay(700)
     onStep?.(i)
   }
-  const digits = input.taxId.replace(/\D/g, '')
+  const digits = input.taxId.replace(/\D/g, "")
   const valid = (digits.length === 11 || digits.length === 14) && !/^0+$/.test(digits)
-  return { status: valid ? 'approved' : 'rejected' }
+  return { status: valid ? "approved" : "rejected" }
 }
-
-// --- Wallet ----------------------------------------------------------------
 
 export async function createEmbeddedWallet(
   onStep?: (step: number) => void,
@@ -187,7 +319,7 @@ export async function createEmbeddedWallet(
   const { address } = await stellarAdapter.createSponsoredAccount()
   return {
     id: `wal_${randomToken().toLowerCase()}`,
-    userId: 'usr_recipient',
+    userId: "usr_recipient",
     stellarAddress: address || randomStellarAddress(),
     usdcBalance: 0,
     sponsored: true,
@@ -197,17 +329,14 @@ export async function createEmbeddedWallet(
 
 export async function claimToWallet(wallet: Wallet, amount: number): Promise<Wallet> {
   await delay(800)
-  const { hash } = await stellarAdapter.sendPayment()
-  void hash
+  void amount
   return { ...wallet, usdcBalance: wallet.usdcBalance + amount }
 }
-
-// --- PIX withdrawal --------------------------------------------------------
 
 export interface PixWithdrawalInput {
   fullName: string
   cpf: string
-  pixKeyType: PixPayout['pixKeyType']
+  pixKeyType: PixPayout["pixKeyType"]
   pixKey: string
   amountUSDC: number
 }
@@ -225,7 +354,7 @@ export async function initiatePixWithdrawal(
   const { reference } = await etherfuseAdapter.createPixOrder(input.amountUSDC)
   return {
     id: `pxo_${randomToken().toLowerCase()}`,
-    claimId: 'clm_demo',
+    claimId: "clm_demo",
     cpf: input.cpf,
     pixKeyType: input.pixKeyType,
     maskedPixKey: input.pixKey,
@@ -233,26 +362,25 @@ export async function initiatePixWithdrawal(
     amountUSDC: input.amountUSDC,
     exchangeRate: Number(quote.exchangeRate),
     fee: Number(quote.feeAmount),
-    status: 'completed',
-    provider: 'Etherfuse',
+    status: "completed",
+    provider: "Etherfuse",
     reference,
     createdAt: new Date().toISOString(),
   }
 }
 
-export async function getWithdrawalStatus(): Promise<PixPayout['status']> {
+export async function getWithdrawalStatus(): Promise<PixPayout["status"]> {
   await delay(400)
-  return 'completed'
+  return "completed"
 }
 
-// Exposed for the developer playground so mocked responses feel real.
 export function mockApiResponse(amount: string) {
   const token = randomToken()
   return {
     id: `clm_${token}`,
     token,
-    status: 'funded',
-    amount: { asset: 'USDC', value: amount },
+    status: "funded",
+    amount: { asset: "USDC", value: amount },
     claimUrl: `https://vaivem.app/br/${token}`,
     stellarTransactionHash: randomTxHash(),
     createdAt: new Date().toISOString(),

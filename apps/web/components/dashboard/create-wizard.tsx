@@ -35,13 +35,12 @@ import { ProcessSteps } from '@/components/process-steps'
 import { cn } from '@/lib/utils'
 import {
   createClaim,
-  fundClaim,
   getFundingUsdc,
   type CreateClaimInput,
 } from '@/lib/services'
-import { formatDisplay, formatUSDC } from '@/lib/format'
-import { saveClaim } from '@/lib/claim-store'
-  import type { Claim, DisplayCurrency, ProtectionType } from '@/lib/types'
+import { formatDisplay, formatUSDC, USD_TO_BRL } from '@/lib/format'
+import { MIN_AMOUNT_USDC } from '@/lib/limits'
+import type { Claim, DisplayCurrency, ProtectionType } from '@/lib/types'
 
 const PURPOSES = [
   'Hackathon prize',
@@ -115,6 +114,20 @@ export function CreateWizard() {
       ? numericAmount / fundingUsdc
       : 1
 
+  // Checked synchronously so nothing is sent for an amount the provider rejects.
+  // Only PIX goes through Etherfuse, so a Stellar-only claim can be any amount.
+  const rate = currency === 'BRL' ? USD_TO_BRL : 1
+  const usdcForAmount = numericAmount / rate
+  const belowMinimum = allowPix && numericAmount > 0 && usdcForAmount < MIN_AMOUNT_USDC
+  // Rounded up so converting the shown value back never lands below the minimum.
+  const minDisplayAmount = Math.ceil(MIN_AMOUNT_USDC * rate * 100) / 100
+  const minimumMessage = `Minimum payout is ${formatUSDC(
+    MIN_AMOUNT_USDC,
+  )} — about ${formatDisplay(
+    minDisplayAmount,
+    currency,
+  )} at the current rate. Smaller amounts are rejected by the PIX provider.`
+
   // Recompute the USDC to lock whenever amount or currency changes (debounced).
   useEffect(() => {
     if (numericAmount <= 0) {
@@ -132,6 +145,7 @@ export function CreateWizard() {
 
   function validateStep1() {
     if (numericAmount <= 0) return 'Enter an amount greater than zero.'
+    if (belowMinimum) return minimumMessage
     if (numericAmount > 100000) return 'Amount exceeds the demo limit of 100,000.'
     if (!allowStellar && !allowPix) return 'Enable at least one payout method.'
     return null
@@ -163,10 +177,17 @@ export function CreateWizard() {
 
   async function handleFund() {
     setError(null)
+    if (belowMinimum) {
+      setError(minimumMessage)
+      setStep(1)
+      return
+    }
     setStage('funding')
+    setFundStep(0)
     const input: CreateClaimInput = {
       amount: numericAmount,
       displayCurrency: currency,
+      fundingUsdc: fundingUsdc ?? undefined,
       recipientCountry: 'BR',
       purpose,
       reference: reference || undefined,
@@ -179,13 +200,18 @@ export function CreateWizard() {
       allowStellar,
       allowPix,
     }
-    const created = await createClaim(input)
-    const funded = await fundClaim(created, (s) => setFundStep(s))
-    // Link is published and awaiting the recipient -> shared.
-    const shared: Claim = { ...funded, status: 'shared' }
-    setClaim(shared)
-    saveClaim(shared)
-    setStage('done')
+    try {
+      if (fundingUsdc == null || fundingUsdc <= 0) {
+        throw new Error('USDC amount not ready — wait for the quote to finish.')
+      }
+      // createClaim funds the exact USDC shown (fundingUsdc) and persists server-side.
+      const shared = await createClaim(input, (s) => setFundStep(s))
+      setClaim(shared)
+      setStage('done')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create claim')
+      setStage('form')
+    }
   }
 
   if (stage === 'funding') {
@@ -275,6 +301,9 @@ export function CreateWizard() {
                       <ToggleGroupItem value="USD">USD</ToggleGroupItem>
                     </ToggleGroup>
                   </div>
+                  {belowMinimum && (
+                    <p className="text-sm text-destructive">{minimumMessage}</p>
+                  )}
                   <FieldDescription>
                     Recipients receive USDC and can cash out in local currency.
                   </FieldDescription>
@@ -472,7 +501,7 @@ export function CreateWizard() {
             </ButtonLink>
           )}
           {step < 3 ? (
-            <Button onClick={next}>
+            <Button onClick={next} disabled={step === 1 && belowMinimum}>
               Continue
               <ArrowRight data-icon="inline-end" />
             </Button>

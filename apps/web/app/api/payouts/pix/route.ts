@@ -9,6 +9,13 @@
  * Returns { orderId, txHash, status, source }. Poll GET /api/payouts/[orderId]
  * until status === "completed".
  *
+ * Clasificación de fallos, por fase:
+ *   - Config + quote: un 5xx/timeout/red degrada a mock (nada se movió todavía).
+ *   - Order: fallo real (502). Ya hay una orden viva del lado del proveedor.
+ *   - payAnchor: fallo real con el result code de Horizon traducido. Nunca mock:
+ *     un 200 acá le muestra "Money on the way!" a alguien a quien no le llegó nada.
+ *   - Etherfuse 4xx en cualquier fase: provider_rejected con el status de upstream.
+ *
  * Sender wallet (STELLAR_SPONSOR_SECRET) preconditions — each failed distinctly
  * during the spike:
  *   - registered as a wallet in the Etherfuse account
@@ -24,11 +31,18 @@ import { NextResponse } from "next/server"
 import {
   createOrder,
   createQuote,
+  describeUpstreamError,
   EtherfuseError,
   getUsdcAssetId,
   requireBankAccountId,
 } from "@/lib/server/etherfuse"
-import { getSponsorPublicKey, payAnchor, StellarError } from "@/lib/server/stellar"
+import {
+  describeStellarFailure,
+  getSponsorPublicKey,
+  payAnchor,
+  StellarError,
+} from "@/lib/server/stellar"
+import { isBelowMinimum, minAmountMessage, MIN_AMOUNT_USDC } from "@/lib/limits"
 
 export const dynamic = "force-dynamic"
 
@@ -68,55 +82,117 @@ export async function POST(req: Request) {
     )
   }
 
-  try {
-    const bankAccountId = requireBankAccountId()
-    const sourceAsset = getUsdcAssetId()
-    const publicKey = getSponsorPublicKey()
-    const quoteId = crypto.randomUUID()
+  // Etherfuse would answer 424 here; a clear message beats an upstream round-trip.
+  if (isBelowMinimum(amount)) {
+    return NextResponse.json(
+      {
+        error: "amount_below_minimum",
+        message: minAmountMessage("BRL"),
+        minAmountUsdc: MIN_AMOUNT_USDC,
+      },
+      { status: 422 },
+    )
+  }
 
-    // 1. Quote (orderId must later equal this quoteId)
-    const quote = await createQuote({
+  // --- Phase 1: config + quote. Nothing has moved, so an outage can still mock.
+  let bankAccountId: string
+  let publicKey: string
+  let quote: Awaited<ReturnType<typeof createQuote>>
+  try {
+    bankAccountId = requireBankAccountId()
+    publicKey = getSponsorPublicKey()
+    quote = await createQuote({
       type: "offramp",
-      sourceAsset,
+      sourceAsset: getUsdcAssetId(),
       targetAsset: "BRL",
       sourceAmount: amount.toFixed(2),
-      quoteId,
+      quoteId: crypto.randomUUID(),
     })
+  } catch (err) {
+    const rejected = providerRejection(err, amount)
+    if (rejected) return rejected
 
-    // 2. Order with useAnchor
-    const order = await createOrder({
+    const reason = errorMessage(err)
+    console.error("[payouts/pix] proveedor no disponible en el quote, degradando a mock:", reason)
+    return NextResponse.json({ ...mockPayout(amount), note: reason })
+  }
+
+  // --- Phase 2: order. The provider now holds a live order — report failures.
+  let order: Awaited<ReturnType<typeof createOrder>>
+  try {
+    order = await createOrder({
       quoteId: quote.quoteId,
       bankAccountId,
       publicKey,
       useAnchor: true,
     })
-
-    const {
-      orderId,
-      withdrawAnchorAccount,
-      withdrawMemo,
-    } = order.offramp
-
-    // 3. Pay anchor with exact hash memo
-    const { hash } = await payAnchor(
-      withdrawAnchorAccount,
-      withdrawMemo,
-      quote.sourceAmount,
-    )
-
-    const out: PixPayoutResponse = {
-      orderId,
-      txHash: hash,
-      status: "submitted",
-      source: "live",
-    }
-    return NextResponse.json(out)
   } catch (err) {
-    const reason =
-      err instanceof EtherfuseError || err instanceof StellarError
-        ? err.message
-        : "error desconocido"
-    console.error("[payouts/pix] falló, degradando a mock:", reason)
-    return NextResponse.json({ ...mockPayout(amount), note: reason })
+    const rejected = providerRejection(err, amount)
+    if (rejected) return rejected
+
+    const reason = errorMessage(err)
+    console.error("[payouts/pix] falló la creación de la orden:", reason)
+    return NextResponse.json(
+      {
+        error: "order_failed",
+        message:
+          "We couldn't open the payout order with the payment provider. Nothing was sent — try again.",
+        detail: reason,
+      },
+      { status: 502 },
+    )
   }
+
+  const { orderId, withdrawAnchorAccount, withdrawMemo } = order.offramp
+
+  // --- Phase 3: payment attempted. Never mock, never 200 on failure.
+  let txHash: string
+  try {
+    const { hash } = await payAnchor(withdrawAnchorAccount, withdrawMemo, quote.sourceAmount)
+    txHash = hash
+  } catch (err) {
+    const rejected = providerRejection(err, amount)
+    if (rejected) return rejected
+
+    const failure = describeStellarFailure(err)
+    console.error(
+      `[payouts/pix] el pago al anchor falló (${failure.code}):`,
+      errorMessage(err),
+    )
+    return NextResponse.json(
+      {
+        error: failure.code,
+        message: failure.message,
+        orderId,
+        resultCodes: err instanceof StellarError ? err.resultCodes : undefined,
+      },
+      { status: 502 },
+    )
+  }
+
+  const out: PixPayoutResponse = {
+    orderId,
+    txHash,
+    status: "submitted",
+    source: "live",
+  }
+  return NextResponse.json(out)
+}
+
+/** Etherfuse 4xx: the provider is up and rejected us. Same shape in every phase. */
+function providerRejection(err: unknown, amount: number) {
+  if (!(err instanceof EtherfuseError) || err.status < 400 || err.status >= 500) return null
+  console.error(`[payouts/pix] Etherfuse rechazó la solicitud (${err.status}):`, err.message)
+  return NextResponse.json(
+    {
+      error: "provider_rejected",
+      message: describeUpstreamError(err.status, err.message, amount),
+      upstreamStatus: err.status,
+    },
+    { status: err.status },
+  )
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "error desconocido"
 }

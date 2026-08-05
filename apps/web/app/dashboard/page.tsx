@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
 import { ClaimsTable } from '@/components/dashboard/claims-table'
@@ -11,14 +11,35 @@ import {
   InputGroupInput,
 } from '@/components/ui/input-group'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { claims } from '@/lib/mock-data'
+import { Skeleton } from '@/components/ui/skeleton'
+import { listClaims } from '@/lib/services'
 import { isActiveStatus } from '@/lib/format'
+import type { Claim } from '@/lib/types'
 
 type Filter = 'all' | 'active' | 'completed' | 'refunded'
 
 export default function DashboardPage() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
+  const [claims, setClaims] = useState<Claim[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const list = await listClaims()
+        if (!cancelled) setClaims(list)
+      } catch {
+        if (!cancelled) setClaims([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const filtered = useMemo(() => {
     return claims.filter((c) => {
@@ -37,7 +58,7 @@ export default function DashboardPage() {
               : ['refunded', 'expired', 'cancelled'].includes(c.status)
       return matchesQuery && matchesFilter
     })
-  }, [query, filter])
+  }, [claims, query, filter])
 
   return (
     <>
@@ -68,7 +89,13 @@ export default function DashboardPage() {
           </ToggleGroup>
         </div>
 
-        {filtered.length > 0 ? (
+        {loading ? (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : filtered.length > 0 ? (
           <ClaimsTable claims={filtered} />
         ) : (
           <Empty className="rounded-xl border border-dashed border-border">

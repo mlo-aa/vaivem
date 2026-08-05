@@ -5,15 +5,24 @@
  * nunca en el cliente.
  *
  * Devuelve `source: "live" | "mock"` para que la UI pueda decir la verdad
- * sobre de dónde salió el número. Si Etherfuse falla, la demo sigue con
- * datos simulados y la pantalla lo indica — nunca se finge una cotización real.
+ * sobre de dónde salió el número.
+ *
+ * El fallback a mock existe SOLO para caídas del proveedor (5xx, timeout, red).
+ * Un 4xx significa que la solicitud es inválida — se devuelve el error con el
+ * status de upstream, sin fingir una cotización.
  *
  * CORS is permissive so apps/demo (and other hosts) can call this route via
  * apiBaseUrl without running their own quote backend.
  */
 
 import { NextResponse } from "next/server"
-import { createQuote, SANDBOX_ASSETS, EtherfuseError } from "@/lib/server/etherfuse"
+import {
+  createQuote,
+  describeUpstreamError,
+  SANDBOX_ASSETS,
+  EtherfuseError,
+} from "@/lib/server/etherfuse"
+import { isBelowMinimum, minAmountMessage, MIN_AMOUNT_USDC } from "@/lib/limits"
 
 export const dynamic = "force-dynamic"
 
@@ -94,6 +103,18 @@ export async function POST(req: Request) {
 
   const currency = CURRENCIES[country]
 
+  // Etherfuse would answer 424 here; a clear message beats an upstream round-trip.
+  if (isBelowMinimum(amount)) {
+    return json(
+      {
+        error: "amount_below_minimum",
+        message: minAmountMessage(currency),
+        minAmountUsdc: MIN_AMOUNT_USDC,
+      },
+      422,
+    )
+  }
+
   try {
     const q = await createQuote({
       type: "offramp",
@@ -119,8 +140,22 @@ export async function POST(req: Request) {
     }
     return json(out)
   } catch (err) {
-    const reason = err instanceof EtherfuseError ? err.message : "error desconocido"
-    console.error("[quote] Etherfuse falló, degradando a mock:", reason)
+    // 4xx: el proveedor está vivo y rechazó la solicitud. No degradar a mock.
+    if (err instanceof EtherfuseError && err.status >= 400 && err.status < 500) {
+      console.error(`[quote] Etherfuse rechazó la solicitud (${err.status}):`, err.message)
+      return json(
+        {
+          error: "provider_rejected",
+          message: describeUpstreamError(err.status, err.message, amount),
+          upstreamStatus: err.status,
+        },
+        err.status,
+      )
+    }
+
+    // 5xx, timeout o fallo de red: caída del proveedor → mock.
+    const reason = err instanceof Error ? err.message : "error desconocido"
+    console.error("[quote] Etherfuse no disponible, degradando a mock:", reason)
     return json({ ...mockQuote(amount, currency), note: reason })
   }
 }

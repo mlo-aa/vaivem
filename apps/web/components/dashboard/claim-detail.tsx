@@ -56,26 +56,41 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
 
   async function handleCancel() {
     setPending('cancel')
-    const updated = await cancelClaim(claim)
-    setClaim(updated)
-    setPending(null)
-    toast.success('Claim cancelled and funds returned')
+    try {
+      const updated = await cancelClaim(claim)
+      setClaim(updated)
+      toast.success('Claim cancelled and funds returned')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Cancel failed')
+    } finally {
+      setPending(null)
+    }
   }
 
   async function handleRefund() {
     setPending('refund')
-    const updated = await refundClaim(claim)
-    setClaim(updated)
-    setPending(null)
-    toast.success('Funds refunded to your balance')
+    try {
+      const updated = await refundClaim(claim)
+      setClaim(updated)
+      toast.success('Funds refunded to your balance')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Refund failed')
+    } finally {
+      setPending(null)
+    }
   }
 
   async function handleExtend() {
     setPending('extend')
-    const updated = await extendExpiration(claim, 7)
-    setClaim(updated)
-    setPending(null)
-    toast.success('Expiration extended by 7 days')
+    try {
+      const updated = await extendExpiration(claim, 7)
+      setClaim(updated)
+      toast.success('Expiration extended by 7 days')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Extend failed')
+    } finally {
+      setPending(null)
+    }
   }
 
   return (

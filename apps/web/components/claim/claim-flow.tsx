@@ -1,27 +1,39 @@
 "use client"
 
 import { ClaimLink } from "@vaivem/react"
-import { saveClaim } from "@/lib/claim-store"
-import type { Claim } from "@/lib/types"
+import type { ClaimStatus, ProtectionType } from "@/lib/types"
 
-const DEMO_CODE = "482913"
+export type PublicClaimView = {
+  token: string
+  senderName: string
+  amount: number
+  country: string
+  message: string | null
+  status: ClaimStatus
+  deadline: number
+  protectionType: ProtectionType
+  requiresCode: boolean
+}
 
 /**
- * Thin host adapter: maps a Claim record onto the importable <ClaimLink /> kit.
+ * Thin host adapter: maps a public claim onto <ClaimLink /> from the kit.
+ * Access code is verified against the server store — never hardcoded.
  */
-export function ClaimFlow({ claim }: { claim: Claim }) {
+export function ClaimFlow({ claim }: { claim: PublicClaimView }) {
+  const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true"
+  const country = claim.country === "MX" ? "MX" : "BR"
+
   return (
     <ClaimLink
-      code={DEMO_CODE}
       amount={claim.amount}
+      country={country}
+      claimToken={claim.token}
+      requiresCode={claim.requiresCode || claim.protectionType === "code"}
+      showDemoCodeHint={demoMode && claim.protectionType === "code"}
       apiBaseUrl=""
-      onClaimed={() => {
-        saveClaim({
-          ...claim,
-          status: "completed",
-          claimedAt: new Date().toISOString(),
-          payoutMethod: claim.payoutMethod ?? "pix",
-        })
+      onStatus={(status) => {
+        // Status mapping: cashing_out while polling; completed only on success.
+        void status
       }}
     />
   )

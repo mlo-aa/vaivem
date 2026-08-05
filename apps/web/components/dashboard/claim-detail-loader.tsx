@@ -1,24 +1,39 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
 import { ArrowLeft, SearchX } from "lucide-react"
 import { ButtonLink } from "@/components/ui/button-link"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ClaimDetail } from "@/components/dashboard/claim-detail"
-import { findClaim } from "@/lib/claim-store"
+import { getClaim } from "@/lib/services"
 import type { Claim } from "@/lib/types"
 
 export function ClaimDetailLoader({ token }: { token: string }) {
-  const [state, setState] = useState<{ loading: boolean; claim: Claim | null }>({
+  const [state, setState] = useState<{ loading: boolean; claim: Claim | null; error?: string }>({
     loading: true,
     claim: null,
   })
 
   useEffect(() => {
-    // Resolve against the client store (seed + session-created claims).
-    setState({ loading: false, claim: findClaim(token) })
+    let cancelled = false
+    ;(async () => {
+      try {
+        const claim = await getClaim(token)
+        if (cancelled) return
+        setState({ loading: false, claim })
+      } catch (err) {
+        if (cancelled) return
+        setState({
+          loading: false,
+          claim: null,
+          error: err instanceof Error ? err.message : "Failed to load",
+        })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [token])
 
   if (state.loading) {
@@ -43,7 +58,8 @@ export function ClaimDetailLoader({ token }: { token: string }) {
           <EmptyTitle>Claim not found</EmptyTitle>
           <EmptyDescription>
             {"We couldn't find a claim for "}
-            <span className="font-mono">{token}</span>. It may have expired or been removed.
+            <span className="font-mono">{token}</span>.{" "}
+            {state.error ?? "It may have expired or been removed."}
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>

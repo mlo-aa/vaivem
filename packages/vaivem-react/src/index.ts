@@ -5,3 +5,12 @@ export { RampWithdraw } from "./ramp-withdraw"
 export type { RampWithdrawProps } from "./ramp-withdraw"
 export { ClaimLink } from "./claim-link"
 export type { ClaimLinkProps } from "./claim-link"
+export { QuoteError, PayoutError } from "./api"
+export type { QuoteErrorKind, PayoutFailureCode } from "./api"
+export {
+  MIN_AMOUNT_USDC,
+  formatFiat,
+  isBelowMinimum,
+  minAmountInFiat,
+  minAmountMessage,
+} from "./limits"

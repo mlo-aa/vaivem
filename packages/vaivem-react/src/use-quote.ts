@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { fetchQuote } from "./api"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { fetchQuote, QuoteError, type QuoteErrorKind } from "./api"
 import type { Quote } from "./types"
 
 export type UseQuoteOptions = {
@@ -25,20 +25,49 @@ export function useQuote(
   const [quote, setQuote] = useState<Quote | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorKind, setErrorKind] = useState<QuoteErrorKind | null>(null)
   const [secondsLeft, setSecondsLeft] = useState(0)
 
-  const refresh = useCallback(async () => {
+  // An invalid request fails the same way every time, so stop auto-retrying it.
+  const blocked = useRef(false)
+
+  const run = useCallback(async () => {
     if (!Number.isFinite(amount) || amount <= 0) return
     setLoading(true)
     try {
       const q = await fetchQuote(amount, country, apiBaseUrl)
       setQuote(q)
       setError(null)
-    } catch {
-      setError("Couldn't refresh the quote. Try again.")
+      setErrorKind(null)
+      blocked.current = false
+    } catch (err) {
+      if (err instanceof QuoteError) {
+        setError(err.message)
+        setErrorKind(err.kind)
+        blocked.current = err.kind === "invalid"
+        // Numbers from a rejected request must never stay on screen.
+        if (err.kind === "invalid") setQuote(null)
+      } else {
+        setError("Couldn't refresh the quote. Try again.")
+        setErrorKind("network")
+      }
     } finally {
       setLoading(false)
     }
+  }, [amount, country, apiBaseUrl])
+
+  const refresh = useCallback(
+    async (opts?: { force?: boolean }) => {
+      if (blocked.current && !opts?.force) return
+      if (opts?.force) blocked.current = false
+      await run()
+    },
+    [run],
+  )
+
+  // Declared before the fetch effect so a new amount/country clears the block first.
+  useEffect(() => {
+    blocked.current = false
   }, [amount, country, apiBaseUrl])
 
   useEffect(() => {
@@ -59,5 +88,5 @@ export function useQuote(
     return () => clearInterval(id)
   }, [quote, enabled, loading, refresh])
 
-  return { quote, loading, error, refresh, secondsLeft, setError }
+  return { quote, loading, error, errorKind, refresh, secondsLeft, setError }
 }

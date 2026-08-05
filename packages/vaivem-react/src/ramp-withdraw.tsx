@@ -2,7 +2,14 @@
 
 import { useState } from "react"
 import { RefreshCw } from "lucide-react"
-import { submitKyc, simulatePixPayout } from "./api"
+import {
+  claimByToken,
+  executePixPayout,
+  PayoutError,
+  submitKyc,
+  type PayoutFailureCode,
+} from "./api"
+import { isBelowMinimum, minAmountMessage } from "./limits"
 import { ProcessSteps } from "./process-steps"
 import type { KycStatus, PixKeyType } from "./types"
 import { useQuote } from "./use-quote"
@@ -12,8 +19,18 @@ import "./styles.css"
 export type RampWithdrawProps = {
   amount: number
   country?: "BR" | "MX"
-  onPaid?: (info: { reference: string; destinationAmount: string }) => void
+  onPaid?: (info: {
+    reference: string
+    destinationAmount: string
+    txHash?: string
+    status: "completed" | "cashing_out"
+  }) => void
+  onFailed?: (info: { code: PayoutFailureCode; message: string }) => void
+  onStatus?: (status: "cashing_out" | "completed" | "failed") => void
   apiBaseUrl?: string
+  /** When set, settle via /api/claims/by-token/[token]/claim instead of bare /api/payouts/pix */
+  claimToken?: string
+  accessCode?: string
 }
 
 const PIX_KEY_LABEL: Record<PixKeyType, string> = {
@@ -22,6 +39,47 @@ const PIX_KEY_LABEL: Record<PixKeyType, string> = {
   email: "Email",
   phone: "Phone",
   random: "Random key",
+}
+
+const FAILURE_COPY: Record<
+  PayoutFailureCode,
+  { title: string; body: string; action: string }
+> = {
+  already_claimed: {
+    title: "Already claimed",
+    body: "This payout was already collected.",
+    action: "Close",
+  },
+  expired: {
+    title: "Payout expired",
+    body: "The claim window closed. Ask the sender for a new link.",
+    action: "Close",
+  },
+  anchor_rejected: {
+    title: "Payment provider rejected",
+    body: "The bank transfer could not be completed. Try again or contact the sender.",
+    action: "Try again",
+  },
+  insufficient_balance: {
+    title: "Sender out of funds",
+    body: "The sender wallet does not have enough USDC right now.",
+    action: "Close",
+  },
+  stuck_funded: {
+    title: "Still processing",
+    body: "Your payout was submitted but is not confirmed yet. Check back shortly.",
+    action: "Check status later",
+  },
+  payout_failed: {
+    title: "Payout failed",
+    body: "Something went wrong sending your money. You can try again.",
+    action: "Try again",
+  },
+  network: {
+    title: "Connection problem",
+    body: "We could not reach the payout service. Check your connection and try again.",
+    action: "Try again",
+  },
 }
 
 function validatePixKey(type: PixKeyType, key: string): string | null {
@@ -43,20 +101,23 @@ function validatePixKey(type: PixKeyType, key: string): string | null {
   }
 }
 
-type Stage = "kyc" | "cashout" | "processing" | "done"
+type Stage = "kyc" | "cashout" | "processing" | "done" | "failed"
 
-/**
- * Quote + countdown + KYC gate + PIX cash-out.
- * Point `apiBaseUrl` at the host that serves POST /api/quote.
- */
 export function RampWithdraw({
   amount,
   country = "BR",
   onPaid,
+  onFailed,
+  onStatus,
   apiBaseUrl = "",
+  claimToken,
+  accessCode,
 }: RampWithdrawProps) {
   const [stage, setStage] = useState<Stage>("kyc")
   const [error, setError] = useState<string | null>(null)
+  const [failure, setFailure] = useState<{ code: PayoutFailureCode; message: string } | null>(
+    null,
+  )
 
   const [kycStatus, setKycStatus] = useState<KycStatus>("not_started")
   const [kycName, setKycName] = useState("")
@@ -69,16 +130,27 @@ export function RampWithdraw({
   const [pixKey, setPixKey] = useState("")
   const [processStep, setProcessStep] = useState(0)
   const [reference, setReference] = useState<string | null>(null)
+  const [txHash, setTxHash] = useState<string | null>(null)
+
+  // Checked before any request goes out — the provider rejects sub-minimum amounts.
+  const belowMinimum = isBelowMinimum(amount)
 
   const quoteEnabled = stage === "cashout" || stage === "processing" || stage === "done"
   const { quote, loading, error: quoteError, refresh, secondsLeft } = useQuote(
     amount,
     country,
-    { apiBaseUrl, enabled: quoteEnabled && kycStatus === "approved" },
+    {
+      apiBaseUrl,
+      enabled: quoteEnabled && kycStatus === "approved" && !belowMinimum,
+    },
   )
 
   const brlAmount = quote ? Number(quote.destinationAmount) : null
-  const displayError = error ?? quoteError
+  const minimumMessage = minAmountMessage(
+    country,
+    quote ? Number(quote.etherfuseMidMarketRate) : null,
+  )
+  const canPay = !belowMinimum && !quoteError && !loading && Boolean(quote)
 
   async function handleSubmitKyc() {
     setError(null)
@@ -110,23 +182,71 @@ export function RampWithdraw({
     }
   }
 
+  function fail(code: PayoutFailureCode, message: string) {
+    setFailure({ code, message })
+    setStage("failed")
+    onStatus?.("failed")
+    onFailed?.({ code, message })
+  }
+
   async function handlePay() {
     setError(null)
+    if (belowMinimum) {
+      setError(minimumMessage)
+      return
+    }
     const keyError = validatePixKey(pixKeyType, pixKey)
     if (keyError) {
       setError(keyError)
       return
     }
     if (!quote || secondsLeft <= 0) {
-      void refresh()
+      void refresh({ force: true })
       setError("Your quote expired. We refreshed it — confirm the new amount.")
       return
     }
     setStage("processing")
-    const payout = await simulatePixPayout((s) => setProcessStep(s))
-    setReference(payout.reference)
-    setStage("done")
-    onPaid?.({ reference: payout.reference, destinationAmount: quote.destinationAmount })
+    onStatus?.("cashing_out")
+    setProcessStep(0)
+    try {
+      if (claimToken) {
+        const result = await claimByToken(
+          claimToken,
+          { rail: "pix", accessCode },
+          apiBaseUrl,
+          (s) => setProcessStep(s),
+        )
+        setReference(result.orderId ?? claimToken)
+        if (result.txHash) setTxHash(result.txHash)
+        setStage("done")
+        onStatus?.("completed")
+        onPaid?.({
+          reference: result.orderId ?? claimToken,
+          destinationAmount: quote.destinationAmount,
+          txHash: result.txHash,
+          status: "completed",
+        })
+        return
+      }
+
+      const payout = await executePixPayout(amount, apiBaseUrl, (s) => setProcessStep(s))
+      setReference(payout.orderId)
+      setTxHash(payout.txHash)
+      setStage("done")
+      onStatus?.("completed")
+      onPaid?.({
+        reference: payout.orderId,
+        destinationAmount: quote.destinationAmount,
+        txHash: payout.txHash,
+        status: "completed",
+      })
+    } catch (err) {
+      if (err instanceof PayoutError) {
+        fail(err.code, err.message)
+      } else {
+        fail("network", err instanceof Error ? err.message : "Payout failed")
+      }
+    }
   }
 
   return (
@@ -186,9 +306,15 @@ export function RampWithdraw({
               </div>
             </div>
           )}
-          {displayError ? <p className="vv-error">{displayError}</p> : null}
+          {belowMinimum ? <p className="vv-error">{minimumMessage}</p> : null}
+          {error ? <p className="vv-error">{error}</p> : null}
           {!kycSubmitting ? (
-            <button type="button" className="vv-btn" onClick={handleSubmitKyc}>
+            <button
+              type="button"
+              className="vv-btn"
+              onClick={handleSubmitKyc}
+              disabled={belowMinimum}
+            >
               Verify and continue
             </button>
           ) : null}
@@ -242,7 +368,12 @@ export function RampWithdraw({
 
           <div className="vv-divider" />
 
-          {loading || !quote ? (
+          {belowMinimum ? (
+            <p className="vv-error">{minimumMessage}</p>
+          ) : quoteError ? (
+            /* The real reason, inline with the amount — not an outage banner. */
+            <p className="vv-error">{quoteError}</p>
+          ) : loading || !quote ? (
             <div className="vv-stack">
               <div className="vv-skeleton" />
               <div className="vv-skeleton" style={{ width: "66%" }} />
@@ -273,7 +404,10 @@ export function RampWithdraw({
                   <span className="vv-mono">{formatUSDC(Number(quote.feeAmount))}</span>
                 </div>
                 <div className="vv-countdown">
-                  <span className="vv-muted" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                  <span
+                    className="vv-muted"
+                    style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
+                  >
                     <RefreshCw className="vv-icon-sm" />
                     Quote refreshes in
                   </span>
@@ -291,13 +425,13 @@ export function RampWithdraw({
             </>
           )}
 
-          {displayError ? <p className="vv-error">{displayError}</p> : null}
+          {error ? <p className="vv-error">{error}</p> : null}
 
           <button
             type="button"
             className="vv-btn"
             onClick={handlePay}
-            disabled={loading || !quote}
+            disabled={!canPay}
           >
             Claim {brlAmount !== null ? formatBRL(brlAmount) : formatUSDC(amount)}
           </button>
@@ -337,6 +471,36 @@ export function RampWithdraw({
               <span className="vv-mono">{reference}</span>
             </div>
           ) : null}
+          {txHash ? (
+            <div className="vv-row">
+              <span className="vv-muted">Transaction</span>
+              <span className="vv-mono" style={{ fontSize: 11 }}>
+                {txHash.slice(0, 12)}…
+              </span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {stage === "failed" && failure ? (
+        <div className="vv-card">
+          <div>
+            <h2 className="vv-title">{FAILURE_COPY[failure.code].title}</h2>
+            <p className="vv-desc">{FAILURE_COPY[failure.code].body}</p>
+            <p className="vv-error" style={{ marginTop: 8 }}>
+              {failure.message}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="vv-btn"
+            onClick={() => {
+              setFailure(null)
+              setStage("cashout")
+            }}
+          >
+            {FAILURE_COPY[failure.code].action}
+          </button>
         </div>
       ) : null}
     </div>

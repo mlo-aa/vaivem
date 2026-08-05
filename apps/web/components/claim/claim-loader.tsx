@@ -1,20 +1,32 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ClaimFlow } from "@/components/claim/claim-flow"
+import { ClaimFlow, type PublicClaimView } from "@/components/claim/claim-flow"
 import { ClaimShell } from "@/components/claim/claim-shell"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { findClaimableClaim, markViewed } from "@/lib/claim-store"
-import type { Claim } from "@/lib/types"
+import { getPublicClaim } from "@/lib/services"
 
 export function ClaimLoader({ token }: { token: string }) {
-  const [claim, setClaim] = useState<Claim | null | undefined>(undefined)
+  const [claim, setClaim] = useState<PublicClaimView | null | undefined>(undefined)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const found = findClaimableClaim(token)
-    if (found) markViewed(found.token)
-    setClaim(found)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const found = await getPublicClaim(token)
+        if (cancelled) return
+        setClaim(found)
+      } catch (err) {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : "Failed to load claim")
+        setClaim(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [token])
 
   if (claim === undefined) {
@@ -47,7 +59,26 @@ export function ClaimLoader({ token }: { token: string }) {
           <CardHeader>
             <p className="text-lg font-semibold text-foreground">Link not found</p>
             <p className="text-sm text-muted-foreground">
-              This claim link doesn&apos;t exist or has been removed.
+              {error ?? "This claim link doesn't exist or has been removed."}
+            </p>
+          </CardHeader>
+        </Card>
+      </ClaimShell>
+    )
+  }
+
+  if (["completed", "claimed", "refunded", "cancelled", "expired"].includes(claim.status)) {
+    return (
+      <ClaimShell>
+        <Card className="mx-auto w-full max-w-md">
+          <CardHeader>
+            <p className="text-lg font-semibold text-foreground">
+              {claim.status === "completed" || claim.status === "claimed"
+                ? "Already claimed"
+                : "Payout unavailable"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              This claim is {claim.status}. Ask the sender for a new link if you still need funds.
             </p>
           </CardHeader>
         </Card>
