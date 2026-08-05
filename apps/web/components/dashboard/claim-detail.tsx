@@ -282,7 +282,7 @@ function ConfirmAction({
   confirmLabel,
   onConfirm,
 }: {
-  trigger: React.ReactNode
+  trigger: React.ReactElement
   title: string
   description: string
   confirmLabel: string

@@ -266,8 +266,10 @@ export function CreateWizard() {
                       className="text-lg font-medium"
                     />
                     <ToggleGroup
-                      value={currency}
-                      onValueChange={(v) => v && setCurrency(v as DisplayCurrency)}
+                      value={[currency]}
+                      onValueChange={(v) => {
+                        if (v[0]) setCurrency(v[0] as DisplayCurrency)
+                      }}
                     >
                       <ToggleGroupItem value="BRL">BRL</ToggleGroupItem>
                       <ToggleGroupItem value="USD">USD</ToggleGroupItem>
@@ -280,7 +282,7 @@ export function CreateWizard() {
 
                 <Field>
                   <FieldLabel htmlFor="purpose">Purpose</FieldLabel>
-                  <Select value={purpose} onValueChange={setPurpose}>
+                  <Select value={purpose} onValueChange={(v) => { if (v != null) setPurpose(v) }}>
                     <SelectTrigger id="purpose">
                       <SelectValue />
                     </SelectTrigger>
@@ -416,7 +418,7 @@ export function CreateWizard() {
 
                 <Field>
                   <FieldLabel htmlFor="expiration">Link expires in</FieldLabel>
-                  <Select value={expiration} onValueChange={setExpiration}>
+                  <Select value={expiration} onValueChange={(v) => { if (v != null) setExpiration(v) }}>
                     <SelectTrigger id="expiration">
                       <SelectValue />
                     </SelectTrigger>

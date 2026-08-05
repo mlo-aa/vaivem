@@ -7,12 +7,21 @@
  * Devuelve `source: "live" | "mock"` para que la UI pueda decir la verdad
  * sobre de dónde salió el número. Si Etherfuse falla, la demo sigue con
  * datos simulados y la pantalla lo indica — nunca se finge una cotización real.
+ *
+ * CORS is permissive so apps/demo (and other hosts) can call this route via
+ * apiBaseUrl without running their own quote backend.
  */
 
 import { NextResponse } from "next/server"
 import { createQuote, SANDBOX_ASSETS, EtherfuseError } from "@/lib/server/etherfuse"
 
 export const dynamic = "force-dynamic"
+
+const CORS_HEADERS: HeadersInit = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+}
 
 const CURRENCIES = { BR: "BRL", MX: "MXN" } as const
 type CountryCode = keyof typeof CURRENCIES
@@ -32,6 +41,10 @@ export interface QuoteResponse {
   currency: string
   source: "live" | "mock"
   note?: string
+}
+
+function json(data: unknown, status = 200) {
+  return NextResponse.json(data, { status, headers: CORS_HEADERS })
 }
 
 /** Réplica de la forma real. Valores medidos contra el sandbox. */
@@ -56,6 +69,10 @@ function mockQuote(usdc: number, currency: string): QuoteResponse {
   }
 }
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+}
+
 export async function POST(req: Request) {
   let amount: number
   let country: CountryCode
@@ -65,14 +82,14 @@ export async function POST(req: Request) {
     amount = Number(body.amount)
     country = (body.country ?? "BR") as CountryCode
   } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 })
+    return json({ error: "JSON inválido" }, 400)
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
-    return NextResponse.json({ error: "amount debe ser un número positivo" }, { status: 400 })
+    return json({ error: "amount debe ser un número positivo" }, 400)
   }
   if (!(country in CURRENCIES)) {
-    return NextResponse.json({ error: `país no soportado: ${country}` }, { status: 400 })
+    return json({ error: `país no soportado: ${country}` }, 400)
   }
 
   const currency = CURRENCIES[country]
@@ -100,10 +117,10 @@ export async function POST(req: Request) {
       currency,
       source: "live",
     }
-    return NextResponse.json(out)
+    return json(out)
   } catch (err) {
     const reason = err instanceof EtherfuseError ? err.message : "error desconocido"
     console.error("[quote] Etherfuse falló, degradando a mock:", reason)
-    return NextResponse.json({ ...mockQuote(amount, currency), note: reason })
+    return json({ ...mockQuote(amount, currency), note: reason })
   }
 }

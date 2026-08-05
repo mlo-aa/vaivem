@@ -12,6 +12,11 @@ export const dynamic = "force-dynamic"
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org"
 
+/** Horizon returns this; the SDK's ClaimableBalanceRecord omits it. */
+type ClaimableBalanceWithTime = Horizon.ServerApi.ClaimableBalanceRecord & {
+  last_modified_time?: string
+}
+
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ balanceId: string }> },
@@ -23,7 +28,10 @@ export async function GET(
 
   try {
     const server = new Horizon.Server(HORIZON_URL)
-    const cb = await server.claimableBalances().claimableBalance(balanceId).call()
+    const cb = (await server
+      .claimableBalances()
+      .claimableBalance(balanceId)
+      .call()) as ClaimableBalanceWithTime
 
     return NextResponse.json({
       id: cb.id,
@@ -32,7 +40,7 @@ export async function GET(
       sponsor: cb.sponsor ?? null,
       claimants: cb.claimants,
       lastModifiedLedger: cb.last_modified_ledger,
-      lastModifiedTime: cb.last_modified_time,
+      lastModifiedTime: cb.last_modified_time ?? null,
     })
   } catch (err) {
     const status =

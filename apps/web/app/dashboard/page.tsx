@@ -55,8 +55,10 @@ export default function DashboardPage() {
             />
           </InputGroup>
           <ToggleGroup
-            value={filter}
-            onValueChange={(v) => v && setFilter(v as Filter)}
+            value={[filter]}
+            onValueChange={(v) => {
+              if (v[0]) setFilter(v[0] as Filter)
+            }}
             className="w-fit"
           >
             <ToggleGroupItem value="all">All</ToggleGroupItem>
