@@ -57,8 +57,8 @@ export async function POST(req: Request) {
       expiresInSeconds,
     )
 
-    // TODO(persistence): durable encrypted store keyed by balanceId
-    recipientSecretsByBalanceId.set(balanceId, recipient.secret)
+    // Persist secret for claim (KV in prod; in-memory fallback locally)
+    await recipientSecretsByBalanceId.set(balanceId, recipient.secret, deadline)
 
     return NextResponse.json({
       balanceId,

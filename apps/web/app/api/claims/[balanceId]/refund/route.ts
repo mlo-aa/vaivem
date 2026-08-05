@@ -23,7 +23,7 @@ export async function POST(
 
   try {
     const { hash } = await refundExpiredBalance(balanceId)
-    recipientSecretsByBalanceId.delete(balanceId)
+    await recipientSecretsByBalanceId.delete(balanceId)
     return NextResponse.json({
       hash,
       explorerUrl: `${EXPLORER_TX}/${hash}`,

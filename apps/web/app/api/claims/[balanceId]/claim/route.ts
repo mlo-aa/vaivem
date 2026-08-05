@@ -21,7 +21,7 @@ export async function POST(
     return NextResponse.json({ error: "balanceId requerido" }, { status: 400 })
   }
 
-  const recipientSecret = recipientSecretsByBalanceId.get(balanceId)
+  const recipientSecret = await recipientSecretsByBalanceId.get(balanceId)
   if (!recipientSecret) {
     return NextResponse.json(
       { error: "Unknown balanceId (secret not found on this server)" },
@@ -31,7 +31,7 @@ export async function POST(
 
   try {
     const { hash } = await claimBalance(balanceId, recipientSecret)
-    recipientSecretsByBalanceId.delete(balanceId)
+    await recipientSecretsByBalanceId.delete(balanceId)
     return NextResponse.json({
       hash,
       explorerUrl: `${EXPLORER_TX}/${hash}`,
