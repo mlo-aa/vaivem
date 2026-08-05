@@ -49,23 +49,19 @@ export interface EtherfuseQuote {
 }
 
 export const etherfuseAdapter = {
-  // TODO(etherfuse): call the Etherfuse quote endpoint with API credentials.
-  // Fee is 20 bps on the USDC notional; BRL is derived from the net USDC.
-  async getQuote(usdc: number): Promise<EtherfuseQuote> {
-    // Small jitter around the sandbox mid-market rate.
-    const mid = 5.13193556 + (Math.random() - 0.5) * 0.01
-    const feeBps = 20
-    const feeAmountUsdc = (usdc * feeBps) / 10000
-    return {
-      quoteId: `qt_${randomId(16)}`,
-      midMarketRate: mid.toFixed(8),
-      nominalRate: mid.toFixed(8),
-      effectiveRate: mid.toFixed(8), // fee taken from USDC, so BRL rate is unchanged
-      feeBps: String(feeBps),
-      feeAmountUsdc: feeAmountUsdc.toFixed(6),
-      requiresSwap: false,
-    }
+  // Cotización real vía /api/quote. La API key vive en el servidor.
+  // La fee es de 20 bps sobre el nocional en USDC; el BRL sale del USDC neto.
+  async getQuote(usdc: number, country: "BR" | "MX" = "BR") {
+    const res = await fetch("/api/quote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: usdc, country }),
+    })
+    if (!res.ok) throw new Error("quote failed")
+    return res.json()
   },
+
+  // TODO(etherfuse): crear la orden real de off-ramp con useAnchor: true.
   async createPixOrder(): Promise<{ reference: string }> {
     return { reference: `pix_${randomId(6).toUpperCase()}` }
   },
