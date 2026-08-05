@@ -9,25 +9,70 @@
 // ---------------------------------------------------------------------------
 // Stellar adapter — account creation, sponsored reserves, trustlines, transfers
 // ---------------------------------------------------------------------------
+//
+// Calls /api/claims/* so the sponsor secret never reaches the browser.
+// Tracks the last funded balanceId so claim/refund work without changing
+// call-site signatures (services still call lockFunds / sendPayment bare).
+
+let lastBalanceId: string | null = null
+
+function apiBase() {
+  return process.env.NEXT_PUBLIC_VAIVEM_API_BASE ?? ""
+}
+
+async function fundClaim(amount: string, expiresInSeconds?: number) {
+  const res = await fetch(`${apiBase()}/api/claims/fund`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount,
+      ...(expiresInSeconds != null ? { expiresInSeconds } : {}),
+    }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error ?? "fund failed")
+  lastBalanceId = data.balanceId as string
+  return data as {
+    balanceId: string
+    recipientPublicKey: string
+    deadline: number
+    hash: string
+  }
+}
+
 export const stellarAdapter = {
-  // TODO(stellar): use @stellar/stellar-sdk Horizon/RPC + a funding keypair.
   async createSponsoredAccount(): Promise<{ address: string; sponsored: boolean }> {
-    // Real impl: build a sponsored createAccount + changeTrust(USDC) tx.
-    return {
-      address: randomStellarAddress(),
-      sponsored: true,
-    }
+    // Fund creates the sponsored account + claimable balance in one flow.
+    const data = await fundClaim("1")
+    return { address: data.recipientPublicKey, sponsored: true }
   },
   async sendPayment(): Promise<{ hash: string }> {
-    // Real impl: submit a Payment operation and poll for confirmation.
-    return { hash: randomTxHash() }
+    // Recipient claim via fee-bump (0 XLM account).
+    if (!lastBalanceId) throw new Error("No funded claimable balance to claim")
+    const res = await fetch(`${apiBase()}/api/claims/${encodeURIComponent(lastBalanceId)}/claim`, {
+      method: "POST",
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error ?? "claim failed")
+    lastBalanceId = null
+    return { hash: data.hash as string }
   },
   async lockFunds(): Promise<{ hash: string }> {
-    // Real impl: move funds into a claimable balance / escrow account.
-    return { hash: randomTxHash() }
+    const data = await fundClaim("10")
+    return { hash: data.hash }
+  },
+  /** Sponsor reclaim after the claim window expires. */
+  async refundFunds(): Promise<{ hash: string }> {
+    if (!lastBalanceId) throw new Error("No funded claimable balance to refund")
+    const res = await fetch(`${apiBase()}/api/claims/${encodeURIComponent(lastBalanceId)}/refund`, {
+      method: "POST",
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error ?? "refund failed")
+    lastBalanceId = null
+    return { hash: data.hash as string }
   },
   explorerUrl(hash: string): string {
-    // Real impl: point at mainnet. Testnet used here for the demo.
     return `https://stellar.expert/explorer/testnet/tx/${hash}`
   },
 }
@@ -52,7 +97,8 @@ export const etherfuseAdapter = {
   // Cotización real vía /api/quote. La API key vive en el servidor.
   // La fee es de 20 bps sobre el nocional en USDC; el BRL sale del USDC neto.
   async getQuote(usdc: number, country: "BR" | "MX" = "BR") {
-    const res = await fetch("/api/quote", {
+    const base = process.env.NEXT_PUBLIC_VAIVEM_API_BASE ?? ""
+    const res = await fetch(`${base}/api/quote`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount: usdc, country }),

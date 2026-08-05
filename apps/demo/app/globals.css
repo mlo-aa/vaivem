@@ -1,0 +1,41 @@
+:root {
+  color-scheme: light;
+  --ink: #0c1222;
+  --paper: #f3efe6;
+  --panel: #fffdf8;
+  --line: #d9d0c0;
+  --accent: #0f766e;
+  --accent-soft: #ccfbf1;
+  --warn: #b45309;
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(ellipse at top left, #d9f3ee 0%, transparent 45%),
+    linear-gradient(165deg, var(--paper), #e8e0d2 70%, #ddd3c2);
+  color: var(--ink);
+}
+
+a {
+  color: var(--accent);
+}
+
+/* Kit inherits Fieldwork palette when embedded here */
+.vv-kit {
+  --vv-brand: #0f766e;
+  --vv-brand-fg: #ecfdf5;
+  --vv-bg: #fffdf8;
+  --vv-card: #fffdf8;
+  --vv-border: #d9d0c0;
+  --vv-fg: #0c1222;
+  --vv-muted: #6b6358;
+  --vv-font: "Segoe UI", "Helvetica Neue", sans-serif;
+}

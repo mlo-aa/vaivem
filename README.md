@@ -1,33 +1,30 @@
-# vaivem
-
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
-
-## Built with v0
-
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
-
-[Continue working on v0 →](https://v0.app/chat/projects/prj_Ayf0onXTTv2Sh7TODagEPZiR3WeV)
-
-## Getting Started
-
-First, run the development server:
+Vaivém is a React kit and Next.js apps for walletless USDC claim links with PIX/SPEI cash-out via a server-side Etherfuse quote.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+```tsx
+"use client"
+import { RampWithdraw } from "@vaivem/react"
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+export default function Page() {
+  return (
+    <RampWithdraw amount={50} country="BR" apiBaseUrl=""
+      onPaid={({ reference }) => console.log(reference)} />
+  )
+}
+```
 
-## Learn More
+`apiBaseUrl` must point at a host that serves `POST /api/quote`. Empty string uses the same origin. Quotes are live against Etherfuse sandbox when `ETHERFUSE_API_KEY` is set; otherwise the route returns a mock quote with `source: "mock"`. PIX settlement and KYC in the kit UI are simulated.
 
-To learn more, take a look at the following resources:
+| Provider | Corridor | Status |
+|----------|----------|--------|
+| Etherfuse | BRL / PIX | live in sandbox |
+| Etherfuse | MXN / SPEI | live in sandbox |
+| Mock | any | for testing |
+| Manteca | BRL / PIX | interface defined, not implemented |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
+**Architecture.** `packages/vaivem-react` is the importable UI (`RampWithdraw`, `ClaimLink`, `useQuote`). `apps/web` hosts product pages and API routes (`/api/quote`, `/api/claims/*`). `apps/demo` is a second app that imports the package. Provider HTTP calls (Etherfuse, Stellar Horizon) run only in server modules under `apps/web/lib/server/` and in route handlers. The API key is read from env on the server and never sent to the browser.
+
+**What we did not build.** Batch payouts, embedded wallet, webhooks, multi-anchor routing, passkeys, production deployment.

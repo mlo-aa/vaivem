@@ -56,27 +56,15 @@ export async function getFundingUsdc(
 
 // Etherfuse USDC -> BRL settlement quote. All monetary values are strings and
 // the provider fee is denominated in USDC (the source asset). Valid 2 minutes.
-export async function getPixQuote(usdc: number): Promise<Quote> {
-  await delay(600)
-  const q = await etherfuseAdapter.getQuote(usdc)
-  const createdAt = new Date()
-  const expiresAt = new Date(createdAt.getTime() + QUOTE_TTL_MS)
-  const feeAmount = Number(q.feeAmountUsdc)
-  const netUsdc = usdc - feeAmount
-  const brl = netUsdc * Number(q.effectiveRate)
-  return {
-    quoteId: q.quoteId,
-    sourceAmount: usdc.toFixed(6),
-    destinationAmount: brl.toFixed(2),
-    exchangeRate: q.effectiveRate,
-    etherfuseMidMarketRate: q.midMarketRate,
-    nominalRate: q.nominalRate,
-    feeBps: q.feeBps,
-    feeAmount: q.feeAmountUsdc,
-    requiresSwap: q.requiresSwap,
-    createdAt: createdAt.toISOString(),
-    expiresAt: expiresAt.toISOString(),
-  }
+export async function getPixQuote(usdc: number, country: "BR" | "MX" = "BR"): Promise<Quote> {
+  const base = process.env.NEXT_PUBLIC_VAIVEM_API_BASE ?? ""
+  const res = await fetch(`${base}/api/quote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount: usdc, country }),
+  })
+  if (!res.ok) throw new Error("Quote request failed")
+  return res.json()
 }
 
 // --- Claims ----------------------------------------------------------------
@@ -140,7 +128,7 @@ export async function cancelClaim(claim: Claim): Promise<Claim> {
 
 export async function refundClaim(claim: Claim): Promise<Claim> {
   await delay(700)
-  const { hash } = await stellarAdapter.sendPayment()
+  const { hash } = await stellarAdapter.refundFunds()
   return { ...claim, status: 'refunded', stellarTransactionHash: hash }
 }
 

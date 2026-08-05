@@ -107,6 +107,9 @@ export interface Quote {
   requiresSwap: boolean
   createdAt: string
   expiresAt: string // exactly 2 minutes after createdAt
+  currency: string
+  source: "live" | "mock"
+  note?: string
 }
 
 export interface Wallet {

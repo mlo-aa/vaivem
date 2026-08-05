@@ -22,10 +22,10 @@ export interface QuoteResponse {
   sourceAmount: string
   destinationAmount: string
   exchangeRate: string
-  midMarketRate: string
+  etherfuseMidMarketRate: string
   nominalRate: string
   feeBps: string
-  feeAmountUsdc: string
+  feeAmount: string
   requiresSwap: boolean
   createdAt: string
   expiresAt: string
@@ -44,10 +44,10 @@ function mockQuote(usdc: number, currency: string): QuoteResponse {
     sourceAmount: usdc.toFixed(2),
     destinationAmount: (usdc * rate * (1 - feeBps / 10000)).toFixed(5),
     exchangeRate: (rate * (1 - feeBps / 10000)).toFixed(8),
-    midMarketRate: rate.toFixed(5),
+    etherfuseMidMarketRate: rate.toFixed(5),
     nominalRate: rate.toFixed(4),
     feeBps: String(feeBps),
-    feeAmountUsdc: ((usdc * feeBps) / 10000).toFixed(2),
+    feeAmount: ((usdc * feeBps) / 10000).toFixed(2),
     requiresSwap: true,
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + 120_000).toISOString(),
@@ -90,10 +90,10 @@ export async function POST(req: Request) {
       sourceAmount: q.sourceAmount,
       destinationAmount: q.destinationAmount,
       exchangeRate: q.exchangeRate,
-      midMarketRate: q.etherfuseMidMarketRate,
+      etherfuseMidMarketRate: q.etherfuseMidMarketRate,
       nominalRate: q.nominalRate,
       feeBps: q.feeBps,
-      feeAmountUsdc: q.feeAmount,
+      feeAmount: q.feeAmount,
       requiresSwap: q.requiresSwap,
       createdAt: q.createdAt,
       expiresAt: q.expiresAt,

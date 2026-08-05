@@ -1,0 +1,317 @@
+/**
+ * lib/server/stellar.ts
+ *
+ * SOLO SERVIDOR. Nunca importar desde un componente cliente.
+ * Primitivas portadas 1:1 desde spike/spike.mjs (verificadas en testnet).
+ */
+
+import "server-only"
+
+import {
+  Keypair,
+  Horizon,
+  TransactionBuilder,
+  Operation,
+  Asset,
+  Networks,
+  BASE_FEE,
+  Claimant,
+  Transaction,
+  FeeBumpTransaction,
+} from "@stellar/stellar-sdk"
+
+const HORIZON_URL = "https://horizon-testnet.stellar.org"
+const NETWORK_PASSPHRASE = Networks.TESTNET
+
+export class StellarError extends Error {
+  constructor(
+    message: string,
+    readonly resultCodes?: {
+      transaction?: string
+      operations?: string[]
+    },
+  ) {
+    super(message)
+    this.name = "StellarError"
+  }
+}
+
+export interface AccountBalance {
+  asset: string
+  balance: string
+}
+
+export interface AccountState {
+  publicKey: string
+  balances: AccountBalance[]
+  subentryCount: number
+  numSponsoring: number
+  numSponsored: number
+}
+
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new StellarError(`${name} is not configured`)
+  }
+  return value
+}
+
+function getConfig() {
+  const network = process.env.STELLAR_NETWORK ?? "testnet"
+  if (network !== "testnet") {
+    throw new StellarError(
+      `STELLAR_NETWORK="${network}" is not supported yet; only "testnet" is configured`,
+    )
+  }
+  return {
+    sponsorSecret: requireEnv("STELLAR_SPONSOR_SECRET"),
+    usdcIssuer: requireEnv("STELLAR_USDC_ISSUER"),
+    network,
+  }
+}
+
+function getServer() {
+  return new Horizon.Server(HORIZON_URL)
+}
+
+function getSponsorKeypair() {
+  return Keypair.fromSecret(getConfig().sponsorSecret)
+}
+
+function getUsdcAsset() {
+  return new Asset("USDC", getConfig().usdcIssuer)
+}
+
+function extractResultCodes(err: unknown): StellarError["resultCodes"] | undefined {
+  if (!err || typeof err !== "object") return undefined
+  const response = (err as { response?: { data?: { extras?: { result_codes?: unknown } } } })
+    .response
+  const codes = response?.data?.extras?.result_codes
+  if (!codes || typeof codes !== "object") return undefined
+  const c = codes as { transaction?: string; operations?: string[] }
+  return {
+    transaction: c.transaction,
+    operations: c.operations,
+  }
+}
+
+async function submitTransaction(
+  tx: Transaction | FeeBumpTransaction,
+  label: string,
+) {
+  const server = getServer()
+  try {
+    return await server.submitTransaction(tx)
+  } catch (err) {
+    const resultCodes = extractResultCodes(err)
+    const detail = resultCodes
+      ? JSON.stringify(resultCodes)
+      : err instanceof Error
+        ? err.message
+        : String(err)
+    throw new StellarError(`${label} failed: ${detail}`, resultCodes)
+  }
+}
+
+/**
+ * Server-only helper. Returns a secret — store it server-side only;
+ * never log it or send it to the client.
+ */
+export function generateRecipientKeypair(): { publicKey: string; secret: string } {
+  const kp = Keypair.random()
+  return { publicKey: kp.publicKey(), secret: kp.secret() }
+}
+
+/**
+ * Single transaction: beginSponsoringFutureReserves → createAccount(0) →
+ * changeTrust(USDC) → endSponsoringFutureReserves.
+ * Signed by BOTH sponsor and recipient.
+ *
+ * The recipient secret is required for co-signing (changeTrust / endSponsoring)
+ * and must never be logged or returned to the client.
+ */
+export async function createSponsoredAccount(
+  recipientPublicKey: string,
+  recipientSecret: string,
+): Promise<{ hash: string }> {
+  const sponsor = getSponsorKeypair()
+  const recipient = Keypair.fromSecret(recipientSecret)
+  if (recipient.publicKey() !== recipientPublicKey) {
+    throw new StellarError("recipientPublicKey does not match recipientSecret")
+  }
+  const USDC = getUsdcAsset()
+  const server = getServer()
+
+  const acc = await server.loadAccount(sponsor.publicKey())
+  const tx = new TransactionBuilder(acc, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(
+      Operation.beginSponsoringFutureReserves({
+        sponsoredId: recipientPublicKey,
+      }),
+    )
+    .addOperation(
+      Operation.createAccount({
+        destination: recipientPublicKey,
+        startingBalance: "0",
+      }),
+    )
+    .addOperation(
+      Operation.changeTrust({
+        asset: USDC,
+        source: recipientPublicKey,
+      }),
+    )
+    .addOperation(
+      Operation.endSponsoringFutureReserves({
+        source: recipientPublicKey,
+      }),
+    )
+    .setTimeout(60)
+    .build()
+
+  tx.sign(sponsor, recipient)
+  const res = await submitTransaction(tx, "createSponsoredAccount")
+  return { hash: res.hash }
+}
+
+/**
+ * Claimable balance with two claimants:
+ *   recipient — Claimant.predicateBeforeAbsoluteTime(deadline)
+ *   sponsor   — Claimant.predicateNot(same predicate)
+ */
+export async function createClaimableBalance(
+  recipientPublicKey: string,
+  amount: string,
+  expiresInSeconds: number,
+): Promise<{ balanceId: string; hash: string; deadline: number }> {
+  const sponsor = getSponsorKeypair()
+  const USDC = getUsdcAsset()
+  const server = getServer()
+
+  const deadline = Math.floor(Date.now() / 1000) + expiresInSeconds
+  const before = Claimant.predicateBeforeAbsoluteTime(String(deadline))
+
+  const claimants = [
+    new Claimant(recipientPublicKey, before),
+    new Claimant(sponsor.publicKey(), Claimant.predicateNot(before)),
+  ]
+
+  const acc = await server.loadAccount(sponsor.publicKey())
+  const tx = new TransactionBuilder(acc, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(
+      Operation.createClaimableBalance({
+        asset: USDC,
+        amount: String(amount),
+        claimants,
+      }),
+    )
+    .setTimeout(60)
+    .build()
+
+  tx.sign(sponsor)
+  const res = await submitTransaction(tx, "createClaimableBalance")
+  const balanceId = tx.getClaimableBalanceId(0)
+
+  return { balanceId, hash: res.hash, deadline }
+}
+
+/**
+ * CRITICAL: recipient has 0 XLM and cannot pay fees.
+ * Build inner tx (recipient as source), sign with recipient, wrap in
+ * fee-bump paid by sponsor. Verified approach from the spike.
+ */
+export async function claimBalance(
+  balanceId: string,
+  recipientSecret: string,
+): Promise<{ hash: string }> {
+  const sponsor = getSponsorKeypair()
+  const recipient = Keypair.fromSecret(recipientSecret)
+  const server = getServer()
+
+  const acc = await server.loadAccount(recipient.publicKey())
+  const inner = new TransactionBuilder(acc, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(Operation.claimClaimableBalance({ balanceId }))
+    .setTimeout(120)
+    .build()
+  inner.sign(recipient)
+
+  const bump = TransactionBuilder.buildFeeBumpTransaction(
+    sponsor,
+    (Number(BASE_FEE) * 2).toString(),
+    inner,
+    NETWORK_PASSPHRASE,
+  )
+  bump.sign(sponsor)
+
+  const res = await submitTransaction(bump, "claimBalance")
+  return { hash: res.hash }
+}
+
+/**
+ * Sponsor claims after expiry.
+ * Before the deadline Horizon returns op_cannot_claim — expected; surfaced as StellarError.
+ */
+export async function refundExpiredBalance(balanceId: string): Promise<{ hash: string }> {
+  const sponsor = getSponsorKeypair()
+  const server = getServer()
+
+  const acc = await server.loadAccount(sponsor.publicKey())
+  const tx = new TransactionBuilder(acc, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(Operation.claimClaimableBalance({ balanceId }))
+    .setTimeout(60)
+    .build()
+  tx.sign(sponsor)
+
+  try {
+    const res = await submitTransaction(tx, "refundExpiredBalance")
+    return { hash: res.hash }
+  } catch (err) {
+    if (err instanceof StellarError) {
+      const ops = err.resultCodes?.operations ?? []
+      if (ops.includes("op_cannot_claim")) {
+        throw new StellarError(
+          "Claimable balance cannot be claimed yet (op_cannot_claim) — deadline has not passed",
+          err.resultCodes,
+        )
+      }
+    }
+    throw err
+  }
+}
+
+/** Balances plus subentry_count, num_sponsoring, num_sponsored. */
+export async function getAccountState(publicKey: string): Promise<AccountState> {
+  const server = getServer()
+  try {
+    const a = await server.loadAccount(publicKey)
+    return {
+      publicKey,
+      balances: a.balances.map((b) => ({
+        asset: "asset_code" in b && b.asset_code ? b.asset_code : "XLM",
+        balance: b.balance,
+      })),
+      subentryCount: a.subentry_count,
+      numSponsoring: a.num_sponsoring ?? 0,
+      numSponsored: a.num_sponsored ?? 0,
+    }
+  } catch (err) {
+    const resultCodes = extractResultCodes(err)
+    throw new StellarError(
+      `Account ${publicKey} not found or unreachable`,
+      resultCodes,
+    )
+  }
+}

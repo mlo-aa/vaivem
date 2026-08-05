@@ -14,5 +14,9 @@ node_modules
 .next/
 .DS_Store
 .env*.local
+*.tsbuildinfo
 
 spike-state.json
+
+# Leftover single-app dirs if OS file locks blocked the move
+_trash_*/
