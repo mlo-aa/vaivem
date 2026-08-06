@@ -15,8 +15,9 @@ export function MarketingHeader() {
   const [open, setOpen] = useState(false)
 
   const NAV = [
+    { label: t('navProblem'), href: '/#problem' as const },
     { label: t('navHow'), href: '/#how-it-works' as const },
-    { label: t('navUseCases'), href: '/#use-cases' as const },
+    { label: t('navProof'), href: '/#proof' as const },
     { label: t('navDevelopers'), href: '/developers' as const },
   ]
 
