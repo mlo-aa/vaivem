@@ -278,10 +278,10 @@ export default function FundingPage() {
   return (
     <>
       <DashboardTopbar title={t('title')} />
-      <main className="flex-1 space-y-6 p-4 sm:p-6">
+      <main className="flex-1 space-y-6 px-4 pb-10 sm:px-8">
         <p className="text-sm text-muted-foreground">{tCustody('line')}</p>
 
-        <div className="rounded-lg border border-border bg-secondary/40 px-4 py-3 text-sm">
+        <div className="rounded-[1.25rem] bg-surface px-4 py-3 text-sm dark:border dark:border-border sm:px-6">
           <p className="font-medium">{t('sandboxTitle')}</p>
           <p className="mt-1 text-muted-foreground">
             {t('sandboxBody', { max: SANDBOX_FIAT_MAX })}
@@ -382,7 +382,7 @@ export default function FundingPage() {
                       </Button>
                     </div>
 
-                    <div className="flex flex-col items-center gap-2 rounded-lg border border-border p-3">
+                    <div className="flex flex-col items-center gap-2 rounded-[1.25rem] bg-background p-3 dark:border dark:border-border">
                       <QRCodeSVG value={usdcInfo.address} size={160} bgColor="transparent" />
                       <p className="text-center text-xs text-muted-foreground">
                         {t('addressQrHint')}
@@ -399,7 +399,7 @@ export default function FundingPage() {
                     </Button>
 
                     {usdcCredits.length > 0 ? (
-                      <div className="rounded-md border border-border bg-secondary/40 p-3">
+                      <div className="rounded-[1rem] bg-surface p-3 dark:border dark:border-border">
                         <p className="font-medium">{t('newlyCredited')}</p>
                         <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
                           {usdcCredits.map((c) => (
@@ -466,7 +466,7 @@ export default function FundingPage() {
                 </form>
 
                 {instructions ? (
-                  <div className="mt-4 space-y-3 rounded-lg border border-border p-3 text-sm">
+                  <div className="mt-4 space-y-3 rounded-[1.25rem] bg-surface p-3 text-sm dark:border dark:border-border sm:p-4">
                     <p className="font-medium">
                       {instructions.rail === 'pix' ? t('pixDeposit') : t('speiDeposit')}
                     </p>
@@ -489,7 +489,7 @@ export default function FundingPage() {
                             <p className="text-xs font-medium text-muted-foreground">
                               {t('pixCopyTitle')}
                             </p>
-                            <p className="break-all rounded-md bg-secondary p-2 font-mono text-xs">
+                            <p className="break-all rounded-[0.75rem] bg-background p-2 font-mono text-xs dark:border dark:border-border">
                               {instructions.pixCopyPaste}
                             </p>
                             <Button
@@ -606,50 +606,89 @@ export default function FundingPage() {
               <p className="text-sm text-muted-foreground">{t('pendingBody')}</p>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('when')}</TableHead>
-                    <TableHead>{t('order')}</TableHead>
-                    <TableHead>{t('fiat')}</TableHead>
-                    <TableHead>{tCommon('usdc')}</TableHead>
-                    <TableHead>{t('status')}</TableHead>
-                    <TableHead className="text-right">{t('action')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingOrders.map((row) => (
-                    <TableRow key={row.orderId}>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {new Date(row.createdAt).toLocaleString(dateLocale)}
-                      </TableCell>
-                      <TableCell className="max-w-[10rem] truncate font-mono text-xs">
-                        {row.orderId}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {row.fiatAmount} {row.currency}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {formatUSDC(row.usdcAmount, locale)}
-                      </TableCell>
-                      <TableCell>{row.status}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={checkingId === row.orderId}
-                          onClick={() => void checkStatus(row.orderId)}
-                        >
-                          {checkingId === row.orderId
-                            ? t('checking')
-                            : t('checkStatus')}
-                        </Button>
-                      </TableCell>
+              {/* Mobile stacked cards */}
+              <div className="flex flex-col gap-3 md:hidden">
+                {pendingOrders.map((row) => (
+                  <div
+                    key={row.orderId}
+                    className="rounded-[1.25rem] bg-background p-4 dark:border dark:border-border"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium tabular-nums">
+                          {row.fiatAmount} {row.currency}
+                        </p>
+                        <p className="mt-0.5 text-sm tabular-nums text-muted-foreground">
+                          {formatUSDC(row.usdcAmount, locale)}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm text-muted-foreground">{row.status}</span>
+                    </div>
+                    <p className="mt-2 truncate font-mono text-xs text-muted-foreground">
+                      {row.orderId}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {new Date(row.createdAt).toLocaleString(dateLocale)}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      disabled={checkingId === row.orderId}
+                      onClick={() => void checkStatus(row.orderId)}
+                    >
+                      {checkingId === row.orderId ? t('checking') : t('checkStatus')}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t('when')}</TableHead>
+                      <TableHead>{t('order')}</TableHead>
+                      <TableHead>{t('fiat')}</TableHead>
+                      <TableHead>{tCommon('usdc')}</TableHead>
+                      <TableHead>{t('status')}</TableHead>
+                      <TableHead className="text-right">{t('action')}</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingOrders.map((row) => (
+                      <TableRow key={row.orderId}>
+                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                          {new Date(row.createdAt).toLocaleString(dateLocale)}
+                        </TableCell>
+                        <TableCell className="max-w-[10rem] truncate font-mono text-xs">
+                          {row.orderId}
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {row.fiatAmount} {row.currency}
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {formatUSDC(row.usdcAmount, locale)}
+                        </TableCell>
+                        <TableCell>{row.status}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={checkingId === row.orderId}
+                            onClick={() => void checkStatus(row.orderId)}
+                          >
+                            {checkingId === row.orderId
+                              ? t('checking')
+                              : t('checkStatus')}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         ) : null}
@@ -662,30 +701,57 @@ export default function FundingPage() {
             {ledger.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('noEntries')}</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('when')}</TableHead>
-                    <TableHead>{t('type')}</TableHead>
-                    <TableHead>{t('amount')}</TableHead>
-                    <TableHead>{t('ref')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                <div className="flex flex-col gap-3 md:hidden">
                   {ledger.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {new Date(row.createdAt).toLocaleString(dateLocale)}
-                      </TableCell>
-                      <TableCell>{row.type}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {formatUSDC(row.amount, locale)}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{row.ref}</TableCell>
-                    </TableRow>
+                    <div
+                      key={row.id}
+                      className="rounded-[1.25rem] bg-background p-4 dark:border dark:border-border"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium">{row.type}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {new Date(row.createdAt).toLocaleString(dateLocale)}
+                          </p>
+                        </div>
+                        <p className="text-base font-semibold tabular-nums tracking-[-0.02em]">
+                          {formatUSDC(row.amount, locale)}
+                        </p>
+                      </div>
+                      <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
+                        {row.ref}
+                      </p>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('when')}</TableHead>
+                        <TableHead>{t('type')}</TableHead>
+                        <TableHead>{t('amount')}</TableHead>
+                        <TableHead>{t('ref')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ledger.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {new Date(row.createdAt).toLocaleString(dateLocale)}
+                          </TableCell>
+                          <TableCell>{row.type}</TableCell>
+                          <TableCell className="tabular-nums">
+                            {formatUSDC(row.amount, locale)}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">{row.ref}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

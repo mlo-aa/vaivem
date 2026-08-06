@@ -22,7 +22,7 @@ export default function CreateClaimPage() {
     return (
       <>
         <DashboardTopbar title={t('title')} />
-        <main className="flex-1 p-4 sm:p-6">
+        <main className="flex-1 px-4 pb-10 sm:px-8">
           <Skeleton className="mx-auto h-64 max-w-lg w-full" />
         </main>
       </>
@@ -32,7 +32,7 @@ export default function CreateClaimPage() {
   return (
     <>
       <DashboardTopbar title={t('title')} />
-      <main className="flex-1 p-4 sm:p-6">
+      <main className="flex-1 px-4 pb-10 sm:px-8">
         <div className="mx-auto mb-4 max-w-lg text-sm text-muted-foreground">
           {t('batchHint')}{' '}
           <Link

@@ -1,19 +1,20 @@
 /* Scoped kit tokens — host apps can override via CSS variables on .vv-kit */
 .vv-kit {
-  --vv-bg: #f7f7f4;
-  --vv-fg: #1a1f2e;
-  --vv-muted: #6b7280;
-  --vv-card: #ffffff;
-  --vv-border: #e5e7eb;
-  --vv-brand: #22c55e;
-  --vv-brand-fg: #0f172a;
+  --vv-bg: #ffffff;
+  --vv-fg: #0a0a0a;
+  --vv-muted: #525252;
+  --vv-card: #f4f4f4;
+  --vv-border: transparent;
+  --vv-brand: #d4ff3f;
+  --vv-brand-fg: #0a0a0a;
   --vv-danger: #dc2626;
-  --vv-amber: #d97706;
-  --vv-radius: 12px;
+  --vv-amber: #ca8a04;
+  --vv-radius: 1.25rem;
   --vv-font: ui-sans-serif, system-ui, sans-serif;
   --vv-mono: ui-monospace, monospace;
   color: var(--vv-fg);
   font-family: var(--vv-font);
+  font-size: 15px;
   box-sizing: border-box;
 }
 
@@ -25,9 +26,9 @@
 
 .vv-card {
   background: var(--vv-card);
-  border: 1px solid var(--vv-border);
+  border: none;
   border-radius: var(--vv-radius);
-  padding: 1.25rem;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -42,11 +43,11 @@
 
 .vv-demo-badge {
   flex: none;
-  border: 1px solid color-mix(in oklab, var(--vv-amber) 45%, transparent);
+  border: none;
   border-radius: 999px;
   padding: 0.15rem 0.45rem;
-  color: var(--vv-amber);
-  background: color-mix(in oklab, var(--vv-amber) 8%, transparent);
+  color: var(--vv-fg);
+  background: #ffffff;
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -56,11 +57,12 @@
   margin: 0;
   font-size: 1.125rem;
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .vv-desc {
   margin: 0.25rem 0 0;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--vv-muted);
   overflow-wrap: anywhere;
 }
@@ -85,19 +87,19 @@
 .vv-input,
 .vv-select {
   width: 100%;
-  height: 2.25rem;
+  height: 2.5rem;
   padding: 0 0.75rem;
-  border: 1px solid var(--vv-border);
-  border-radius: 8px;
-  background: var(--vv-card);
+  border: 1px solid #e5e5e5;
+  border-radius: 999px;
+  background: #ffffff;
   color: var(--vv-fg);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
 }
 
 .vv-input:focus,
 .vv-select:focus {
-  outline: 2px solid color-mix(in oklab, var(--vv-brand) 40%, transparent);
+  outline: 2px solid var(--vv-brand);
   border-color: var(--vv-brand);
 }
 
@@ -107,15 +109,20 @@
   justify-content: center;
   gap: 0.4rem;
   width: 100%;
-  height: 2.5rem;
+  height: 2.75rem;
   border: none;
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--vv-brand);
   color: var(--vv-brand-fg);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
+  transition: opacity 150ms ease;
+}
+
+.vv-btn:hover:not(:disabled) {
+  opacity: 0.95;
 }
 
 .vv-btn:disabled {
@@ -124,13 +131,13 @@
 }
 
 .vv-btn--ghost {
-  background: transparent;
-  color: var(--vv-muted);
-  border: 1px solid transparent;
+  background: #ffffff;
+  color: var(--vv-fg);
+  border: none;
 }
 
 .vv-btn--ghost:hover {
-  background: color-mix(in oklab, var(--vv-fg) 4%, transparent);
+  opacity: 0.9;
 }
 
 .vv-error {
@@ -173,8 +180,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.4rem 0.55rem;
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--vv-fg) 4%, transparent);
+  border-radius: 999px;
+  background: #ffffff;
   font-size: 0.875rem;
 }
 
@@ -194,13 +201,14 @@
   gap: 0.85rem;
   width: 100%;
   padding: 0.85rem;
-  border: 1px solid var(--vv-border);
-  border-radius: 10px;
-  background: var(--vv-card);
+  border: none;
+  border-radius: var(--vv-radius);
+  background: #ffffff;
   text-align: left;
   cursor: pointer;
   font: inherit;
   color: inherit;
+  transition: background 150ms ease;
 }
 
 .vv-rail > span:nth-child(2) {
@@ -208,8 +216,9 @@
 }
 
 .vv-rail[data-selected="true"] {
-  border-color: var(--vv-brand);
-  background: color-mix(in oklab, var(--vv-brand) 8%, white);
+  border: none;
+  background: var(--vv-brand);
+  color: var(--vv-brand-fg);
 }
 
 .vv-rail-icon {
@@ -219,14 +228,18 @@
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 999px;
-  background: color-mix(in oklab, var(--vv-fg) 6%, transparent);
+  background: var(--vv-card);
+}
+
+.vv-rail[data-selected="true"] .vv-rail-icon {
+  background: color-mix(in srgb, var(--vv-brand-fg) 12%, transparent);
 }
 
 .vv-rail-eta {
   margin-left: auto;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--vv-brand);
+  color: inherit;
 }
 
 .vv-hero {
@@ -236,9 +249,9 @@
 
 .vv-hero-amount {
   margin: 0.25rem 0;
-  font-size: 2.15rem;
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -261,8 +274,9 @@
   text-align: center;
   font-size: 1.1rem;
   font-family: var(--vv-mono);
-  border: 1px solid var(--vv-border);
-  border-radius: 8px;
+  border: 1px solid #e5e5e5;
+  border-radius: 0.75rem;
+  background: #ffffff;
 }
 
 .vv-steps {
@@ -289,7 +303,7 @@
   justify-content: center;
   font-size: 0.75rem;
   font-weight: 600;
-  background: color-mix(in oklab, var(--vv-fg) 8%, transparent);
+  background: #ffffff;
   color: var(--vv-muted);
 }
 
@@ -321,23 +335,7 @@
 .vv-skeleton {
   height: 1.1rem;
   border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--vv-fg) 6%, transparent),
-    color-mix(in oklab, var(--vv-fg) 12%, transparent),
-    color-mix(in oklab, var(--vv-fg) 6%, transparent)
-  );
-  background-size: 200% 100%;
-  animation: vv-shimmer 1.2s ease-in-out infinite;
-}
-
-@keyframes vv-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
+  background: #e5e5e5;
 }
 
 .vv-stack {

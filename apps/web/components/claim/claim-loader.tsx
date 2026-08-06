@@ -40,7 +40,7 @@ export function ClaimLoader({ token }: { token: string }) {
             <Skeleton className="h-14 w-52 rounded-2xl" />
             <Skeleton className="h-4 w-24 rounded-full" />
           </div>
-          <Card className="rounded-2xl border-black/5 shadow-sm">
+          <Card>
             <CardHeader>
               <Skeleton className="h-5 w-40" />
             </CardHeader>
@@ -57,9 +57,9 @@ export function ClaimLoader({ token }: { token: string }) {
   if (claim === null) {
     return (
       <ClaimShell>
-        <Card className="mx-auto w-full max-w-md rounded-2xl border-black/5 shadow-sm">
+        <Card className="mx-auto w-full max-w-md">
           <CardHeader className="space-y-2">
-            <p className="text-xl font-semibold tracking-tight text-foreground">
+            <p className="text-xl font-semibold tracking-[-0.02em] text-foreground">
               {t("notFound")}
             </p>
             <p className="text-sm leading-relaxed text-muted-foreground">
@@ -76,9 +76,9 @@ export function ClaimLoader({ token }: { token: string }) {
       claim.status === "completed" || claim.status === "claimed"
     return (
       <ClaimShell>
-        <Card className="mx-auto w-full max-w-md rounded-2xl border-black/5 shadow-sm">
+        <Card className="mx-auto w-full max-w-md">
           <CardHeader className="space-y-2">
-            <p className="text-xl font-semibold tracking-tight text-foreground">
+            <p className="text-xl font-semibold tracking-[-0.02em] text-foreground">
               {received ? t("alreadyReceived") : t("unavailable")}
             </p>
             <p className="text-sm leading-relaxed text-muted-foreground">

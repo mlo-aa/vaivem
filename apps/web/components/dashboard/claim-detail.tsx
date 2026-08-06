@@ -123,7 +123,7 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="text-3xl font-semibold tracking-[-0.02em] tabular-nums sm:text-[2.5rem]">
               {formatDisplay(claim.displayAmount, claim.displayCurrency, locale)}
             </h1>
             <StatusBadge status={claim.status} />
@@ -228,7 +228,7 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
               {claim.message && (
                 <div className="sm:col-span-2">
                   <p className="text-xs font-medium text-muted-foreground">{t('messageToRecipient')}</p>
-                  <p className="mt-1 rounded-lg bg-secondary p-3 text-sm">{claim.message}</p>
+                  <p className="mt-1 rounded-[1.25rem] bg-surface p-3 text-sm dark:border dark:border-border">{claim.message}</p>
                 </div>
               )}
             </CardContent>

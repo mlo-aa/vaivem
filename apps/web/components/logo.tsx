@@ -10,7 +10,7 @@ export function LogoMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center rounded-[0.5rem] bg-navy text-navy-foreground',
+        'inline-flex items-center justify-center rounded-[0.5rem] bg-foreground text-background',
         className,
       )}
       aria-hidden="true"
@@ -18,7 +18,7 @@ export function LogoMark({ className }: { className?: string }) {
       <svg viewBox="0 0 24 24" fill="none" className="size-[62%]">
         <path
           d="M9.5 14.5L14.5 9.5"
-          stroke="var(--brand)"
+          stroke="var(--primary)"
           strokeWidth="2"
           strokeLinecap="round"
         />

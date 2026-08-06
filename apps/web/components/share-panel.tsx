@@ -51,8 +51,8 @@ export function SharePanel({ token, amountLabel }: { token: string; amountLabel:
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-card p-6">
-        <div className="rounded-xl bg-background p-3 ring-1 ring-border">
+      <div className="flex flex-col items-center gap-4 rounded-[1.25rem] bg-surface p-6 dark:border dark:border-border">
+        <div className="rounded-[1rem] bg-background p-3 dark:border dark:border-border">
           <QRCodeSVG value={url} size={148} bgColor="transparent" fgColor="currentColor" />
         </div>
         <p className="text-center text-sm text-muted-foreground">{t('scanHint')}</p>

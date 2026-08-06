@@ -14,25 +14,25 @@ export function ProcessSteps({ steps, current }: { steps: string[]; current: num
             <span
               className={cn(
                 'flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium transition-colors',
-                done && 'bg-success text-success-foreground',
-                active && 'bg-brand text-brand-foreground',
-                !done && !active && 'bg-secondary text-muted-foreground',
-              )}
-            >
-              {done ? (
-                <Check className="size-4" />
-              ) : active ? (
-                <Spinner className="size-4" />
-              ) : (
-                step
-              )}
-            </span>
-            <span
-              className={cn(
-                'text-sm transition-colors',
-                done || active ? 'font-medium text-foreground' : 'text-muted-foreground',
-              )}
-            >
+                  done && 'bg-primary text-primary-foreground',
+                  active && 'bg-primary text-primary-foreground',
+                  !done && !active && 'bg-surface text-muted-foreground',
+                )}
+              >
+                {done ? (
+                  <Check className="size-4" />
+                ) : active ? (
+                  <Spinner className="size-4" />
+                ) : (
+                  step
+                )}
+              </span>
+              <span
+                className={cn(
+                  'text-sm transition-colors duration-150',
+                  done || active ? 'font-medium text-foreground' : 'text-muted-foreground',
+                )}
+              >
               {label}
             </span>
           </li>

@@ -88,7 +88,7 @@ export function ClaimTimeline({ claim }: { claim: Claim }) {
               <span
                 className={cn(
                   'flex size-8 shrink-0 items-center justify-center rounded-full',
-                  last ? 'bg-brand/15 text-[color-mix(in_oklab,var(--brand),black_40%)]' : 'bg-secondary text-muted-foreground',
+                  last ? 'bg-primary text-primary-foreground' : 'bg-surface text-muted-foreground',
                 )}
               >
                 <Icon className="size-4" />

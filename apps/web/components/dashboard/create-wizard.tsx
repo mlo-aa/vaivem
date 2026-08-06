@@ -209,7 +209,7 @@ export function CreateWizard() {
       <Card className="mx-auto max-w-lg">
         <CardContent className="flex flex-col gap-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-brand/15 text-[color-mix(in_oklab,var(--brand),black_40%)]">
+            <span className="flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
               <ShieldCheck className="size-5" />
             </span>
             <div>
@@ -235,7 +235,7 @@ export function CreateWizard() {
     return (
       <div className="mx-auto flex max-w-lg flex-col gap-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <span className="flex size-14 items-center justify-center rounded-full bg-success/15 text-success">
+          <span className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <CheckCircle2 className="size-7" />
           </span>
           <div>
@@ -269,7 +269,7 @@ export function CreateWizard() {
         <Stepper step={step} />
 
         {error && (
-          <div className="rounded-lg border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div className="rounded-[1.25rem] bg-destructive/10 px-4 py-3 text-sm text-destructive dark:border dark:border-destructive/40">
             {error}
           </div>
         )}
@@ -376,18 +376,18 @@ export function CreateWizard() {
                         type="button"
                         onClick={() => setProtection(p.value)}
                         className={cn(
-                          'flex items-start gap-3 rounded-lg border p-3 text-left transition-colors',
+                          'flex items-start gap-3 rounded-[1.25rem] bg-surface p-3 text-left transition-colors duration-150 dark:border dark:border-border',
                           protection === p.value
-                            ? 'border-brand bg-brand/5 ring-1 ring-brand/30'
-                            : 'border-border hover:bg-secondary',
+                            ? 'bg-primary text-primary-foreground dark:border-transparent'
+                            : 'hover:opacity-90',
                         )}
                       >
                         <span
                           className={cn(
-                            'mt-0.5 flex size-8 items-center justify-center rounded-lg',
+                            'mt-0.5 flex size-8 items-center justify-center rounded-full',
                             protection === p.value
-                              ? 'bg-brand/15 text-[color-mix(in_oklab,var(--brand),black_40%)]'
-                              : 'bg-secondary text-muted-foreground',
+                              ? 'bg-primary-foreground/15 text-primary-foreground'
+                              : 'bg-background text-muted-foreground',
                           )}
                         >
                           <p.icon className="size-4" />
@@ -396,7 +396,14 @@ export function CreateWizard() {
                           <span className="text-sm font-medium">
                             {t(`protection.${p.value}.label`)}
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span
+                            className={cn(
+                              'text-xs',
+                              protection === p.value
+                                ? 'text-primary-foreground/80'
+                                : 'text-muted-foreground',
+                            )}
+                          >
                             {t(`protection.${p.value}.description`)}
                           </span>
                         </span>
@@ -519,28 +526,28 @@ export function CreateWizard() {
 
       {/* Live summary */}
       <div className="lg:sticky lg:top-24 lg:self-start">
-        <Card className="bg-navy text-navy-foreground">
+        <Card className="bg-primary text-primary-foreground dark:border-transparent">
           <CardContent className="flex flex-col gap-5 py-2">
-            <div className="flex items-center gap-2 text-navy-foreground/70">
+            <div className="flex items-center gap-2 text-primary-foreground/70">
               <Sparkles className="size-4" />
               <span className="text-xs font-medium uppercase tracking-wide">{t('liveQuote')}</span>
             </div>
             <div>
-              <p className="text-sm text-navy-foreground/70">{t('youLock')}</p>
+              <p className="text-sm text-primary-foreground/70">{t('youLock')}</p>
               {quoting ? (
-                <Skeleton className="mt-1 h-9 w-40 bg-white/10" />
+                <Skeleton className="mt-1 h-9 w-40 bg-primary-foreground/15" />
               ) : (
-                <p className="text-3xl font-semibold tabular-nums">
+                <p className="text-3xl font-semibold tabular-nums tracking-[-0.02em] sm:text-4xl">
                   {formatUSDC(fundingUsdc ?? 0, locale)}
                 </p>
               )}
-              <p className="mt-1 text-sm text-navy-foreground/60">
+              <p className="mt-1 text-sm text-primary-foreground/60">
                 {numericAmount > 0
                   ? formatDisplay(numericAmount, currency, locale)
                   : t('enterAmount')}
               </p>
             </div>
-            <div className="flex flex-col gap-2 border-t border-white/10 pt-4 text-sm">
+            <div className="flex flex-col gap-2 border-t border-primary-foreground/15 pt-4 text-sm">
               <QuoteRow
                 label={t('referenceRate')}
                 value={
@@ -552,10 +559,10 @@ export function CreateWizard() {
               <QuoteRow label={t('cashOutFee')} value={t('cashOutFeeValue')} />
               <QuoteRow label={t('networkFee')} value={t('networkFeeValue')} />
             </div>
-            <div className="rounded-lg bg-white/5 p-3">
+            <div className="rounded-[1rem] bg-primary-foreground/10 p-3">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="size-4 text-brand" />
-                <span className="text-xs text-navy-foreground/80">{t('lockedHint')}</span>
+                <ShieldCheck className="size-4" />
+                <span className="text-xs text-primary-foreground/80">{t('lockedHint')}</span>
               </div>
             </div>
           </CardContent>
@@ -580,9 +587,9 @@ function Stepper({ step }: { step: number }) {
               <span
                 className={cn(
                   'flex size-7 items-center justify-center rounded-full text-xs font-medium',
-                  done && 'bg-success text-success-foreground',
-                  active && 'bg-brand text-brand-foreground',
-                  !done && !active && 'bg-secondary text-muted-foreground',
+                  done && 'bg-foreground text-background',
+                  active && 'bg-primary text-primary-foreground',
+                  !done && !active && 'bg-surface text-muted-foreground',
                 )}
               >
                 {done ? <CheckCircle2 className="size-4" /> : n}
@@ -616,7 +623,7 @@ function MethodToggle({
   onChange: (v: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+    <div className="flex items-center justify-between gap-4 rounded-[1.25rem] bg-surface p-3 dark:border dark:border-border">
       <div className="flex flex-col">
         <span className="text-sm font-medium">{title}</span>
         <span className="text-xs text-muted-foreground">{description}</span>
@@ -638,7 +645,7 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 function QuoteRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-navy-foreground/60">{label}</span>
+      <span className="text-primary-foreground/60">{label}</span>
       <span className="font-medium tabular-nums">{value}</span>
     </div>
   )

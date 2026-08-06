@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import {
   ArrowRight,
   Award,
@@ -79,15 +78,19 @@ export default function LandingPage() {
       <MarketingHeader />
 
       <main className="flex-1">
-        {/* Hero */}
+        {/* Hero — single subtle gradient allowed on marketing */}
         <section className="relative overflow-hidden">
-          <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
+          <div
+            className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,var(--surface)_0%,var(--background)_55%)]"
+            aria-hidden
+          />
+          <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-8 lg:grid-cols-2 lg:py-24">
             <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-                <span className="size-1.5 rounded-full bg-brand" />
+              <span className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1 text-xs font-medium text-muted-foreground dark:border dark:border-border">
+                <span className="size-1.5 rounded-full bg-primary" />
                 USDC payouts for Latin America
               </span>
-              <h1 className="mt-5 text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
+              <h1 className="mt-5 text-balance text-5xl font-semibold leading-[1.05] tracking-[-0.02em] sm:text-6xl">
                 Send USDC with a link.
               </h1>
               <p className="mt-5 max-w-md text-pretty text-lg leading-relaxed text-muted-foreground">
@@ -99,7 +102,7 @@ export default function LandingPage() {
                   Create a claim link
                   <ArrowRight data-icon="inline-end" />
                 </ButtonLink>
-                <ButtonLink size="lg" variant="outline" href="/claim/demo-active">
+                <ButtonLink size="lg" variant="secondary" href="/claim/demo-active">
                   View demo claim
                 </ButtonLink>
               </div>
@@ -109,20 +112,16 @@ export default function LandingPage() {
             </div>
 
             <div className="relative flex justify-center lg:justify-end">
-              <div
-                className="absolute -inset-6 -z-10 rounded-[2.5rem] bg-accent/40 blur-2xl"
-                aria-hidden="true"
-              />
               <ClaimCardPreview />
             </div>
           </div>
         </section>
 
         {/* Steps */}
-        <section id="how-it-works" className="border-t border-border bg-card/40">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
+        <section id="how-it-works" className="bg-surface">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-8 lg:py-20">
             <div className="max-w-2xl">
-              <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+              <h2 className="text-balance text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
                 From payout to payday in three steps
               </h2>
               <p className="mt-3 text-pretty text-muted-foreground">
@@ -131,15 +130,18 @@ export default function LandingPage() {
             </div>
             <div className="mt-10 grid gap-4 md:grid-cols-3">
               {STEPS.map((step, i) => (
-                <div key={step.title} className="rounded-2xl border border-border bg-card p-6">
+                <div
+                  key={step.title}
+                  className="rounded-[1.25rem] bg-background p-6 dark:border dark:border-border"
+                >
                   <div className="flex items-center justify-between">
-                    <span className="flex size-11 items-center justify-center rounded-xl bg-brand/15 text-[color-mix(in_oklab,var(--brand),black_40%)]">
+                    <span className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
                       <step.icon className="size-5" />
                     </span>
                     <span className="font-mono text-sm text-muted-foreground">0{i + 1}</span>
                   </div>
-                  <h3 className="mt-5 text-lg font-semibold">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
+                  <h3 className="mt-5 text-lg font-semibold tracking-[-0.02em]">{step.title}</h3>
+                  <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{step.body}</p>
                 </div>
               ))}
             </div>
@@ -147,11 +149,11 @@ export default function LandingPage() {
         </section>
 
         {/* Use cases */}
-        <section id="use-cases" className="border-t border-border">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
+        <section id="use-cases">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-8 lg:py-20">
             <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <div className="max-w-2xl">
-                <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+                <h2 className="text-balance text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
                   One link for every kind of payout
                 </h2>
                 <p className="mt-3 text-pretty text-muted-foreground">
@@ -164,9 +166,9 @@ export default function LandingPage() {
               {USE_CASES.map((uc) => (
                 <div
                   key={uc.label}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-4"
+                  className="flex items-center gap-3 rounded-[1.25rem] bg-surface px-4 py-4 dark:border dark:border-border"
                 >
-                  <span className="flex size-9 items-center justify-center rounded-lg bg-secondary text-foreground">
+                  <span className="flex size-9 items-center justify-center rounded-full bg-background text-foreground">
                     <uc.icon className="size-4.5" />
                   </span>
                   <span className="text-sm font-medium">{uc.label}</span>
@@ -177,31 +179,31 @@ export default function LandingPage() {
         </section>
 
         {/* Developer */}
-        <section className="border-t border-border bg-navy text-navy-foreground">
-          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
+        <section className="bg-foreground text-background">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:px-8 lg:grid-cols-2 lg:py-24">
             <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-xs font-medium text-navy-foreground/70">
+              <span className="inline-flex items-center gap-2 rounded-full bg-background/10 px-3 py-1 text-xs font-medium text-background/70">
                 Developer SDK
               </span>
-              <h2 className="mt-5 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+              <h2 className="mt-5 text-balance text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
                 Payouts in a few lines of code
               </h2>
-              <p className="mt-4 max-w-md text-pretty leading-relaxed text-navy-foreground/70">
+              <p className="mt-4 max-w-md text-pretty leading-relaxed text-background/70">
                 Drop Vaivém into your product and let your users send USDC that anyone can claim
                 or cash out. Full REST API, typed SDK, and webhooks.
               </p>
-              <ButtonLink className="mt-8" variant="secondary" href="/developers">
+              <ButtonLink className="mt-8" href="/developers">
                 Read the docs
                 <ArrowRight data-icon="inline-end" />
               </ButtonLink>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-black/25 p-1.5 shadow-2xl">
+            <div className="rounded-[1.25rem] bg-background/10 p-1.5">
               <div className="flex items-center gap-1.5 px-3 py-2.5">
-                <span className="size-2.5 rounded-full bg-white/20" />
-                <span className="size-2.5 rounded-full bg-white/20" />
-                <span className="size-2.5 rounded-full bg-white/20" />
+                <span className="size-2.5 rounded-full bg-background/20" />
+                <span className="size-2.5 rounded-full bg-background/20" />
+                <span className="size-2.5 rounded-full bg-background/20" />
               </div>
-              <pre className="overflow-x-auto rounded-xl bg-black/40 p-5 font-mono text-sm leading-relaxed text-navy-foreground/90">
+              <pre className="overflow-x-auto rounded-[1rem] bg-background/15 p-5 font-mono text-sm leading-relaxed text-background/90">
                 <code>{CODE}</code>
               </pre>
             </div>
@@ -209,10 +211,10 @@ export default function LandingPage() {
         </section>
 
         {/* Trust & security */}
-        <section id="security" className="border-t border-border">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
+        <section id="security">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-8 lg:py-20">
             <div className="max-w-2xl">
-              <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+              <h2 className="text-balance text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
                 Trust built into every link
               </h2>
               <p className="mt-3 text-pretty text-muted-foreground">
@@ -221,12 +223,15 @@ export default function LandingPage() {
             </div>
             <div className="mt-10 grid gap-4 md:grid-cols-3">
               {TRUST.map((item) => (
-                <div key={item.title} className="rounded-2xl border border-border bg-card p-6">
-                  <span className="flex size-11 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+                <div
+                  key={item.title}
+                  className="rounded-[1.25rem] bg-surface p-6 dark:border dark:border-border"
+                >
+                  <span className="flex size-11 items-center justify-center rounded-full bg-background text-foreground">
                     <item.icon className="size-5" />
                   </span>
-                  <h3 className="mt-5 text-lg font-semibold">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
+                  <h3 className="mt-5 text-lg font-semibold tracking-[-0.02em]">{item.title}</h3>
+                  <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{item.body}</p>
                 </div>
               ))}
             </div>
@@ -234,22 +239,31 @@ export default function LandingPage() {
         </section>
 
         {/* CTA */}
-        <section className="border-t border-border bg-card/40">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
-            <div className="flex flex-col items-center gap-6 rounded-3xl border border-border bg-card px-6 py-12 text-center">
-              <h2 className="max-w-xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+        <section className="bg-surface">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-8 lg:py-20">
+            <div className="flex flex-col items-center gap-6 rounded-[1.5rem] bg-primary px-6 py-12 text-center text-primary-foreground">
+              <h2 className="max-w-xl text-balance text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
                 Send your first walletless payout today
               </h2>
-              <p className="max-w-md text-pretty text-muted-foreground">
+              <p className="max-w-md text-pretty text-primary-foreground/80">
                 Create a protected claim link in under a minute. Your recipient claims it with just a
                 link.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <ButtonLink size="lg" href="/dashboard">
+                <ButtonLink
+                  size="lg"
+                  href="/dashboard"
+                  className="bg-foreground text-background hover:opacity-90"
+                >
                   Create a claim link
                   <ArrowRight data-icon="inline-end" />
                 </ButtonLink>
-                <ButtonLink size="lg" variant="outline" href="/dashboard">
+                <ButtonLink
+                  size="lg"
+                  variant="secondary"
+                  href="/dashboard"
+                  className="bg-primary-foreground/15 text-primary-foreground hover:bg-primary-foreground/25"
+                >
                   Explore the dashboard
                 </ButtonLink>
               </div>

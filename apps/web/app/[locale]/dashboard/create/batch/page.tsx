@@ -178,7 +178,7 @@ export default function BatchCreatePage() {
     return (
       <>
         <DashboardTopbar title={t('title')} />
-        <main className="flex-1 p-4 sm:p-6">
+        <main className="flex-1 px-4 pb-10 sm:px-8">
           <Skeleton className="mx-auto h-64 max-w-lg w-full" />
         </main>
       </>
@@ -188,7 +188,7 @@ export default function BatchCreatePage() {
   return (
     <>
       <DashboardTopbar title={t('title')} />
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 pb-10 sm:px-8">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">
             {t('available', { balance: formatUSDC(balance ?? 0, locale) })}
@@ -222,7 +222,7 @@ export default function BatchCreatePage() {
               ) : null}
 
               {validation && validation.errors.length > 0 ? (
-                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                <div className="rounded-[1.25rem] bg-destructive/10 p-3 text-sm text-destructive dark:border dark:border-destructive/40">
                   <p className="font-medium text-destructive">
                     {t('validationErrors')}
                   </p>
@@ -253,31 +253,56 @@ export default function BatchCreatePage() {
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="max-h-72 overflow-auto rounded-lg border border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('columns.line')}</TableHead>
-                      <TableHead>{t('columns.recipient')}</TableHead>
-                      <TableHead>{t('columns.email')}</TableHead>
-                      <TableHead className="text-right">{t('columns.usdc')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {previewRows.map((row: BatchCsvRow) => (
-                      <TableRow key={row.line}>
-                        <TableCell className="tabular-nums">{row.line}</TableCell>
-                        <TableCell>{row.recipientName}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {row.recipientEmail}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
+              <div className="max-h-72 overflow-auto rounded-[1.25rem] bg-surface p-1 dark:border dark:border-border md:p-0">
+                <div className="flex flex-col gap-2 p-2 md:hidden">
+                  {previewRows.map((row: BatchCsvRow) => (
+                    <div
+                      key={row.line}
+                      className="rounded-[1rem] bg-background p-3 dark:border dark:border-border"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium">{row.recipientName}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {row.recipientEmail}
+                          </p>
+                        </div>
+                        <p className="shrink-0 font-semibold tabular-nums tracking-[-0.02em]">
                           {formatUSDC(row.amount, locale)}
-                        </TableCell>
+                        </p>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t('columns.line')} {row.line}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('columns.line')}</TableHead>
+                        <TableHead>{t('columns.recipient')}</TableHead>
+                        <TableHead>{t('columns.email')}</TableHead>
+                        <TableHead className="text-right">{t('columns.usdc')}</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {previewRows.map((row: BatchCsvRow) => (
+                        <TableRow key={row.line}>
+                          <TableCell className="tabular-nums">{row.line}</TableCell>
+                          <TableCell>{row.recipientName}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {row.recipientEmail}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatUSDC(row.amount, locale)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
               {createError ? (
                 <p className="text-sm text-destructive">{createError}</p>
@@ -320,9 +345,9 @@ export default function BatchCreatePage() {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="h-2 overflow-hidden rounded-full bg-secondary">
+              <div className="h-2 overflow-hidden rounded-full bg-surface">
                 <div
-                  className="h-full bg-foreground transition-all"
+                  className="h-full bg-primary transition-all duration-150"
                   style={{
                     width: `${
                       validation?.rows.length
@@ -354,47 +379,83 @@ export default function BatchCreatePage() {
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="max-h-80 overflow-auto rounded-lg border border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('columns.status')}</TableHead>
-                      <TableHead>{t('columns.recipient')}</TableHead>
-                      <TableHead>{t('columns.link')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {results.map((r) => (
-                      <TableRow key={r.line}>
-                        <TableCell>
+              <div className="max-h-80 overflow-auto rounded-[1.25rem] bg-surface p-1 dark:border dark:border-border md:p-0">
+                <div className="flex flex-col gap-2 p-2 md:hidden">
+                  {results.map((r) => (
+                    <div
+                      key={r.line}
+                      className="rounded-[1rem] bg-background p-3 dark:border dark:border-border"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium">{r.recipientName}</p>
+                          <p className="text-xs tabular-nums text-muted-foreground">
+                            {formatUSDC(r.amount, locale)}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs font-medium">
                           {r.status === 'ok' ? t('statusOk') : t('statusError')}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span>{r.recipientName}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatUSDC(r.amount, locale)}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate text-xs">
-                          {r.status === 'ok' ? (
-                            <a
-                              href={r.url}
-                              className="font-mono text-foreground underline"
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {r.token}
-                            </a>
-                          ) : (
-                            <span className="text-destructive">{r.error}</span>
-                          )}
-                        </TableCell>
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs">
+                        {r.status === 'ok' ? (
+                          <a
+                            href={r.url}
+                            className="break-all font-mono text-foreground underline"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {r.token}
+                          </a>
+                        ) : (
+                          <span className="text-destructive">{r.error}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('columns.status')}</TableHead>
+                        <TableHead>{t('columns.recipient')}</TableHead>
+                        <TableHead>{t('columns.link')}</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {results.map((r) => (
+                        <TableRow key={r.line}>
+                          <TableCell>
+                            {r.status === 'ok' ? t('statusOk') : t('statusError')}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span>{r.recipientName}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {formatUSDC(r.amount, locale)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate text-xs">
+                            {r.status === 'ok' ? (
+                              <a
+                                href={r.url}
+                                className="font-mono text-foreground underline"
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {r.token}
+                              </a>
+                            ) : (
+                              <span className="text-destructive">{r.error}</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" onClick={downloadResults}>

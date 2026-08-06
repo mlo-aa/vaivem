@@ -17,7 +17,7 @@ export function DemoBadge({
     <Badge
       variant="outline"
       className={cn(
-        'gap-1.5 border-warning/40 bg-warning/10 text-warning-foreground',
+        'gap-1.5 bg-surface text-foreground dark:border dark:border-border',
         className,
       )}
     >

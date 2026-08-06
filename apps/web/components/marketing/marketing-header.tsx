@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import { ButtonLink } from '@/components/ui/button-link'
 import { Logo } from '@/components/logo'
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Link } from '@/i18n/navigation'
 import { cn } from '@/lib/utils'
 
@@ -20,8 +21,8 @@ export function MarketingHeader() {
   ]
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-lg">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+    <header className="sticky top-0 z-40 border-b border-transparent bg-background dark:border-border">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-8">
         <Link href="/" aria-label="Vaivém home">
           <Logo />
         </Link>
@@ -31,7 +32,7 @@ export function MarketingHeader() {
             <Link
               key={item.href}
               href={item.href}
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="text-sm font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
             >
               {item.label}
             </Link>
@@ -40,6 +41,7 @@ export function MarketingHeader() {
 
         <div className="hidden items-center gap-2 md:flex">
           <LanguageSwitcher compact />
+          <ThemeToggle />
           <ButtonLink variant="ghost" href="/developers">
             {t('navDevelopers')}
           </ButtonLink>
@@ -47,7 +49,7 @@ export function MarketingHeader() {
         </div>
 
         <button
-          className="inline-flex size-10 items-center justify-center rounded-lg text-foreground md:hidden"
+          className="inline-flex size-10 items-center justify-center rounded-full bg-surface text-foreground md:hidden dark:border dark:border-border"
           onClick={() => setOpen((v) => !v)}
           aria-label={open ? 'Close menu' : 'Open menu'}
           aria-expanded={open}
@@ -57,19 +59,22 @@ export function MarketingHeader() {
       </div>
 
       <div className={cn('border-t border-border bg-background md:hidden', open ? 'block' : 'hidden')}>
-        <nav className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-4" aria-label="Mobile">
+        <nav className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-4 sm:px-8" aria-label="Mobile">
           {NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+              className="rounded-full px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-surface hover:text-foreground"
             >
               {item.label}
             </Link>
           ))}
           <div className="mt-2 flex flex-col gap-2">
-            <LanguageSwitcher />
+            <div className="flex items-center gap-2 px-1">
+              <LanguageSwitcher />
+              <ThemeToggle />
+            </div>
             <ButtonLink variant="outline" href="/developers" onClick={() => setOpen(false)}>
               {t('navDevelopers')}
             </ButtonLink>

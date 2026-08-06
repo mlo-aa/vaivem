@@ -73,7 +73,7 @@ export function DevelopersView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card className="rounded-2xl border-border/80 bg-card/80 shadow-lg shadow-black/20">
+      <Card>
         <CardHeader>
           <CardTitle>{t("apiTitle")}</CardTitle>
           <CardDescription>{t("apiBody")}</CardDescription>
@@ -82,7 +82,7 @@ export function DevelopersView() {
           {endpoints.map((e, i) => (
             <div
               key={e.path}
-              className="flex items-center gap-3 border-border py-3 data-[first=false]:border-t"
+              className="flex items-center gap-3 border-transparent py-3 dark:border-border data-[first=false]:border-t"
               data-first={i === 0}
             >
               <Badge
@@ -101,7 +101,7 @@ export function DevelopersView() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden rounded-2xl border-border/80 bg-card/80 shadow-lg shadow-black/20">
+        <Card className="overflow-hidden">
           <CardHeader>
             <CardTitle className="text-base">{t("quickstart")}</CardTitle>
           </CardHeader>
@@ -131,10 +131,10 @@ export function DevelopersView() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border/80 bg-card/80 shadow-lg shadow-black/20">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Terminal className="size-4 text-primary" />
+              <Terminal className="size-4 text-foreground" />
               {t("playground")}
             </CardTitle>
             <CardDescription>{t("playgroundBody")}</CardDescription>
@@ -154,11 +154,11 @@ export function DevelopersView() {
               {running ? t("sending") : t("sendTest")}
             </Button>
             {response ? (
-              <pre className="max-h-64 overflow-auto rounded-xl bg-primary p-4 font-mono text-xs leading-relaxed text-primary-foreground">
+              <pre className="max-h-64 overflow-auto rounded-[1.25rem] bg-foreground p-4 font-mono text-xs leading-relaxed text-background">
                 {response}
               </pre>
             ) : (
-              <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+              <div className="rounded-[1.25rem] bg-surface p-4 text-center text-sm text-muted-foreground dark:border dark:border-dashed dark:border-border">
                 {t("responsePlaceholder")}
               </div>
             )}
@@ -185,13 +185,13 @@ function CodeBlock({
       <Button
         variant="ghost"
         size="icon-sm"
-        className="absolute right-2 top-2 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+        className="absolute right-2 top-2 text-background hover:bg-background/10 hover:text-background"
         onClick={onCopy}
         aria-label={copyLabel}
       >
         {copied ? <Check /> : <Copy />}
       </Button>
-      <pre className="max-h-80 overflow-auto rounded-xl bg-primary p-4 font-mono text-xs leading-relaxed text-primary-foreground">
+      <pre className="max-h-80 overflow-auto rounded-[1.25rem] bg-foreground p-4 font-mono text-xs leading-relaxed text-background">
         {code}
       </pre>
     </div>

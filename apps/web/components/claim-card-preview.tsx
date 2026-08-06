@@ -7,18 +7,18 @@ export function ClaimCardPreview({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-xl shadow-navy/5',
+        'w-full max-w-sm rounded-[1.5rem] bg-card p-6 dark:border dark:border-border',
         className,
       )}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-lg bg-navy text-navy-foreground">
-            <Sparkles className="size-4 text-brand" />
+          <span className="flex size-7 items-center justify-center rounded-full bg-foreground text-background">
+            <Sparkles className="size-4 text-primary" />
           </span>
-            <span className="text-sm font-medium">Vaivém</span>
+          <span className="text-sm font-medium">Vaivém</span>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/15 px-2.5 py-1 text-xs font-medium text-[color-mix(in_oklab,var(--brand),black_40%)]">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-foreground dark:border dark:border-border">
           <ShieldCheck className="size-3.5" />
           Secure claim
         </span>
@@ -26,11 +26,13 @@ export function ClaimCardPreview({ className }: { className?: string }) {
 
       <div className="mt-6 text-center">
         <p className="text-sm text-muted-foreground">You received</p>
-        <p className="mt-1 font-mono text-4xl font-semibold tracking-tight">R$500,00</p>
+        <p className="mt-1 text-4xl font-semibold tracking-[-0.02em] tabular-nums">
+          R$500,00
+        </p>
         <p className="mt-1 text-sm text-muted-foreground">Approximately 99.10 USDC</p>
       </div>
 
-      <div className="mt-6 rounded-2xl bg-secondary p-4">
+      <div className="mt-6 rounded-[1.25rem] bg-background p-4 dark:border dark:border-border">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">From</span>
           <span className="font-medium">Acme Payments</span>
@@ -41,7 +43,7 @@ export function ClaimCardPreview({ className }: { className?: string }) {
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl bg-brand py-3 text-center text-sm font-semibold text-brand-foreground">
+      <div className="mt-4 rounded-full bg-primary py-3 text-center text-sm font-semibold text-primary-foreground">
         Claim funds
       </div>
       <p className="mt-3 text-center text-xs text-muted-foreground">
