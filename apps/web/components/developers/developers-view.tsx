@@ -3,8 +3,8 @@
 import { useState } from "react"
 import { Check, Copy, Play, Terminal } from "lucide-react"
 import { useTranslations } from "next-intl"
-
 import { Button } from "@/components/ui/button"
+import { ButtonLink } from "@/components/ui/button-link"
 import {
   Card,
   CardContent,
@@ -16,53 +16,93 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Field, FieldLabel } from "@/components/ui/field"
-import { mockApiResponse } from "@/lib/services"
 
-const CURL = `curl https://api.vaivem.app/v1/claims \\
-  -H "Authorization: Bearer sk_live_••••" \\
+const CURL = `curl https://YOUR_HOST/api/v1/claims \\
+  -H "Authorization: Bearer sk_test_…" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "amount": "500",
+    "amount": "10",
     "currency": "BRL",
     "recipient": { "name": "Ana", "email": "ana@example.com" },
     "protection": "email"
   }'`
 
-const NODE = `import { Vaivem } from "@vaivem/node"
-
-const client = new Vaivem(process.env.VAIVEM_KEY)
-
-const claim = await client.claims.create({
-  amount: "500",
-  currency: "BRL",
-  recipient: { name: "Ana", email: "ana@example.com" },
-  protection: "email",
+const NODE = `const res = await fetch("https://YOUR_HOST/api/v1/claims", {
+  method: "POST",
+  headers: {
+    Authorization: \`Bearer \${process.env.VAIVEM_API_KEY}\`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    amount: "10",
+    currency: "BRL",
+    recipient: { name: "Ana", email: "ana@example.com" },
+    protection: "email",
+  }),
 })
 
+const claim = await res.json()
 console.log(claim.claimUrl)`
 
 export function DevelopersView() {
   const t = useTranslations("developers")
   const tc = useTranslations("common")
-  const [amount, setAmount] = useState("500")
+  const [amount, setAmount] = useState("10")
+  const [apiKey, setApiKey] = useState("")
   const [response, setResponse] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
 
   const endpoints = [
-    { method: "POST", path: "/v1/claims", desc: t("epCreate") },
-    { method: "GET", path: "/v1/claims/{id}", desc: t("epGet") },
-    { method: "POST", path: "/v1/claims/batch", desc: t("epBatch") },
-    { method: "POST", path: "/v1/webhooks", desc: t("epWebhooks") },
+    { method: "POST", path: "/api/v1/claims", desc: t("epCreate") },
+    { method: "GET", path: "/api/v1/claims/{id}", desc: t("epGet") },
+    { method: "POST", path: "/api/v1/claims/batch", desc: t("epBatch") },
+    { method: "POST", path: "/api/v1/webhooks", desc: t("epWebhooks") },
   ]
 
-  function run() {
+  async function run() {
     setRunning(true)
     setResponse(null)
-    setTimeout(() => {
-      setResponse(JSON.stringify(mockApiResponse(amount), null, 2))
+    try {
+      if (!apiKey.trim()) {
+        setResponse(
+          JSON.stringify(
+            { error: "missing_api_key", message: "Paste an API key from the dashboard." },
+            null,
+            2,
+          ),
+        )
+        return
+      }
+      const res = await fetch("/api/v1/claims", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey.trim()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount,
+          currency: "BRL",
+          recipient: { name: "Ana", email: "ana@example.com" },
+          protection: "email",
+        }),
+      })
+      const data = await res.json()
+      setResponse(JSON.stringify(data, null, 2))
+    } catch (err) {
+      setResponse(
+        JSON.stringify(
+          {
+            error: "network",
+            message: err instanceof Error ? err.message : "Request failed",
+          },
+          null,
+          2,
+        ),
+      )
+    } finally {
       setRunning(false)
-    }, 700)
+    }
   }
 
   function copy(id: string, text: string) {
@@ -97,6 +137,11 @@ export function DevelopersView() {
               </span>
             </div>
           ))}
+          <div className="pt-2">
+            <ButtonLink href="/dashboard/api-keys" variant="secondary" size="sm">
+              {t("manageKeys")}
+            </ButtonLink>
+          </div>
         </CardContent>
       </Card>
 
@@ -141,6 +186,18 @@ export function DevelopersView() {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <Field>
+              <FieldLabel htmlFor="pg-key">{t("apiKeyLabel")}</FieldLabel>
+              <Input
+                id="pg-key"
+                type="password"
+                autoComplete="off"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={t("apiKeyPlaceholder")}
+                className="font-mono"
+              />
+            </Field>
+            <Field>
               <FieldLabel htmlFor="pg-amount">{t("amountBrl")}</FieldLabel>
               <Input
                 id="pg-amount"
@@ -149,7 +206,7 @@ export function DevelopersView() {
                 className="font-mono"
               />
             </Field>
-            <Button onClick={run} disabled={running}>
+            <Button onClick={() => void run()} disabled={running}>
               <Play data-icon="inline-start" />
               {running ? t("sending") : t("sendTest")}
             </Button>

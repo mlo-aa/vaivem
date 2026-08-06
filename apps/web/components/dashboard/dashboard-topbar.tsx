@@ -40,6 +40,7 @@ const MOBILE_NAV = [
   { labelKey: 'createClaim' as const, href: '/dashboard/create', needsFunds: true },
   { labelKey: 'batchCsv' as const, href: '/dashboard/create/batch', needsFunds: true },
   { labelKey: 'funding' as const, href: '/dashboard/funding', needsFunds: false },
+  { labelKey: 'apiKeys' as const, href: '/dashboard/api-keys', needsFunds: false },
   { labelKey: 'developers' as const, href: '/developers', needsFunds: false },
 ]
 

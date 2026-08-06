@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { Link, usePathname } from '@/i18n/navigation'
-import { Link2, Plus, Code2, LifeBuoy, Wallet, Upload } from 'lucide-react'
+import { Link2, Plus, Code2, LifeBuoy, Wallet, Upload, KeyRound } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { cn } from '@/lib/utils'
 import { useSenderBalance } from '@/lib/use-sender-balance'
@@ -23,6 +23,7 @@ const NAV = [
     needsFunds: true,
   },
   { labelKey: 'funding' as const, href: '/dashboard/funding', icon: Wallet, needsFunds: false },
+  { labelKey: 'apiKeys' as const, href: '/dashboard/api-keys', icon: KeyRound, needsFunds: false },
   { labelKey: 'developers' as const, href: '/developers', icon: Code2, needsFunds: false },
 ]
 

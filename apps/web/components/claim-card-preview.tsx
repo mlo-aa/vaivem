@@ -1,4 +1,5 @@
-import { ShieldCheck, Sparkles } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
+import { Logo } from '@/components/logo'
 import { cn } from '@/lib/utils'
 
 // A static, presentational preview of the recipient claim card — used on the
@@ -12,12 +13,7 @@ export function ClaimCardPreview({ className }: { className?: string }) {
       )}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-full bg-foreground text-background">
-            <Sparkles className="size-4 text-primary" />
-          </span>
-          <span className="text-sm font-medium">Vaivém</span>
-        </div>
+        <Logo className="h-6 sm:h-7" />
         <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-foreground dark:border dark:border-border">
           <ShieldCheck className="size-3.5" />
           Secure claim

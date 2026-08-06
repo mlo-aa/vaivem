@@ -19,6 +19,11 @@ export const metadata: Metadata = {
   title: 'Vaivém — Send USDC with a link',
   description:
     'Create walletless payouts that recipients can claim on Stellar or withdraw through regional payment rails such as PIX.',
+  icons: {
+    icon: [{ url: '/favicon.png', type: 'image/png', sizes: 'any' }],
+    apple: [{ url: '/favicon.png', type: 'image/png' }],
+    shortcut: '/favicon.png',
+  },
 }
 
 export const viewport: Viewport = {

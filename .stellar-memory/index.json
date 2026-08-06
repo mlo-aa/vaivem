@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "project": {
+    "name": "vaivem",
+    "purpose": "Vaivém is a React kit and Next.js apps for walletless USDC claim links with PIX/SPEI cash-out via a server-side Etherfuse quote.",
+    "networks": [
+      "testnet",
+      "mainnet"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "doc:apps/web/AGENTS.md",
+      "kind": "doc",
+      "title": "AGENTS.md",
+      "path": "apps/web/AGENTS.md",
+      "summary": "<!-- BEGIN:nextjs-agent-rules -->",
+      "provenance": [
+        {
+          "source": "human",
+          "file": "apps/web/AGENTS.md"
+        }
+      ],
+      "firstSeen": "2026-08-06T15:30:26.169Z",
+      "lastChanged": "2026-08-06T15:30:26.169Z"
+    },
+    {
+      "id": "doc:apps/web/CLAUDE.md",
+      "kind": "doc",
+      "title": "CLAUDE.md",
+      "path": "apps/web/CLAUDE.md",
+      "summary": "@AGENTS.md",
+      "provenance": [
+        {
+          "source": "human",
+          "file": "apps/web/CLAUDE.md"
+        }
+      ],
+      "firstSeen": "2026-08-06T15:30:26.169Z",
+      "lastChanged": "2026-08-06T15:30:26.169Z"
+    },
+    {
+      "id": "doc:packages/vaivem-react/README.md",
+      "kind": "doc",
+      "title": "README.md",
+      "path": "packages/vaivem-react/README.md",
+      "summary": "Importable React kit: walletless claim UI and PIX ramp withdraw. Quotes are fetched from the host backend; this package never embeds API keys.",
+      "provenance": [
+        {
+          "source": "human",
+          "file": "packages/vaivem-react/README.md"
+        }
+      ],
+      "firstSeen": "2026-08-06T15:30:26.169Z",
+      "lastChanged": "2026-08-06T15:30:26.169Z"
+    },
+    {
+      "id": "doc:README.md",
+      "kind": "doc",
+      "title": "README.md",
+      "path": "README.md",
+      "summary": "Vaivém is a React kit and Next.js apps for walletless USDC claim links with PIX/SPEI cash-out via a server-side Etherfuse quote.",
+      "provenance": [
+        {
+          "source": "human",
+          "file": "README.md"
+        }
+      ],
+      "firstSeen": "2026-08-06T15:30:26.169Z",
+      "lastChanged": "2026-08-06T15:30:26.169Z"
+    },
+    {
+      "id": "doc:SPIKE.md",
+      "kind": "doc",
+      "title": "SPIKE.md",
+      "path": "SPIKE.md",
+      "summary": "Verified against Etherfuse sandbox and Stellar testnet. Source scripts: `spike/spike.mjs`, `apps/web/lib/server/etherfuse.ts`, `apps/web/lib/server/stellar.ts`.",
+      "provenance": [
+        {
+          "source": "human",
+          "file": "SPIKE.md"
+        }
+      ],
+      "firstSeen": "2026-08-06T15:30:26.169Z",
+      "lastChanged": "2026-08-06T15:30:26.169Z"
+    },
+    {
+      "id": "project:vaivem",
+      "kind": "project",
+      "title": "vaivem",
+      "summary": "Vaivém is a React kit and Next.js apps for walletless USDC claim links with PIX/SPEI cash-out via a server-side Etherfuse quote.",
+      "data": {
+        "branch": "main",
+        "head": "687e179d479a4113121857491dfd1696f69a7c3e",
+        "lastCommitDate": "2026-08-06T11:13:08-03:00",
+        "dirtyFiles": 16
+      },
+      "provenance": [
+        {
+          "source": "git",
+          "ref": "687e179d479a4113121857491dfd1696f69a7c3e"
+        }
+      ],
+      "firstSeen": "2026-08-06T15:30:26.169Z",
+      "lastChanged": "2026-08-06T15:30:26.169Z"
+    }
+  ],
+  "edges": [],
+  "scans": [
+    {
+      "at": "2026-08-06T15:30:26.169Z",
+      "commit": "687e179d479a4113121857491dfd1696f69a7c3e",
+      "nodeCount": 6,
+      "edgeCount": 0,
+      "changed": [
+        "doc:apps/web/AGENTS.md",
+        "doc:apps/web/CLAUDE.md",
+        "doc:packages/vaivem-react/README.md",
+        "doc:README.md",
+        "doc:SPIKE.md",
+        "project:vaivem"
+      ]
+    }
+  ]
+}

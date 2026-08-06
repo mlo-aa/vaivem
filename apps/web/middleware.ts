@@ -24,6 +24,8 @@ function isProtectedPath(pathWithoutLocale: string): boolean {
   if (pathWithoutLocale === "/dashboard" || pathWithoutLocale.startsWith("/dashboard/")) {
     return true
   }
+  if (pathWithoutLocale.startsWith("/api/v1")) return false
+  if (pathWithoutLocale.startsWith("/api/api-keys")) return true
   if (pathWithoutLocale.startsWith("/api/funding")) return true
   if (pathWithoutLocale.startsWith("/api/claims")) {
     if (pathWithoutLocale.startsWith("/api/claims/by-token/")) return false
