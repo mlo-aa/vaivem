@@ -18,9 +18,9 @@ export function ClaimLoader({ token }: { token: string }) {
         const found = await getPublicClaim(token)
         if (cancelled) return
         setClaim(found)
-      } catch (err) {
+      } catch {
         if (cancelled) return
-        setError(err instanceof Error ? err.message : "Failed to load claim")
+        setError("Não foi possível carregar o pagamento. Tente novamente.")
         setClaim(null)
       }
     })()
@@ -57,9 +57,9 @@ export function ClaimLoader({ token }: { token: string }) {
       <ClaimShell>
         <Card className="mx-auto w-full max-w-md">
           <CardHeader>
-            <p className="text-lg font-semibold text-foreground">Link not found</p>
+            <p className="text-lg font-semibold text-foreground">Link não encontrado</p>
             <p className="text-sm text-muted-foreground">
-              {error ?? "This claim link doesn't exist or has been removed."}
+              {error ?? "Este link não existe ou foi removido."}
             </p>
           </CardHeader>
         </Card>
@@ -74,11 +74,12 @@ export function ClaimLoader({ token }: { token: string }) {
           <CardHeader>
             <p className="text-lg font-semibold text-foreground">
               {claim.status === "completed" || claim.status === "claimed"
-                ? "Already claimed"
-                : "Payout unavailable"}
+                ? "Este valor já foi recebido"
+                : "Pagamento indisponível"}
             </p>
             <p className="text-sm text-muted-foreground">
-              This claim is {claim.status}. Ask the sender for a new link if you still need funds.
+              Este pagamento não está mais disponível. Se precisar, peça um novo link para a
+              pessoa que enviou.
             </p>
           </CardHeader>
         </Card>

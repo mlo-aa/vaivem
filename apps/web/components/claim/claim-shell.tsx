@@ -1,18 +1,26 @@
 import type { ReactNode } from "react"
 import { Logo } from "@/components/logo"
-import { ShieldCheck } from "lucide-react"
 
+/**
+ * Recipient chrome for /claim/*.
+ * Trust copy is product-level (what the person gets), not infrastructure branding.
+ * The demo badge stays visible because KYC and some settlement paths are still simulated.
+ */
 export function ClaimShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-svh flex-col bg-[color-mix(in_oklab,var(--brand),var(--background)_88%)]">
-      <header className="flex items-center justify-between px-4 py-4 sm:px-6">
+      <header className="flex flex-col gap-2 px-3 py-3 sm:px-6 sm:py-4">
         <Logo />
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border">
-          <ShieldCheck className="size-3.5 text-[color-mix(in_oklab,var(--brand),black_25%)]" />
-          Secured by Stellar
-        </span>
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center rounded-full border border-warning/40 bg-warning/15 px-2.5 py-1 text-[11px] font-semibold text-warning-foreground">
+            Demonstração
+          </span>
+          <span className="inline-flex items-center rounded-full bg-background/70 px-2.5 py-1 text-[11px] font-medium text-muted-foreground ring-1 ring-inset ring-border">
+            Só é liberado para você
+          </span>
+        </div>
       </header>
-      <main className="flex flex-1 items-start justify-center px-4 pb-16 pt-2 sm:items-center sm:pt-0">
+      <main className="flex flex-1 items-start justify-center px-3 pb-16 pt-2 sm:items-center sm:px-4 sm:pt-0">
         <div className="w-full max-w-md">{children}</div>
       </main>
     </div>

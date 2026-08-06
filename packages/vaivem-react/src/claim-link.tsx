@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Banknote, Lock, Wallet } from "lucide-react"
+import { Banknote, ChevronDown, Lock, Wallet } from "lucide-react"
 import { claimByToken, PayoutError, type PayoutFailureCode } from "./api"
+import { formatFiat } from "./limits"
 import { RampWithdraw } from "./ramp-withdraw"
 import { formatUSDC } from "./utils"
 import "./styles.css"
@@ -23,6 +24,10 @@ export type ClaimLinkProps = {
   /** USDC amount locked in the claim. Default 50 for standalone demos. */
   amount?: number
   country?: "BR" | "MX"
+  /** Recipient language. Claim links default to Brazilian Portuguese. */
+  locale?: "pt-BR" | "en"
+  /** Optional sender-facing fiat amount. Falls back to the sandbox reference rate. */
+  fiatAmount?: number
   /** When set, PIX/Stellar settle via /api/claims/by-token/[token]/claim */
   claimToken?: string
 }
@@ -71,6 +76,44 @@ const FAILURE_COPY: Record<
   },
 }
 
+const FAILURE_COPY_PT: typeof FAILURE_COPY = {
+  already_claimed: {
+    title: "Este valor já foi recebido",
+    body: "Este pagamento já foi resgatado.",
+    action: "Fechar",
+  },
+  expired: {
+    title: "O prazo terminou",
+    body: "Peça um novo link para a pessoa que enviou o pagamento.",
+    action: "Fechar",
+  },
+  anchor_rejected: {
+    title: "O banco não aceitou o pagamento",
+    body: "Confira os dados ou tente novamente mais tarde.",
+    action: "Tentar novamente",
+  },
+  insufficient_balance: {
+    title: "A conta de envio está sem saldo",
+    body: "A pessoa que enviou precisa adicionar saldo antes de você tentar novamente.",
+    action: "Fechar",
+  },
+  stuck_funded: {
+    title: "Ainda estamos processando",
+    body: "O envio foi iniciado, mas ainda não foi confirmado.",
+    action: "Verificar depois",
+  },
+  payout_failed: {
+    title: "Não foi possível enviar",
+    body: "Nada foi enviado. Você pode tentar novamente.",
+    action: "Tentar novamente",
+  },
+  network: {
+    title: "Sem conexão com o serviço",
+    body: "Confira sua internet e tente novamente.",
+    action: "Tentar novamente",
+  },
+}
+
 /**
  * Walletless claim flow: unlock with a code → choose rail → PIX ramp or USDC keep.
  */
@@ -83,6 +126,8 @@ export function ClaimLink({
   apiBaseUrl = "",
   amount = 50,
   country = "BR",
+  locale = "pt-BR",
+  fiatAmount,
   claimToken,
 }: ClaimLinkProps) {
   const [stage, setStage] = useState<Stage>(requiresCode ? "unlock" : "choose")
@@ -94,6 +139,9 @@ export function ClaimLink({
   const [failure, setFailure] = useState<{ code: PayoutFailureCode; message: string } | null>(
     null,
   )
+  const pt = locale === "pt-BR"
+  const localAmount = fiatAmount ?? amount * (country === "BR" ? 5.13193556 : 18.42)
+  const primaryAmount = formatFiat(localAmount, country)
 
   async function verifyUnlockCode(candidate: string): Promise<boolean> {
     if (code != null && code !== "") {
@@ -120,12 +168,12 @@ export function ClaimLink({
     try {
       const ok = await verifyUnlockCode(entered)
       if (!ok) {
-        setError("That code doesn't match.")
+        setError(pt ? "Esse código não confere." : "That code doesn't match.")
         return
       }
       setStage("choose")
     } catch {
-      setError("Could not verify the code. Try again.")
+      setError(pt ? "Não foi possível verificar o código. Tente novamente." : "Could not verify the code. Try again.")
     }
   }
 
@@ -142,7 +190,7 @@ export function ClaimLink({
       return
     }
     if (walletAddress.trim().length < 8) {
-      setError("Enter a valid Stellar wallet address.")
+      setError(pt ? "Digite um endereço de carteira válido." : "Enter a valid wallet address.")
       return
     }
     if (!claimToken) {
@@ -172,7 +220,7 @@ export function ClaimLink({
       if (err instanceof PayoutError) {
         fail(err.code, err.message)
       } else {
-        fail("network", err instanceof Error ? err.message : "Claim failed")
+        fail("network", err instanceof Error ? err.message : pt ? "Não foi possível receber." : "Claim failed")
       }
     }
   }
@@ -181,9 +229,10 @@ export function ClaimLink({
     <div className="vv-kit" style={{ maxWidth: 28 * 16, margin: "0 auto", width: "100%" }}>
       <div className="vv-hero">
         <p className="vv-muted" style={{ margin: 0, fontSize: "0.875rem" }}>
-          You received
+          {pt ? "Você recebeu" : "You received"}
         </p>
-        <p className="vv-hero-amount">{formatUSDC(amount)}</p>
+        <p className="vv-hero-amount">{primaryAmount}</p>
+        <p className="vv-hero-secondary">{formatUSDC(amount)}</p>
       </div>
 
       {stage === "unlock" ? (
@@ -191,46 +240,41 @@ export function ClaimLink({
           <div>
             <h2 className="vv-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Lock className="vv-icon-sm" />
-              Enter your access code
+              {pt ? "Digite seu código de acesso" : "Enter your access code"}
             </h2>
-            <p className="vv-desc">The sender shared a 6-digit code with you.</p>
+            <p className="vv-desc">
+              {pt
+                ? "Use o código de 6 dígitos que você recebeu."
+                : "The sender shared a 6-digit code with you."}
+            </p>
           </div>
-          <div className="vv-otp">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <input
-                key={i}
-                inputMode="numeric"
-                maxLength={1}
-                value={entered[i] ?? ""}
-                onChange={(e) => {
-                  const ch = e.target.value.replace(/\D/g, "").slice(-1)
-                  const next = entered.split("")
-                  next[i] = ch
-                  const joined = next.join("").slice(0, 6)
-                  setEntered(joined)
-                  const el = e.target.nextElementSibling as HTMLInputElement | null
-                  if (ch && el) el.focus()
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Backspace" && !entered[i]) {
-                    const el = (e.target as HTMLInputElement)
-                      .previousElementSibling as HTMLInputElement | null
-                    el?.focus()
-                  }
-                }}
-              />
-            ))}
+          <div className="vv-field" style={{ marginBottom: 0 }}>
+            <label className="vv-label" htmlFor="vv-access-code">
+              {pt ? "Código de 6 dígitos" : "6-digit code"}
+            </label>
+            <input
+              id="vv-access-code"
+              className="vv-input vv-otp-single"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={entered}
+              onChange={(e) => setEntered(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+            />
           </div>
           {showDemoCodeHint && code ? (
             <button type="button" className="vv-linkish" onClick={() => setEntered(code)}>
-              Use demo code ({code})
+              {pt ? `Usar código de demonstração (${code})` : `Use demo code (${code})`}
             </button>
           ) : showDemoCodeHint ? (
-            <p className="vv-hint">Demo mode: use the access code the sender shared.</p>
+            <p className="vv-hint">
+              {pt ? "Demonstração: use o código compartilhado por quem enviou." : "Demo mode: use the access code the sender shared."}
+            </p>
           ) : null}
           {error ? <p className="vv-error">{error}</p> : null}
           <button type="button" className="vv-btn" onClick={handleUnlock}>
-            Unlock my payout
+            {pt ? "Continuar" : "Unlock my payout"}
           </button>
         </div>
       ) : null}
@@ -238,8 +282,8 @@ export function ClaimLink({
       {stage === "choose" ? (
         <div className="vv-card">
           <div>
-            <h2 className="vv-title">How do you want your money?</h2>
-            <p className="vv-desc">Choose the payout that works for you.</p>
+            <h2 className="vv-title">{pt ? "Como você quer receber?" : "How do you want your money?"}</h2>
+            <p className="vv-desc">{pt ? "O PIX já vem selecionado para você." : "Choose the payout that works for you."}</p>
           </div>
           <div className="vv-stack">
             <button
@@ -253,44 +297,49 @@ export function ClaimLink({
               </span>
               <span>
                 <span style={{ display: "block", fontSize: "0.875rem", fontWeight: 500 }}>
-                  Instant bank via PIX
+                  {pt ? "Receber por PIX" : "Instant bank via PIX"}
                 </span>
                 <span className="vv-muted" style={{ fontSize: "0.75rem" }}>
-                  Cash into your Brazilian bank account
+                  {pt ? "Direto na sua conta bancária" : "Cash into your Brazilian bank account"}
                 </span>
               </span>
-              <span className="vv-rail-eta">Under 2 min</span>
+              <span className="vv-rail-eta">{pt ? "Até 2 min" : "Under 2 min"}</span>
             </button>
-            <button
-              type="button"
-              className="vv-rail"
-              data-selected={rail === "stellar"}
-              onClick={() => setRail("stellar")}
-            >
-              <span className="vv-rail-icon">
-                <Wallet className="vv-icon-sm" />
-              </span>
-              <span>
-                <span style={{ display: "block", fontSize: "0.875rem", fontWeight: 500 }}>
-                  Keep as USDC
+            <details className="vv-disclosure">
+              <summary>
+                <ChevronDown className="vv-icon-sm" />
+                {pt ? "Opções avançadas" : "Advanced options"}
+              </summary>
+              <button
+                type="button"
+                className="vv-rail"
+                data-selected={rail === "stellar"}
+                onClick={() => setRail("stellar")}
+              >
+                <span className="vv-rail-icon">
+                  <Wallet className="vv-icon-sm" />
                 </span>
-                <span className="vv-muted" style={{ fontSize: "0.75rem" }}>
-                  Send to a Stellar wallet address
+                <span>
+                  <span style={{ display: "block", fontSize: "0.875rem", fontWeight: 500 }}>
+                    {pt ? "Receber em moeda digital (USDC)" : "Keep as USDC"}
+                  </span>
+                  <span className="vv-muted" style={{ fontSize: "0.75rem" }}>
+                    {pt ? "Para quem já usa uma carteira digital" : "Send to a digital wallet"}
+                  </span>
                 </span>
-              </span>
-              <span className="vv-rail-eta">Instant</span>
-            </button>
+              </button>
+            </details>
           </div>
           {rail === "stellar" ? (
             <div className="vv-field">
               <label className="vv-label" htmlFor="vv-wallet">
-                Wallet address
+                {pt ? "Endereço da carteira digital" : "Wallet address"}
               </label>
               <input
                 id="vv-wallet"
                 className="vv-input"
                 style={{ fontFamily: "var(--vv-mono)" }}
-                placeholder="G… Stellar address"
+                placeholder={pt ? "Cole o endereço da sua carteira" : "Paste your wallet address"}
                 value={walletAddress}
                 onChange={(e) => setWalletAddress(e.target.value)}
               />
@@ -298,7 +347,7 @@ export function ClaimLink({
           ) : null}
           {error ? <p className="vv-error">{error}</p> : null}
           <button type="button" className="vv-btn" onClick={handleContinue}>
-            Continue
+            {pt ? "Continuar" : "Continue"}
           </button>
         </div>
       ) : null}
@@ -307,6 +356,7 @@ export function ClaimLink({
         <RampWithdraw
           amount={amount}
           country={country}
+          locale={locale}
           apiBaseUrl={apiBaseUrl}
           claimToken={claimToken}
           accessCode={requiresCode ? entered : undefined}
@@ -318,18 +368,20 @@ export function ClaimLink({
 
       {stage === "stellar-processing" ? (
         <div className="vv-card">
-          <h2 className="vv-title">Sending your money</h2>
-          <p className="vv-desc">Forwarding USDC to your Stellar wallet…</p>
+          <h2 className="vv-title">{pt ? "Enviando seu dinheiro" : "Sending your money"}</h2>
+          <p className="vv-desc">{pt ? "Transferindo para sua carteira digital…" : "Sending to your digital wallet…"}</p>
         </div>
       ) : null}
 
       {stage === "stellar-done" ? (
         <div className="vv-card">
-          <h2 className="vv-title">Money on the way!</h2>
-          <p className="vv-desc">{formatUSDC(amount)} is being sent to your Stellar wallet.</p>
+          <h2 className="vv-title">{pt ? "Dinheiro enviado!" : "Money on the way!"}</h2>
+          <p className="vv-desc">
+            {pt ? `${formatUSDC(amount)} foi enviado para sua carteira digital.` : `${formatUSDC(amount)} is being sent to your digital wallet.`}
+          </p>
           {txHash ? (
             <div className="vv-row">
-              <span className="vv-muted">Transaction</span>
+              <span className="vv-muted">{pt ? "Comprovante digital" : "Transaction"}</span>
               <span className="vv-mono" style={{ fontSize: 11 }}>
                 {txHash.slice(0, 12)}…
               </span>
@@ -341,14 +393,16 @@ export function ClaimLink({
       {stage === "failed" && failure ? (
         <div className="vv-card">
           <div>
-            <h2 className="vv-title">{FAILURE_COPY[failure.code].title}</h2>
-            <p className="vv-desc">{FAILURE_COPY[failure.code].body}</p>
-            <p className="vv-error" style={{ marginTop: 8 }}>
-              {failure.message}
+            <h2 className="vv-title">
+              {(pt ? FAILURE_COPY_PT : FAILURE_COPY)[failure.code].title}
+            </h2>
+            <p className="vv-desc">
+              {(pt ? FAILURE_COPY_PT : FAILURE_COPY)[failure.code].body}
             </p>
+            {!pt ? <p className="vv-error" style={{ marginTop: 8 }}>{failure.message}</p> : null}
           </div>
           <button type="button" className="vv-btn" onClick={() => setStage("choose")}>
-            {FAILURE_COPY[failure.code].action}
+            {(pt ? FAILURE_COPY_PT : FAILURE_COPY)[failure.code].action}
           </button>
         </div>
       ) : null}

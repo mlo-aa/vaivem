@@ -13,6 +13,8 @@ export type PublicClaimView = {
   deadline: number
   protectionType: ProtectionType
   requiresCode: boolean
+  displayCurrency?: "BRL" | "USD"
+  displayAmount?: number
 }
 
 /**
@@ -26,7 +28,9 @@ export function ClaimFlow({ claim }: { claim: PublicClaimView }) {
   return (
     <ClaimLink
       amount={claim.amount}
+      fiatAmount={claim.displayCurrency === "BRL" ? claim.displayAmount : undefined}
       country={country}
+      locale="pt-BR"
       claimToken={claim.token}
       requiresCode={claim.requiresCode || claim.protectionType === "code"}
       showDemoCodeHint={demoMode && claim.protectionType === "code"}

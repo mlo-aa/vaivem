@@ -239,6 +239,8 @@ export async function getPublicClaim(token: string): Promise<{
   requiresCode: boolean
   expiresAt?: string
   recipientName?: string
+  displayCurrency?: "BRL" | "USD"
+  displayAmount?: number
 } | null> {
   const res = await fetch(
     `${apiBase()}/api/claims/by-token/${encodeURIComponent(token)}`,

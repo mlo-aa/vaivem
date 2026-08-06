@@ -33,6 +33,25 @@
   gap: 1rem;
 }
 
+.vv-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.vv-demo-badge {
+  flex: none;
+  border: 1px solid color-mix(in oklab, var(--vv-amber) 45%, transparent);
+  border-radius: 999px;
+  padding: 0.15rem 0.45rem;
+  color: var(--vv-amber);
+  background: color-mix(in oklab, var(--vv-amber) 8%, transparent);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
 .vv-title {
   margin: 0;
   font-size: 1.125rem;
@@ -43,6 +62,7 @@
   margin: 0.25rem 0 0;
   font-size: 0.875rem;
   color: var(--vv-muted);
+  overflow-wrap: anywhere;
 }
 
 .vv-field {
@@ -183,6 +203,10 @@
   color: inherit;
 }
 
+.vv-rail > span:nth-child(2) {
+  min-width: 0;
+}
+
 .vv-rail[data-selected="true"] {
   border-color: var(--vv-brand);
   background: color-mix(in oklab, var(--vv-brand) 8%, white);
@@ -212,10 +236,17 @@
 
 .vv-hero-amount {
   margin: 0.25rem 0;
-  font-family: var(--vv-mono);
-  font-size: 2.75rem;
+  font-size: 2.15rem;
   font-weight: 600;
   letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.vv-hero-secondary {
+  margin: 0;
+  color: var(--vv-muted);
+  font-family: var(--vv-mono);
+  font-size: 0.8rem;
 }
 
 .vv-otp {
@@ -324,4 +355,98 @@
   text-decoration: underline;
   cursor: pointer;
   padding: 0;
+}
+
+.vv-disclosure {
+  border-radius: 8px;
+}
+
+.vv-disclosure > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--vv-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+
+.vv-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.vv-disclosure[open] > summary .vv-icon-sm {
+  transform: rotate(180deg);
+}
+
+.vv-disclosure > summary .vv-icon-sm {
+  transition: transform 150ms ease;
+}
+
+.vv-disclosure > .vv-rail,
+.vv-disclosure > .vv-stack {
+  margin-top: 0.65rem;
+}
+
+.vv-disclosure--rates {
+  padding-top: 0.15rem;
+}
+
+.vv-expectation {
+  margin: 0;
+  color: var(--vv-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.vv-otp-single {
+  text-align: center;
+  letter-spacing: 0.35em;
+  font-family: var(--vv-mono);
+  font-size: 1.15rem;
+}
+
+@media (max-width: 399px) {
+  .vv-card {
+    padding: 1rem;
+  }
+
+  .vv-hero {
+    margin-bottom: 0.9rem;
+  }
+
+  .vv-hero-amount {
+    font-size: 1.9rem;
+  }
+
+  .vv-otp {
+    gap: 0.25rem;
+  }
+
+  .vv-otp input {
+    width: min(2rem, calc((100vw - 4.5rem) / 6));
+    height: 2.5rem;
+    font-size: 1rem;
+  }
+
+  .vv-rail {
+    gap: 0.6rem;
+    padding: 0.7rem;
+  }
+
+  .vv-rail-icon {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .vv-rail-eta {
+    font-size: 0.68rem;
+  }
+
+  .vv-row {
+    align-items: flex-start;
+    font-size: 0.8rem;
+  }
 }

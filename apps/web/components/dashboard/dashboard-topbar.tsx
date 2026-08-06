@@ -87,7 +87,7 @@ export function DashboardTopbar({ title }: { title: string }) {
           </SheetContent>
         </Sheet>
         <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-        <DemoBadge className="hidden sm:inline-flex" />
+        <DemoBadge />
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">

@@ -7,7 +7,13 @@ import { cn } from '@/lib/utils'
  * It must not be hidden — it signals that the numbers are demo values, not
  * live API responses.
  */
-export function DemoBadge({ className }: { className?: string }) {
+export function DemoBadge({
+  className,
+  label = 'Demo data',
+}: {
+  className?: string
+  label?: string
+}) {
   return (
     <Badge
       variant="outline"
@@ -17,7 +23,7 @@ export function DemoBadge({ className }: { className?: string }) {
       )}
     >
       <FlaskConical className="size-3" />
-      Demo data
+      {label}
     </Badge>
   )
 }
