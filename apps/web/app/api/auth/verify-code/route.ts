@@ -1,7 +1,3 @@
-/**
- * POST /api/auth/verify-code  { email, code }
- */
-
 import { NextResponse } from "next/server"
 import {
   COOKIE_NAME,
@@ -20,7 +16,7 @@ export async function POST(req: Request) {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 })
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
   const email = normalizeEmail(String(body.email ?? ""))

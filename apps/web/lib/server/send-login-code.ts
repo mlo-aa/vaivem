@@ -1,7 +1,3 @@
-/**
- * Send login codes via Resend, or log them in dev when unset.
- */
-
 import "server-only"
 
 import { Resend } from "resend"

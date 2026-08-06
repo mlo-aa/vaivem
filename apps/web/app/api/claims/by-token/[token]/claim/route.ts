@@ -99,7 +99,7 @@ export async function POST(
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 })
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
   const rail = body.rail === "stellar" ? "stellar" : "pix"
@@ -276,9 +276,9 @@ export async function POST(
         ? err.message
         : err instanceof Error
           ? err.message
-          : "error desconocido"
+          : "unknown error"
     const classified = classifyError(raw)
-    console.error("[claims/claim] falló:", raw)
+    console.error("[claims/claim] failed:", raw)
     return NextResponse.json(
       { error: classified.code, message: classified.message, detail: raw },
       { status: 502 },

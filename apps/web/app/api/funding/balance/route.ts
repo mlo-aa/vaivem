@@ -1,7 +1,3 @@
-/**
- * GET /api/funding/balance — reconcile on-ramps + USDC deposits, then return demo ledger.
- */
-
 import { NextResponse } from "next/server"
 import { requireOwnerId } from "@/lib/server/auth-session"
 import { getBalance, getLedger } from "@/lib/server/balance-store"

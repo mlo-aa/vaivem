@@ -1,10 +1,8 @@
 /**
- * lib/server/etherfuse.ts
+ * Server-only. Never import from a client component or from lib/adapters —
+ * the API key grants access to the whole organization.
  *
- * SOLO SERVIDOR. Nunca importar desde un componente cliente ni desde
- * lib/adapters — la API key da acceso a toda la organización.
- *
- * Parámetros verificados contra api.sand.etherfuse.com.
+ * Parameters verified against api.sand.etherfuse.com.
  */
 
 import "server-only"
@@ -13,7 +11,7 @@ const BASE_URL = process.env.ETHERFUSE_BASE_URL ?? "https://api.sand.etherfuse.c
 const API_KEY = process.env.ETHERFUSE_API_KEY
 const ORG_ID = process.env.ETHERFUSE_ORG_ID
 
-/** Identificadores de SANDBOX. Distintos en producción. */
+/** Sandbox asset IDs — different in production. */
 export const SANDBOX_ASSETS = {
   USDC: "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
   TESOURO: "TESOURO:GC3CW7EDYRTWQ635VDIGY6S4ZUF5L6TQ7AA4MWS7LEQDBLUSZXV7UPS4",
@@ -30,10 +28,10 @@ export interface RawQuote {
   etherfuseMidMarketRate: string
   nominalRate: string
   feeBps: string
-  feeAmount: string // en el ACTIVO ORIGEN (USDC), no en fiat
+  feeAmount: string // denominated in the SOURCE asset (USDC), not fiat
   requiresSwap: boolean
   createdAt: string
-  expiresAt: string // 2 minutos exactos
+  expiresAt: string // exactly 2 minutes after createdAt
 }
 
 export class EtherfuseError extends Error {
@@ -44,12 +42,12 @@ export class EtherfuseError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!API_KEY) throw new EtherfuseError("ETHERFUSE_API_KEY no configurada", 500)
+  if (!API_KEY) throw new EtherfuseError("ETHERFUSE_API_KEY is not configured", 500)
 
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
-      // Sin prefijo "Bearer": la API lo rechaza explícitamente.
+      // No "Bearer" prefix — the API rejects it explicitly.
       Authorization: API_KEY,
       "Content-Type": "application/json",
       ...init?.headers,
@@ -76,26 +74,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
-/** Verifica la key. Útil para un health check. */
-export function me() {
-  return request<{ id: string; displayName: string; approvedAt: string }>("/ramp/me")
-}
-
-/**
- * Los tres parámetros son obligatorios pese a lo que sugiere la doc:
- * omitir cualquiera devuelve "Query deserialize error: missing field".
- */
-export async function listAssets(params: {
-  blockchain: string
-  currency: string
-  wallet: string
-}) {
-  const qs = new URLSearchParams(params)
-  const res = await request<{ assets: unknown[] }>(`/ramp/assets?${qs}`)
-  return res.assets
-}
-
-/** Cotización real. Expira a los 2 minutos. */
 export function createQuote(params: {
   type: "onramp" | "offramp"
   sourceAsset: string
@@ -108,7 +86,7 @@ export function createQuote(params: {
   walletAddress?: string
 }) {
   if (!ORG_ID && !params.customerId) {
-    throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
+    throw new EtherfuseError("ETHERFUSE_ORG_ID is not configured", 500)
   }
   const quoteId = params.quoteId ?? crypto.randomUUID()
   return request<RawQuote>("/ramp/quote", {
@@ -163,7 +141,7 @@ export function createOrder(params: {
   useAnchor?: boolean
 }) {
   if (!ORG_ID && !params.customerId) {
-    throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
+    throw new EtherfuseError("ETHERFUSE_ORG_ID is not configured", 500)
   }
   return request<OfframpOrderResult>("/ramp/order", {
     method: "POST",
@@ -189,7 +167,7 @@ export function createOnrampOrder(params: {
   customerId?: string
 }) {
   if (!ORG_ID && !params.customerId) {
-    throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
+    throw new EtherfuseError("ETHERFUSE_ORG_ID is not configured", 500)
   }
   return request<OnrampOrderResult>("/ramp/order", {
     method: "POST",
@@ -223,7 +201,7 @@ export interface EtherfuseBankAccount {
 
 export async function listWallets(customerId?: string) {
   const id = customerId ?? ORG_ID
-  if (!id) throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
+  if (!id) throw new EtherfuseError("ETHERFUSE_ORG_ID is not configured", 500)
   const res = await request<{ items: EtherfuseWallet[] }>(
     `/ramp/wallets?customerId=${encodeURIComponent(id)}`,
   )
@@ -232,7 +210,7 @@ export async function listWallets(customerId?: string) {
 
 export async function listBankAccounts(customerId?: string) {
   const id = customerId ?? ORG_ID
-  if (!id) throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
+  if (!id) throw new EtherfuseError("ETHERFUSE_ORG_ID is not configured", 500)
   const res = await request<{ items: EtherfuseBankAccount[] }>(
     `/ramp/bank-accounts?customerId=${encodeURIComponent(id)}`,
   )
@@ -341,7 +319,7 @@ export async function listOrders(params?: {
 }): Promise<RampOrderListItem[]> {
   const customerId = params?.customerId ?? ORG_ID
   if (!customerId) {
-    throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
+    throw new EtherfuseError("ETHERFUSE_ORG_ID is not configured", 500)
   }
   const qs = new URLSearchParams({
     customerId,
@@ -375,10 +353,6 @@ export function describeUpstreamError(
   return `The payment provider rejected this request (${status}).`
 }
 
-export function getEtherfuseOrgId(): string | undefined {
-  return ORG_ID
-}
-
 export function getUsdcAssetId(): string {
   return process.env.ETHERFUSE_USDC_ASSET ?? SANDBOX_ASSETS.USDC
 }
@@ -386,7 +360,7 @@ export function getUsdcAssetId(): string {
 export function requireBankAccountId(): string {
   const id = process.env.ETHERFUSE_BRL_BANK_ACCOUNT_ID
   if (!id) {
-    throw new EtherfuseError("ETHERFUSE_BRL_BANK_ACCOUNT_ID no configurada", 500)
+    throw new EtherfuseError("ETHERFUSE_BRL_BANK_ACCOUNT_ID is not configured", 500)
   }
   return id
 }

@@ -56,8 +56,8 @@ export async function GET() {
     )
     return NextResponse.json({ claims: reconciled.map(serialize) })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "error desconocido"
-    console.error("[claims/list] falló:", message)
+    const message = err instanceof Error ? err.message : "unknown error"
+    console.error("[claims/list] failed:", message)
     return NextResponse.json({ error: message }, { status: 502 })
   }
 }

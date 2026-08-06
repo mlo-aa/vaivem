@@ -70,7 +70,6 @@ export function CreateWizard() {
   const [step, setStep] = useState(1)
   const [stage, setStage] = useState<Stage>('form')
 
-  // form state
   const [amount, setAmount] = useState('500')
   const [currency, setCurrency] = useState<DisplayCurrency>('BRL')
   const [purpose, setPurpose] = useState('Hackathon prize')
@@ -118,7 +117,6 @@ export function CreateWizard() {
     return t(`protection.${value}.label`)
   }
 
-  // Recompute the USDC to lock whenever amount or currency changes (debounced).
   useEffect(() => {
     if (numericAmount <= 0) {
       setFundingUsdc(null)

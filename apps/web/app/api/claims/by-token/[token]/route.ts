@@ -52,7 +52,7 @@ export async function PATCH(
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 })
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
   const action = body.action
@@ -116,8 +116,8 @@ export async function PATCH(
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "error desconocido"
-    console.error("[claims/patch] falló:", message)
+    const message = err instanceof Error ? err.message : "unknown error"
+    console.error("[claims/patch] failed:", message)
     return NextResponse.json({ error: message }, { status: 502 })
   }
 }

@@ -1,8 +1,3 @@
-/**
- * POST /api/funding/deposit
- * Create an Etherfuse ON-RAMP order (fiat → USDC) and return deposit instructions.
- */
-
 import { NextResponse } from "next/server"
 import { requireOwnerId } from "@/lib/server/auth-session"
 import { savePendingDeposit } from "@/lib/server/balance-store"
@@ -42,7 +37,7 @@ export async function POST(req: Request) {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 })
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
   const currency = parseCurrency(body.currency)
@@ -164,7 +159,7 @@ export async function POST(req: Request) {
       console.error("[funding/deposit]", err.status, msg)
       return NextResponse.json({ error: msg }, { status: err.status >= 400 ? err.status : 502 })
     }
-    const message = err instanceof Error ? err.message : "error desconocido"
+    const message = err instanceof Error ? err.message : "unknown error"
     console.error("[funding/deposit]", message)
     return NextResponse.json({ error: message }, { status: 502 })
   }

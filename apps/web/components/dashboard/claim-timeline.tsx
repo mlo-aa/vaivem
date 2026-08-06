@@ -33,7 +33,6 @@ const EVENT_ICONS: Record<ClaimEventType, LucideIcon> = {
   expired: Ban,
 }
 
-// Derive a plausible event history from the claim's current status.
 function deriveEvents(claim: Claim): { event: ClaimEventType; timestamp: string }[] {
   const created = claim.createdAt
   const list: { event: ClaimEventType; timestamp: string }[] = [

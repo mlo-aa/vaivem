@@ -1,7 +1,3 @@
-/**
- * POST /api/claims/create — dashboard (session cookie).
- */
-
 import { NextResponse } from "next/server"
 import { requireOwnerId } from "@/lib/server/auth-session"
 import {
@@ -51,8 +47,8 @@ export async function POST(req: Request) {
       batchId: d.batchId,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "error desconocido"
-    console.error("[claims/create] falló:", message)
+    const message = err instanceof Error ? err.message : "unknown error"
+    console.error("[claims/create] failed:", message)
     return NextResponse.json({ error: message }, { status: 502 })
   }
 }

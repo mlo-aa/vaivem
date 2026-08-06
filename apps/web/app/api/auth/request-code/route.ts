@@ -1,7 +1,3 @@
-/**
- * POST /api/auth/request-code  { email }
- */
-
 import { NextResponse } from "next/server"
 import { isValidEmail, normalizeEmail } from "@/lib/dashboard-session"
 import { createAuthCode } from "@/lib/server/auth-code-store"
@@ -14,7 +10,7 @@ export async function POST(req: Request) {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 })
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
   const email = normalizeEmail(String(body.email ?? ""))

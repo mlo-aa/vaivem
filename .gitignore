@@ -9,17 +9,26 @@ __v0_jsx-dev-runtime.ts
 # Environment variables
 .env*.local
 
-# Common ignores
-node_modules
+# Dependencies & build
+node_modules/
 .next/
-.DS_Store
-.env*.local
 *.tsbuildinfo
 
+# OS
+.DS_Store
+
+# Local funding / API key stores (no KV)
+apps/web/.data/
+
+# Spike scratch
+spike/spike-state.json
 spike-state.json
 
-# Local dev funding ledger (no KV)
-apps/web/.data/
+# AI tooling artifacts
+AGENTS.md
+CLAUDE.md
+**/AGENTS.md
+**/CLAUDE.md
 
 # Leftover single-app dirs if OS file locks blocked the move
 _trash_*/

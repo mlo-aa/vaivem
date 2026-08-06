@@ -1,7 +1,3 @@
-/**
- * GET /api/auth/me — current sender session.
- */
-
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { COOKIE_NAME, verifySessionToken } from "@/lib/dashboard-session"

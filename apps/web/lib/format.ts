@@ -1,13 +1,7 @@
-/**
- * Locale-aware number / currency / relative time helpers.
- */
-
 import type { ClaimStatus } from "./types"
 import type { AppLocale } from "@/i18n/routing"
 
 export const USD_TO_BRL = 5.13193556
-export const PROVIDER_FEE_BPS = 20
-export const PROVIDER_FEE_PCT = PROVIDER_FEE_BPS / 10000
 
 const BCP47: Record<AppLocale, string> = {
   en: "en-US",
@@ -51,14 +45,6 @@ export function formatDisplay(
   return currency === "BRL"
     ? formatBRL(value, locale)
     : formatUSD(value, locale)
-}
-
-export function formatDate(iso: string, locale?: string | null): string {
-  return new Date(iso).toLocaleDateString(toBcp47(locale), {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
 }
 
 export function formatDateTime(iso: string, locale?: string | null): string {
@@ -139,21 +125,8 @@ export function maskEmail(email: string): string {
   return `${visible}${"•".repeat(Math.max(name.length - 2, 2))}@${domain}`
 }
 
-export function maskCPF(cpf: string): string {
-  const digits = cpf.replace(/\D/g, "")
-  if (digits.length !== 11) return cpf
-  return `•••.${digits.slice(3, 6)}.•••-${digits.slice(9)}`
-}
-
 export function maskStellarAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-6)}`
-}
-
-export function maskPixKey(key: string, type: string): string {
-  if (type === "email") return maskEmail(key)
-  if (type === "cpf") return maskCPF(key)
-  const clean = key.replace(/\s/g, "")
-  return `${clean.slice(0, 3)}••••${clean.slice(-2)}`
 }
 
 interface StatusMeta {

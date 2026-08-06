@@ -1,7 +1,3 @@
-/**
- * GET /api/funding/usdc — deposit address + per-sender memo for crypto funding.
- */
-
 import { NextResponse } from "next/server"
 import { requireOwnerId } from "@/lib/server/auth-session"
 import { ownerDepositMemoHex } from "@/lib/server/deposit-memo"
@@ -34,7 +30,7 @@ export async function GET() {
         "Only USDC issued by this issuer is credited. Other USDC assets are ignored. Use Memo type Hash with the hex value below.",
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "error desconocido"
+    const message = err instanceof Error ? err.message : "unknown error"
     return NextResponse.json({ error: message }, { status: 502 })
   }
 }

@@ -1,15 +1,10 @@
 /**
- * app/api/quote/route.ts
+ * Sole browser → Etherfuse gateway. The API key lives here, never on the client.
  *
- * Única puerta entre el navegador y Etherfuse. La API key vive acá,
- * nunca en el cliente.
+ * Returns `source: "live" | "mock"` so the UI can tell where the number came from.
  *
- * Devuelve `source: "live" | "mock"` para que la UI pueda decir la verdad
- * sobre de dónde salió el número.
- *
- * El fallback a mock existe SOLO para caídas del proveedor (5xx, timeout, red).
- * Un 4xx significa que la solicitud es inválida — se devuelve el error con el
- * status de upstream, sin fingir una cotización.
+ * Mock fallback is ONLY for provider outages (5xx, timeout, network).
+ * A 4xx means the request is invalid — return the upstream status, do not fake a quote.
  *
  * CORS is permissive so apps/demo (and other hosts) can call this route via
  * apiBaseUrl without running their own quote backend.
@@ -56,7 +51,7 @@ function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status, headers: CORS_HEADERS })
 }
 
-/** Réplica de la forma real. Valores medidos contra el sandbox. */
+/** Mirrors the live shape. Values measured against the sandbox. */
 function mockQuote(usdc: number, currency: string): QuoteResponse {
   const rate = currency === "BRL" ? 5.13193556 : 18.42
   const feeBps = 20
@@ -91,14 +86,14 @@ export async function POST(req: Request) {
     amount = Number(body.amount)
     country = (body.country ?? "BR") as CountryCode
   } catch {
-    return json({ error: "JSON inválido" }, 400)
+    return json({ error: "Invalid JSON" }, 400)
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
-    return json({ error: "amount debe ser un número positivo" }, 400)
+    return json({ error: "amount must be a positive number" }, 400)
   }
   if (!(country in CURRENCIES)) {
-    return json({ error: `país no soportado: ${country}` }, 400)
+    return json({ error: `unsupported country: ${country}` }, 400)
   }
 
   const currency = CURRENCIES[country]
@@ -140,9 +135,9 @@ export async function POST(req: Request) {
     }
     return json(out)
   } catch (err) {
-    // 4xx: el proveedor está vivo y rechazó la solicitud. No degradar a mock.
+    // 4xx: provider is up and rejected the request. Do not degrade to mock.
     if (err instanceof EtherfuseError && err.status >= 400 && err.status < 500) {
-      console.error(`[quote] Etherfuse rechazó la solicitud (${err.status}):`, err.message)
+      console.error(`[quote] Etherfuse rejected the request (${err.status}):`, err.message)
       return json(
         {
           error: "provider_rejected",
@@ -153,9 +148,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // 5xx, timeout o fallo de red: caída del proveedor → mock.
-    const reason = err instanceof Error ? err.message : "error desconocido"
-    console.error("[quote] Etherfuse no disponible, degradando a mock:", reason)
+    // 5xx, timeout, or network failure: provider outage → mock.
+    const reason = err instanceof Error ? err.message : "unknown error"
+    console.error("[quote] Etherfuse unavailable, degrading to mock:", reason)
     return json({ ...mockQuote(amount, currency), note: reason })
   }
 }

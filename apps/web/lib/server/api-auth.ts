@@ -34,7 +34,6 @@ export async function requireBearerOwner(req: Request): Promise<ApiCaller> {
   const resolved = await resolveApiKey(raw)
   if (!resolved) return { ok: false, status: 401 }
 
-  // ownerId is usually the email/user id from sessionStore
   const user = await sessionStore.getUserByEmail(resolved.ownerId)
   return {
     ok: true,

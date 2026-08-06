@@ -11,20 +11,6 @@ function apiBase() {
   return process.env.NEXT_PUBLIC_VAIVEM_API_BASE ?? ""
 }
 
-function randomTxHash(): string {
-  const chars = "abcdef0123456789"
-  return Array.from({ length: 64 }, () =>
-    chars[Math.floor(Math.random() * chars.length)],
-  ).join("")
-}
-
-function randomToken(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-  return Array.from({ length: 6 }, () =>
-    chars[Math.floor(Math.random() * chars.length)],
-  ).join("")
-}
-
 export interface CreateClaimInput {
   amount: number
   displayCurrency: DisplayCurrency
@@ -226,18 +212,4 @@ export async function refundClaim(claim: Claim): Promise<Claim> {
 
 export async function extendExpiration(claim: Claim, days: number): Promise<Claim> {
   return patchClaim(claim.token, { action: "extend", days })
-}
-
-/** Fake /v1 response for the developers playground only. */
-export function mockApiResponse(amount: string) {
-  const token = randomToken()
-  return {
-    id: `clm_${token}`,
-    token,
-    status: "funded",
-    amount: { asset: "USDC", value: amount },
-    claimUrl: `http://localhost:3000/claim/${token}`,
-    stellarTransactionHash: randomTxHash(),
-    createdAt: new Date().toISOString(),
-  }
 }

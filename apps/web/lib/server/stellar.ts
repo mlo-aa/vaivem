@@ -1,8 +1,6 @@
 /**
- * lib/server/stellar.ts
- *
- * SOLO SERVIDOR. Nunca importar desde un componente cliente.
- * Primitivas portadas 1:1 desde spike/spike.mjs (verificadas en testnet).
+ * Server-only. Never import from a client component.
+ * Primitives ported 1:1 from spike/spike.mjs (verified on testnet).
  */
 
 import "server-only"

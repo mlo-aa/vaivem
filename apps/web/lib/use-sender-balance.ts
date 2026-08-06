@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-/** Shared sender ledger balance for nav / empty states / redirects. */
 export function useSenderBalance() {
   const [balance, setBalance] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -32,6 +31,3 @@ export function useSenderBalance() {
 
   return { balance, loading, refresh, funded: (balance ?? 0) > 0 }
 }
-
-export const CUSTODY_LINE =
-  'Demo ledger on a shared sponsor wallet — not segregated custody.'

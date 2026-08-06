@@ -1,7 +1,3 @@
-/**
- * Email login codes in KV (or memory). auth-code:{email}
- */
-
 import "server-only"
 
 import { kv } from "@vercel/kv"

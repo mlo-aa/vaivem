@@ -1,8 +1,3 @@
-/**
- * GET /api/funding/[orderId]
- * Reconcile one on-ramp against Etherfuse; credit ledger when completed.
- */
-
 import { NextResponse } from "next/server"
 import { requireOwnerId } from "@/lib/server/auth-session"
 import { getPendingDeposit } from "@/lib/server/balance-store"

@@ -1,8 +1,3 @@
-/**
- * Shared claim creation used by dashboard POST /api/claims/create
- * and public POST /api/v1/claims.
- */
-
 import "server-only"
 
 import {

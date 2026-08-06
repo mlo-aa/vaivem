@@ -36,8 +36,8 @@ export async function GET(
     })
   } catch (err) {
     const message =
-      err instanceof EtherfuseError ? err.message : "error desconocido"
-    console.error("[payouts/get] falló:", message)
+      err instanceof EtherfuseError ? err.message : "unknown error"
+    console.error("[payouts/get] failed:", message)
     return NextResponse.json({ error: message }, { status: 502 })
   }
 }

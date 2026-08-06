@@ -1,6 +1,4 @@
 /**
- * POST /api/payouts/pix
- *
  * Verified Etherfuse offramp cycle (sandbox):
  *   1. POST /ramp/quote  (offramp USDC → BRL, 120s TTL)
  *   2. POST /ramp/order  (orderId === quoteId, useAnchor: true, publicKey)
@@ -9,12 +7,12 @@
  * Returns { orderId, txHash, status, source }. Poll GET /api/payouts/[orderId]
  * until status === "completed".
  *
- * Clasificación de fallos, por fase:
- *   - Config + quote: un 5xx/timeout/red degrada a mock (nada se movió todavía).
- *   - Order: fallo real (502). Ya hay una orden viva del lado del proveedor.
- *   - payAnchor: fallo real con el result code de Horizon traducido. Nunca mock:
- *     un 200 acá le muestra "Money on the way!" a alguien a quien no le llegó nada.
- *   - Etherfuse 4xx en cualquier fase: provider_rejected con el status de upstream.
+ * Failure classification by phase:
+ *   - Config + quote: a 5xx/timeout/network outage degrades to mock (nothing moved yet).
+ *   - Order: real failure (502). A live order already exists on the provider side.
+ *   - payAnchor: real failure with Horizon result codes translated. Never mock:
+ *     a 200 here would show "Money on the way!" to someone who received nothing.
+ *   - Etherfuse 4xx in any phase: provider_rejected with the upstream status.
  *
  * Sender wallet (STELLAR_SPONSOR_SECRET) preconditions — each failed distinctly
  * during the spike:
@@ -72,12 +70,12 @@ export async function POST(req: Request) {
     const body = await req.json()
     amount = Number(body.amount)
   } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 })
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return NextResponse.json(
-      { error: "amount debe ser un número positivo" },
+      { error: "amount must be a positive number" },
       { status: 400 },
     )
   }
@@ -113,7 +111,7 @@ export async function POST(req: Request) {
     if (rejected) return rejected
 
     const reason = errorMessage(err)
-    console.error("[payouts/pix] proveedor no disponible en el quote, degradando a mock:", reason)
+    console.error("[payouts/pix] provider unavailable on quote, degrading to mock:", reason)
     return NextResponse.json({ ...mockPayout(amount), note: reason })
   }
 
@@ -131,7 +129,7 @@ export async function POST(req: Request) {
     if (rejected) return rejected
 
     const reason = errorMessage(err)
-    console.error("[payouts/pix] falló la creación de la orden:", reason)
+    console.error("[payouts/pix] order creation failed:", reason)
     return NextResponse.json(
       {
         error: "order_failed",
@@ -156,7 +154,7 @@ export async function POST(req: Request) {
 
     const failure = describeStellarFailure(err)
     console.error(
-      `[payouts/pix] el pago al anchor falló (${failure.code}):`,
+      `[payouts/pix] anchor payment failed (${failure.code}):`,
       errorMessage(err),
     )
     return NextResponse.json(
@@ -182,7 +180,7 @@ export async function POST(req: Request) {
 /** Etherfuse 4xx: the provider is up and rejected us. Same shape in every phase. */
 function providerRejection(err: unknown, amount: number) {
   if (!(err instanceof EtherfuseError) || err.status < 400 || err.status >= 500) return null
-  console.error(`[payouts/pix] Etherfuse rechazó la solicitud (${err.status}):`, err.message)
+  console.error(`[payouts/pix] Etherfuse rejected the request (${err.status}):`, err.message)
   return NextResponse.json(
     {
       error: "provider_rejected",
@@ -194,5 +192,5 @@ function providerRejection(err: unknown, amount: number) {
 }
 
 function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : "error desconocido"
+  return err instanceof Error ? err.message : "unknown error"
 }

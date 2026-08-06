@@ -1,7 +1,3 @@
-/**
- * Resolve the sender owner id for dashboard / funding routes.
- */
-
 import "server-only"
 
 import { cookies } from "next/headers"

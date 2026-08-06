@@ -1,7 +1,3 @@
-/**
- * POST /api/auth/logout — clear session cookie.
- */
-
 import { NextResponse } from "next/server"
 import {
   COOKIE_NAME,
