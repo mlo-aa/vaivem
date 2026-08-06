@@ -137,14 +137,18 @@ export interface OfframpOrderResult {
   }
 }
 
+export interface OnrampInstructions {
+  orderId: string
+  depositClabe?: string
+  depositAmount?: string
+  depositBankName?: string
+  depositAccountHolder?: string
+  /** Provider may add Pix-specific keys; pass through when present. */
+  [key: string]: unknown
+}
+
 export interface OnrampOrderResult {
-  onramp: {
-    orderId: string
-    depositClabe: string
-    depositAmount: string
-    depositBankName: string
-    depositAccountHolder: string
-  }
+  onramp: OnrampInstructions
 }
 
 /**
@@ -254,6 +258,27 @@ export async function resolveMxnBankAccountId(): Promise<string> {
     )
   }
   return mxn.bankAccountId
+}
+
+/** Prefer env override, else first compliant BRL bank that is not deleted. */
+export async function resolveBrlBankAccountId(): Promise<string> {
+  const fromEnv = process.env.ETHERFUSE_BRL_BANK_ACCOUNT_ID
+  if (fromEnv) return fromEnv
+  const accounts = await listBankAccounts()
+  const brl = accounts.find(
+    (a) =>
+      a.currency?.toLowerCase() === "brl" &&
+      !a.deletedAt &&
+      (a.compliant !== false) &&
+      (a.status == null || a.status === "active"),
+  )
+  if (!brl) {
+    throw new EtherfuseError(
+      "No BRL bank account on the Etherfuse org. Set ETHERFUSE_BRL_BANK_ACCOUNT_ID.",
+      500,
+    )
+  }
+  return brl.bankAccountId
 }
 
 /** Prefer env, else wallet matching the Stellar sponsor public key. */

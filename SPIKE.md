@@ -13,6 +13,14 @@ Verified against Etherfuse sandbox and Stellar testnet. Source scripts: `spike/s
 - The mock fallback is for **provider outages only** (5xx, timeout, network). A 4xx is returned to the client with the upstream status, because the provider is up and the request is what is wrong — reporting it as "live provider unavailable" would be false.
 - In `/api/payouts/pix` the fallback is additionally scoped **by phase**: config and quote may degrade to a mock (nothing has moved yet), while an order or anchor-payment failure is always reported. A 200 after a failed payment shows "Money on the way!" to someone who received nothing.
 
+### BRL on-ramp (fiat → USDC, funding)
+
+- **2026-08-05:** `POST /ramp/quote` with `type: "onramp"`, `sourceAsset: "BRL"`, `targetAsset: USDC:GBBD47…` returned HTTP **424** `FailedToGetQuote` for every amount tested on our sandbox org. The app correctly blocked BRL funding with an explicit message rather than failing silently.
+- **2026-08-06:** The same path started returning HTTP **200**. Example: 100 BRL → ~19.48 USDC quoted, `feeBps` 20, 120s TTL. Provider capability can change without notice — the kit and server adapters should treat corridor availability as runtime data, not hardcoded product truth.
+- **Sandbox fiat cap:** Both **BRL and MXN** on-ramps reject amounts above **500** with `SandboxAmountExceeded` (501 fails; 500 succeeds).
+- **`POST /ramp/order` (BRL, observed 2026-08-06):** Same top-level shape as MXN — `{ onramp: { orderId, depositClabe, depositAmount, depositBankName, depositAccountHolder } }`. For BRL, `depositClabe` is empty, `depositBankName` is `"PIX"`, `depositAmount` is the BRL amount. No separate copia-e-cola field in the POST body; sandbox payment uses `statusPage` from `GET /ramp/order/{id}` (e.g. `https://sandbox.etherfuse.com/ramp/order/{orderId}`). If Etherfuse adds Pix payload fields later, pass them through rather than assuming names.
+- **`statusPage` UI (BRL, sandbox, verified 2026-08-06):** Client-rendered order page — order summary, amount in BRL, **Get Transfer Details** button. That modal currently shows SPEI-style copy with an **empty CLABE** and the BRL amount; **no Pix copia-e-cola and no payable Pix QR** on the page. Public `GET /ramping/order/{id}/update` also has `stpProxyClabe: null`. Do not label a QR of the `statusPage` URL as a bank Pix code — it is only a link to this page.
+
 ## Stellar (testnet)
 
 Horizon: `https://horizon-testnet.stellar.org`, network passphrase `Networks.TESTNET`.

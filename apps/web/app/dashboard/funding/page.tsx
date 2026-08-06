@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { QRCodeSVG } from 'qrcode.react'
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
 import { Button } from '@/components/ui/button'
 import { ButtonLink } from '@/components/ui/button-link'
@@ -18,6 +19,10 @@ import {
 import { formatUSDC } from '@/lib/format'
 import { CUSTODY_LINE } from '@/lib/use-sender-balance'
 
+const SANDBOX_FIAT_MAX = 500
+
+type FundingCurrency = 'BRL' | 'MXN'
+
 type LedgerEntry = {
   id: string
   type: 'deposit' | 'claim_funded' | 'refund'
@@ -27,10 +32,13 @@ type LedgerEntry = {
 }
 
 type DepositInstructions = {
-  depositClabe: string
+  rail: 'spei' | 'pix'
   depositAmount: string
   depositBankName: string
   depositAccountHolder: string
+  depositClabe?: string
+  statusPage?: string
+  pixCopyPaste?: string
 }
 
 type PendingOrder = {
@@ -43,9 +51,14 @@ type PendingOrder = {
   credited: boolean
 }
 
+function hasPixCopyPaste(instructions: DepositInstructions): boolean {
+  return Boolean(instructions.pixCopyPaste?.trim())
+}
+
 export default function FundingPage() {
   const router = useRouter()
   const redirected = useRef(false)
+  const [currency, setCurrency] = useState<FundingCurrency>('BRL')
   const [amount, setAmount] = useState('100')
   const [balance, setBalance] = useState<number | null>(null)
   const [ledger, setLedger] = useState<LedgerEntry[]>([])
@@ -55,8 +68,10 @@ export default function FundingPage() {
   const [checkingId, setCheckingId] = useState<string | null>(null)
   const [orderId, setOrderId] = useState<string | null>(null)
   const [instructions, setInstructions] = useState<DepositInstructions | null>(null)
+  const [depositNote, setDepositNote] = useState<string | null>(null)
   const [orderStatus, setOrderStatus] = useState<string | null>(null)
   const [quotedUsdc, setQuotedUsdc] = useState<number | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const refreshBalance = useCallback(async () => {
     const res = await fetch('/api/funding/balance')
@@ -110,14 +125,16 @@ export default function FundingPage() {
     setPending(true)
     setError(null)
     setInstructions(null)
+    setDepositNote(null)
     setOrderId(null)
     setOrderStatus(null)
+    setCopied(false)
     redirected.current = false
     try {
       const res = await fetch('/api/funding/deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: Number(amount), currency: 'MXN' }),
+        body: JSON.stringify({ amount: Number(amount), currency }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -127,12 +144,23 @@ export default function FundingPage() {
       setOrderId(String(data.orderId))
       setOrderStatus('created')
       setQuotedUsdc(Number(data.usdcAmount))
-      setInstructions(data.instructions)
+      setInstructions(data.instructions ?? null)
+      setDepositNote(typeof data.note === 'string' ? data.note : null)
       await refreshBalance()
     } catch {
       setError('Could not reach the funding service.')
     } finally {
       setPending(false)
+    }
+  }
+
+  async function copyText(value: string) {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setError('Could not copy to clipboard.')
     }
   }
 
@@ -161,6 +189,8 @@ export default function FundingPage() {
     }
   }
 
+  const showPixCopyPaste = instructions ? hasPixCopyPaste(instructions) : false
+
   return (
     <>
       <DashboardTopbar title="Funding" />
@@ -170,9 +200,11 @@ export default function FundingPage() {
         <div className="rounded-lg border border-border bg-secondary/40 px-4 py-3 text-sm">
           <p className="font-medium">Sandbox funding</p>
           <p className="mt-1 text-muted-foreground">
-            Only <strong className="text-foreground">MXN</strong> on-ramp works here, up to{' '}
-            <strong className="text-foreground">500 MXN</strong> per order. BRL on-ramp is not
-            yet available in the Etherfuse sandbox — do not try BRL deposits.
+            Live Etherfuse on-ramp in sandbox: <strong className="text-foreground">BRL</strong>{' '}
+            (PIX) or <strong className="text-foreground">MXN</strong> (SPEI), up to{' '}
+            <strong className="text-foreground">{SANDBOX_FIAT_MAX}</strong> per order in either
+            currency. After payment completes, reload this page or tap Check status — credits
+            reconcile automatically.
           </p>
         </div>
 
@@ -194,7 +226,7 @@ export default function FundingPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Deposit MXN → USDC</CardTitle>
+              <CardTitle>Deposit fiat → USDC</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Creates a live Etherfuse on-ramp order. After it completes, you go straight to
                 Create.
@@ -203,44 +235,155 @@ export default function FundingPage() {
             <CardContent>
               <form onSubmit={onDeposit} className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="mxn" className="text-sm font-medium">
-                    Amount (MXN)
+                  <span className="text-sm font-medium">Currency</span>
+                  <div className="flex gap-2">
+                    {(['BRL', 'MXN'] as const).map((c) => (
+                      <Button
+                        key={c}
+                        type="button"
+                        variant={currency === c ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setCurrency(c)}
+                      >
+                        {c}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="fiat-amount" className="text-sm font-medium">
+                    Amount ({currency})
                   </label>
                   <Input
-                    id="mxn"
+                    id="fiat-amount"
                     type="number"
                     min={1}
-                    max={500}
+                    max={SANDBOX_FIAT_MAX}
                     step="1"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     required
                   />
-                  <p className="text-xs text-muted-foreground">1–500 MXN · currency fixed to MXN</p>
+                  <p className="text-xs text-muted-foreground">
+                    1–{SANDBOX_FIAT_MAX} {currency} · sandbox cap applies to both currencies
+                  </p>
                 </div>
                 {error ? <p className="text-sm text-destructive">{error}</p> : null}
                 <Button type="submit" disabled={pending}>
-                  {pending ? 'Creating order…' : 'Create MXN deposit'}
+                  {pending ? 'Creating order…' : `Create ${currency} deposit`}
                 </Button>
               </form>
 
               {instructions ? (
-                <div className="mt-4 space-y-2 rounded-lg border border-border p-3 text-sm">
-                  <p className="font-medium">Deposit instructions</p>
-                  <p>
-                    Bank: <span className="font-mono">{instructions.depositBankName}</span>
+                <div className="mt-4 space-y-3 rounded-lg border border-border p-3 text-sm">
+                  <p className="font-medium">
+                    {instructions.rail === 'pix' ? 'PIX deposit' : 'SPEI deposit'}
                   </p>
-                  <p>
-                    CLABE:{' '}
-                    <span className="font-mono">{instructions.depositClabe || '—'}</span>
-                  </p>
-                  <p>
-                    Amount:{' '}
-                    <span className="font-mono">
-                      {instructions.depositAmount} MXN
-                    </span>
-                  </p>
-                  <p>Holder: {instructions.depositAccountHolder}</p>
+
+                  {instructions.rail === 'pix' ? (
+                    <>
+                      <p>
+                        Rail:{' '}
+                        <span className="font-medium">{instructions.depositBankName}</span>
+                      </p>
+                      <p>
+                        Amount:{' '}
+                        <span className="font-mono">
+                          {instructions.depositAmount} {currency}
+                        </span>
+                      </p>
+                      <p>Recipient: {instructions.depositAccountHolder}</p>
+
+                      {showPixCopyPaste ? (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Pix copia e cola — pay from your banking app
+                          </p>
+                          <p className="break-all rounded-md bg-secondary p-2 font-mono text-xs">
+                            {instructions.pixCopyPaste}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void copyText(instructions.pixCopyPaste!)}
+                          >
+                            {copied ? 'Copied' : 'Copy Pix code'}
+                          </Button>
+                          <div className="flex flex-col items-center gap-1 pt-2">
+                            <QRCodeSVG
+                              value={instructions.pixCopyPaste!}
+                              size={160}
+                              bgColor="transparent"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Pix QR — scan in your banking app
+                            </p>
+                          </div>
+                        </div>
+                      ) : instructions.statusPage ? (
+                        <div className="space-y-3">
+                          <p className="text-xs text-muted-foreground">
+                            Payment instructions are not in the API response. Open the
+                            Etherfuse order page and tap{' '}
+                            <strong className="text-foreground">Get Transfer Details</strong>.
+                            In sandbox (verified 2026-08-06) that modal shows the BRL amount
+                            but no Pix copia-e-cola and no payable Pix QR — use Etherfuse
+                            sandbox tools to simulate fiat receipt, then return here.
+                          </p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            render={
+                              <a
+                                href={instructions.statusPage}
+                                target="_blank"
+                                rel="noreferrer"
+                              />
+                            }
+                          >
+                            Abrir página de pagamento
+                          </Button>
+                          <div className="flex flex-col items-center gap-1 pt-1">
+                            <QRCodeSVG
+                              value={instructions.statusPage}
+                              size={160}
+                              bgColor="transparent"
+                            />
+                            <p className="max-w-[14rem] text-center text-xs text-muted-foreground">
+                              QR opens the order page — not a Pix code for your bank app
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void copyText(instructions.statusPage!)}
+                          >
+                            {copied ? 'Copied link' : 'Copy order page link'}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        Bank: <span className="font-mono">{instructions.depositBankName}</span>
+                      </p>
+                      <p>
+                        CLABE:{' '}
+                        <span className="font-mono">{instructions.depositClabe || '—'}</span>
+                      </p>
+                      <p>
+                        Amount:{' '}
+                        <span className="font-mono">
+                          {instructions.depositAmount} {currency}
+                        </span>
+                      </p>
+                      <p>Holder: {instructions.depositAccountHolder}</p>
+                    </>
+                  )}
+
                   {quotedUsdc != null ? (
                     <p>Credits ≈ {formatUSDC(quotedUsdc)} when the order completes</p>
                   ) : null}
@@ -250,11 +393,9 @@ export default function FundingPage() {
                       {orderStatus ?? '…'}
                     </p>
                   ) : null}
-                  <p className="text-xs text-muted-foreground">
-                    Sandbox: simulate fiat with Etherfuse{"'"}s fiat_received endpoint. You can
-                    leave this page — the deposit stays pending until you return or tap Check
-                    status.
-                  </p>
+                  {depositNote ? (
+                    <p className="text-xs text-muted-foreground">{depositNote}</p>
+                  ) : null}
                 </div>
               ) : null}
             </CardContent>
@@ -267,7 +408,7 @@ export default function FundingPage() {
               <CardTitle>Pending deposits</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Orders waiting on Etherfuse. Status is refreshed on every page load; use Check
-                status after simulating fiat in the sandbox.
+                status after completing payment in the sandbox.
               </p>
             </CardHeader>
             <CardContent>

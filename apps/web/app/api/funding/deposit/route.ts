@@ -10,15 +10,27 @@ import {
   createOnrampOrder,
   createQuote,
   EtherfuseError,
+  getOrder,
   getUsdcAssetId,
+  resolveBrlBankAccountId,
   resolveCryptoWallet,
   resolveMxnBankAccountId,
 } from "@/lib/server/etherfuse"
+import { normalizeOnrampInstructions } from "@/lib/server/onramp-instructions"
 import { getSponsorPublicKey } from "@/lib/server/stellar"
 
 export const dynamic = "force-dynamic"
 
-const SANDBOX_MXN_MAX = 500
+/** Sandbox caps both MXN and BRL at 500 (SandboxAmountExceeded above). */
+const SANDBOX_FIAT_MAX = 500
+
+type FundingCurrency = "MXN" | "BRL"
+
+function parseCurrency(raw: unknown): FundingCurrency | null {
+  const c = String(raw ?? "BRL").toUpperCase()
+  if (c === "MXN" || c === "BRL") return c
+  return null
+}
 
 export async function POST(req: Request) {
   const who = await requireOwnerId()
@@ -33,21 +45,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 })
   }
 
-  const currency = String(body.currency ?? "MXN").toUpperCase()
+  const currency = parseCurrency(body.currency)
   const amount = Number(body.amount)
 
-  if (currency === "BRL") {
-    return NextResponse.json(
-      {
-        error: "brl_onramp_unavailable",
-        message:
-          "BRL on-ramp is not yet available in the Etherfuse sandbox. Use MXN (max 500 MXN) to fund your demo balance.",
-      },
-      { status: 422 },
-    )
-  }
-
-  if (currency !== "MXN") {
+  if (!currency) {
     return NextResponse.json(
       { error: "currency must be MXN or BRL" },
       { status: 400 },
@@ -61,12 +62,12 @@ export async function POST(req: Request) {
     )
   }
 
-  if (amount > SANDBOX_MXN_MAX) {
+  if (amount > SANDBOX_FIAT_MAX) {
     return NextResponse.json(
       {
         error: "amount_above_sandbox_limit",
-        message: `Sandbox MXN on-ramps are capped at ${SANDBOX_MXN_MAX} MXN per order.`,
-        maxAmount: SANDBOX_MXN_MAX,
+        message: `Sandbox on-ramps are capped at ${SANDBOX_FIAT_MAX} ${currency} per order.`,
+        maxAmount: SANDBOX_FIAT_MAX,
       },
       { status: 422 },
     )
@@ -75,12 +76,15 @@ export async function POST(req: Request) {
   try {
     const sponsorKey = getSponsorPublicKey()
     const wallet = await resolveCryptoWallet(sponsorKey)
-    const bankAccountId = await resolveMxnBankAccountId()
+    const bankAccountId =
+      currency === "BRL"
+        ? await resolveBrlBankAccountId()
+        : await resolveMxnBankAccountId()
     const quoteId = crypto.randomUUID()
 
     const quote = await createQuote({
       type: "onramp",
-      sourceAsset: "MXN",
+      sourceAsset: currency,
       targetAsset: getUsdcAssetId(),
       sourceAmount: amount.toFixed(2),
       quoteId,
@@ -94,43 +98,65 @@ export async function POST(req: Request) {
       cryptoWalletId: wallet.walletId,
     })
 
+    if (currency === "BRL") {
+      console.log(
+        "[funding/deposit] BRL onramp raw:",
+        JSON.stringify(order.onramp),
+      )
+    }
+
+    let statusPage: string | undefined
+    try {
+      const detail = await getOrder(order.onramp.orderId)
+      if (typeof detail.statusPage === "string") {
+        statusPage = detail.statusPage
+      }
+    } catch {
+      /* optional */
+    }
+
+    const instructions = normalizeOnrampInstructions(
+      order.onramp,
+      currency,
+      statusPage,
+    )
+
     const usdcAmount = Math.round(Number(quote.destinationAmount) * 100) / 100
     await savePendingDeposit({
       orderId: order.onramp.orderId,
       ownerId: who.ownerId,
-      currency: "MXN",
+      currency,
       fiatAmount: amount,
       usdcAmount,
       createdAt: new Date().toISOString(),
       credited: false,
     })
 
+    const note =
+      currency === "BRL"
+        ? "Sandbox: open the Etherfuse status page (or simulate fiat with fiat_received), then return here — pending deposits reconcile on load. Credited USDC is a demo ledger entry."
+        : "Sandbox: simulate the SPEI deposit with Etherfuse fiat_received, then return here. Production detects SPEI automatically. Credited USDC is a demo ledger entry."
+
     return NextResponse.json({
       orderId: order.onramp.orderId,
       status: "created",
-      currency: "MXN",
+      currency,
       fiatAmount: amount,
       usdcAmount,
       exchangeRate: quote.exchangeRate,
       expiresAt: quote.expiresAt,
-      instructions: {
-        depositClabe: order.onramp.depositClabe,
-        depositAmount: order.onramp.depositAmount,
-        depositBankName: order.onramp.depositBankName,
-        depositAccountHolder: order.onramp.depositAccountHolder,
-      },
-      note:
-        "Sandbox: simulate the SPEI deposit with Etherfuse fiat_received, then poll GET /api/funding/[orderId]. Production detects SPEI automatically. Credited USDC is a demo ledger entry — the shared sponsor wallet still holds the on-chain funds.",
+      instructions,
+      note,
     })
   } catch (err) {
     if (err instanceof EtherfuseError) {
       const msg = err.message
-      if (/FailedToGetQuote/i.test(msg)) {
+      if (/SandboxAmountExceeded/i.test(msg)) {
         return NextResponse.json(
           {
-            error: "brl_onramp_unavailable",
-            message:
-              "BRL on-ramp is not yet available in the Etherfuse sandbox. Use MXN (max 500 MXN) to fund your demo balance.",
+            error: "amount_above_sandbox_limit",
+            message: `Sandbox on-ramps are capped at ${SANDBOX_FIAT_MAX} ${currency} per order.`,
+            maxAmount: SANDBOX_FIAT_MAX,
           },
           { status: 422 },
         )
