@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Link2, Plus, Code2, LifeBuoy } from 'lucide-react'
+import { Link2, Plus, Code2, LifeBuoy, Wallet } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { cn } from '@/lib/utils'
 
 const NAV = [
   { label: 'Claims', href: '/dashboard', icon: Link2 },
   { label: 'Create claim', href: '/dashboard/create', icon: Plus },
+  { label: 'Funding', href: '/dashboard/funding', icon: Wallet },
   { label: 'Developers', href: '/developers', icon: Code2 },
 ]
 

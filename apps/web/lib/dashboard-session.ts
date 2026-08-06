@@ -1,20 +1,23 @@
 /**
- * Shared-password dashboard session.
- * Edge-safe (no Node APIs) so middleware and route handlers can both use it.
+ * Edge-safe signed session cookie for sender email-code auth.
  */
 
-const COOKIE_NAME = "vaivem_dash"
+const COOKIE_NAME = "vaivem_session"
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7 // 7 days
 
 export { COOKIE_NAME, MAX_AGE_SECONDS }
 
-function getPassword(): string | undefined {
-  const value = process.env.DASHBOARD_PASSWORD
-  return value && value.length > 0 ? value : undefined
+export interface SessionPayload {
+  email: string
+  exp: number
 }
 
-export function dashboardAuthConfigured(): boolean {
-  return Boolean(getPassword())
+function getSecret(): string {
+  return (
+    process.env.AUTH_SECRET ||
+    process.env.RESEND_API_KEY ||
+    "vaivem-dev-auth-secret"
+  )
 }
 
 function bytesToBase64Url(bytes: ArrayBuffer | Uint8Array): string {
@@ -60,49 +63,50 @@ async function sign(payloadB64: string, secret: string): Promise<string> {
   return bytesToBase64Url(sig)
 }
 
-/** Create a signed session cookie value. */
-export async function createSessionToken(): Promise<string | null> {
-  const password = getPassword()
-  if (!password) return null
-  const payload = bytesToBase64Url(
-    new TextEncoder().encode(
-      JSON.stringify({ exp: Math.floor(Date.now() / 1000) + MAX_AGE_SECONDS }),
-    ),
-  )
-  const signature = await sign(payload, password)
-  return `${payload}.${signature}`
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
 }
 
-/** Verify a signed session cookie value. */
-export async function verifySessionToken(token: string | undefined | null): Promise<boolean> {
-  const password = getPassword()
-  if (!password) return true // auth disabled
-  if (!token) return false
-  const [payload, signature] = token.split(".")
-  if (!payload || !signature) return false
-  const expected = await sign(payload, password)
-  if (expected.length !== signature.length) return false
-  // Constant-time-ish compare
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+export async function createSessionToken(email: string): Promise<string> {
+  const payload: SessionPayload = {
+    email: normalizeEmail(email),
+    exp: Math.floor(Date.now() / 1000) + MAX_AGE_SECONDS,
+  }
+  const payloadB64 = bytesToBase64Url(
+    new TextEncoder().encode(JSON.stringify(payload)),
+  )
+  const signature = await sign(payloadB64, getSecret())
+  return `${payloadB64}.${signature}`
+}
+
+export async function verifySessionToken(
+  token: string | undefined | null,
+): Promise<SessionPayload | null> {
+  if (!token) return null
+  const [payloadB64, signature] = token.split(".")
+  if (!payloadB64 || !signature) return null
+  const expected = await sign(payloadB64, getSecret())
+  if (expected.length !== signature.length) return null
   let diff = 0
   for (let i = 0; i < expected.length; i++) {
     diff |= expected.charCodeAt(i)! ^ signature.charCodeAt(i)!
   }
-  if (diff !== 0) return false
+  if (diff !== 0) return null
   try {
-    const json = JSON.parse(new TextDecoder().decode(base64UrlToBytes(payload))) as {
-      exp?: number
+    const json = JSON.parse(
+      new TextDecoder().decode(base64UrlToBytes(payloadB64)),
+    ) as SessionPayload
+    if (!json.email || !json.exp || json.exp < Math.floor(Date.now() / 1000)) {
+      return null
     }
-    if (!json.exp || json.exp < Math.floor(Date.now() / 1000)) return false
-    return true
+    return { email: normalizeEmail(json.email), exp: json.exp }
   } catch {
-    return false
+    return null
   }
-}
-
-export function passwordMatches(candidate: string): boolean {
-  const password = getPassword()
-  if (!password) return true
-  return candidate === password
 }
 
 export function sessionCookieOptions(maxAge = MAX_AGE_SECONDS) {

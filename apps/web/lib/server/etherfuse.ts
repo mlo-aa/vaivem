@@ -104,6 +104,8 @@ export function createQuote(params: {
   customerId?: string
   /** When set, used as quoteId (and later as orderId). Otherwise a UUID is generated. */
   quoteId?: string
+  /** Stellar public key — used for on-ramp wallet setup fees. */
+  walletAddress?: string
 }) {
   if (!ORG_ID && !params.customerId) {
     throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
@@ -121,6 +123,7 @@ export function createQuote(params: {
         targetAsset: params.targetAsset,
       },
       sourceAmount: params.sourceAmount,
+      ...(params.walletAddress ? { walletAddress: params.walletAddress } : {}),
     }),
   })
 }
@@ -131,6 +134,16 @@ export interface OfframpOrderResult {
     withdrawAnchorAccount: string
     withdrawMemo: string
     withdrawMemoType: "hash" | string
+  }
+}
+
+export interface OnrampOrderResult {
+  onramp: {
+    orderId: string
+    depositClabe: string
+    depositAmount: string
+    depositBankName: string
+    depositAccountHolder: string
   }
 }
 
@@ -159,6 +172,114 @@ export function createOrder(params: {
       useAnchor: params.useAnchor ?? true,
     }),
   })
+}
+
+/**
+ * Creates an on-ramp order. Returns SPEI/PIX deposit instructions.
+ */
+export function createOnrampOrder(params: {
+  quoteId: string
+  bankAccountId: string
+  publicKey: string
+  cryptoWalletId?: string
+  customerId?: string
+}) {
+  if (!ORG_ID && !params.customerId) {
+    throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
+  }
+  return request<OnrampOrderResult>("/ramp/order", {
+    method: "POST",
+    body: JSON.stringify({
+      orderId: params.quoteId,
+      quoteId: params.quoteId,
+      customerId: params.customerId ?? ORG_ID,
+      bankAccountId: params.bankAccountId,
+      publicKey: params.publicKey,
+      ...(params.cryptoWalletId
+        ? { cryptoWalletId: params.cryptoWalletId }
+        : {}),
+    }),
+  })
+}
+
+export interface EtherfuseWallet {
+  walletId: string
+  publicKey: string
+  blockchain: string
+  customerId?: string
+}
+
+export interface EtherfuseBankAccount {
+  bankAccountId: string
+  currency: string
+  status?: string
+  compliant?: boolean
+  deletedAt?: string | null
+}
+
+export async function listWallets(customerId?: string) {
+  const id = customerId ?? ORG_ID
+  if (!id) throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
+  const res = await request<{ items: EtherfuseWallet[] }>(
+    `/ramp/wallets?customerId=${encodeURIComponent(id)}`,
+  )
+  return res.items ?? []
+}
+
+export async function listBankAccounts(customerId?: string) {
+  const id = customerId ?? ORG_ID
+  if (!id) throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
+  const res = await request<{ items: EtherfuseBankAccount[] }>(
+    `/ramp/bank-accounts?customerId=${encodeURIComponent(id)}`,
+  )
+  return res.items ?? []
+}
+
+/** Prefer env override, else first compliant MXN bank that is not deleted. */
+export async function resolveMxnBankAccountId(): Promise<string> {
+  const fromEnv = process.env.ETHERFUSE_MXN_BANK_ACCOUNT_ID
+  if (fromEnv) return fromEnv
+  const accounts = await listBankAccounts()
+  const mxn = accounts.find(
+    (a) =>
+      a.currency?.toLowerCase() === "mxn" &&
+      !a.deletedAt &&
+      (a.compliant !== false) &&
+      (a.status == null || a.status === "active"),
+  )
+  if (!mxn) {
+    throw new EtherfuseError(
+      "No MXN bank account on the Etherfuse org. Set ETHERFUSE_MXN_BANK_ACCOUNT_ID.",
+      500,
+    )
+  }
+  return mxn.bankAccountId
+}
+
+/** Prefer env, else wallet matching the Stellar sponsor public key. */
+export async function resolveCryptoWallet(publicKey: string): Promise<{
+  walletId: string
+  publicKey: string
+}> {
+  const fromEnv = process.env.ETHERFUSE_CRYPTO_WALLET_ID
+  const wallets = await listWallets()
+  if (fromEnv) {
+    const match = wallets.find((w) => w.walletId === fromEnv)
+    return {
+      walletId: fromEnv,
+      publicKey: match?.publicKey ?? publicKey,
+    }
+  }
+  const match =
+    wallets.find((w) => w.publicKey === publicKey && w.blockchain === "stellar") ??
+    wallets.find((w) => w.blockchain === "stellar")
+  if (!match) {
+    throw new EtherfuseError(
+      "No Stellar crypto wallet on the Etherfuse org. Set ETHERFUSE_CRYPTO_WALLET_ID.",
+      500,
+    )
+  }
+  return { walletId: match.walletId, publicKey: match.publicKey }
 }
 
 export interface RampOrderStatus {

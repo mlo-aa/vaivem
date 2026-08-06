@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Menu, Plus, Wallet as WalletIcon } from 'lucide-react'
 import {
   Sheet,
@@ -24,34 +24,66 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ButtonLink } from '@/components/ui/button-link'
 import { Logo } from '@/components/logo'
 import { DemoBadge } from '@/components/demo-badge'
-import { currentOrg, currentUser } from '@/lib/mock-data'
 import { formatUSDC } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const MOBILE_NAV = [
   { label: 'Claims', href: '/dashboard' },
   { label: 'Create claim', href: '/dashboard/create' },
+  { label: 'Funding', href: '/dashboard/funding' },
   { label: 'Developers', href: '/developers' },
 ]
 
 function initials(name: string) {
   return name
-    .split(' ')
+    .split(/[\s@]+/)
     .map((n) => n[0])
+    .filter(Boolean)
     .slice(0, 2)
     .join('')
+    .toUpperCase()
 }
 
 export function DashboardTopbar({ title }: { title: string }) {
   const [open, setOpen] = useState(false)
+  const [balance, setBalance] = useState<number | null>(null)
+  const [displayName, setDisplayName] = useState('Sender')
+  const [displayEmail, setDisplayEmail] = useState('')
   const pathname = usePathname()
   const router = useRouter()
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [balRes, meRes] = await Promise.all([
+          fetch('/api/funding/balance'),
+          fetch('/api/auth/me'),
+        ])
+        if (!cancelled && balRes.ok) {
+          const data = await balRes.json()
+          setBalance(Number(data.amount ?? 0))
+        }
+        if (!cancelled && meRes.ok) {
+          const data = await meRes.json()
+          setDisplayName(String(data.user?.name || data.user?.email || 'Sender'))
+          setDisplayEmail(String(data.user?.email || ''))
+        }
+      } catch {
+        // leave defaults
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.replace('/login')
     router.refresh()
   }
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-border bg-background/80 px-4 backdrop-blur-lg sm:px-6">
       <div className="flex items-center gap-3">
@@ -98,10 +130,15 @@ export function DashboardTopbar({ title }: { title: string }) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        <div className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 sm:flex">
+        <Link
+          href="/dashboard/funding"
+          className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 sm:flex hover:bg-secondary/60"
+        >
           <WalletIcon className="size-4 text-muted-foreground" />
-          <span className="text-sm font-medium tabular-nums">{formatUSDC(currentOrg.balance)}</span>
-        </div>
+          <span className="text-sm font-medium tabular-nums">
+            {balance == null ? '—' : formatUSDC(balance)}
+          </span>
+        </Link>
         <ButtonLink href="/dashboard/create" size="sm">
           <Plus data-icon="inline-start" />
           New claim
@@ -113,7 +150,7 @@ export function DashboardTopbar({ title }: { title: string }) {
           >
             <Avatar className="size-9">
               <AvatarFallback className="bg-navy text-navy-foreground text-xs">
-                {initials(currentUser.name)}
+                {initials(displayName)}
               </AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
@@ -121,18 +158,23 @@ export function DashboardTopbar({ title }: { title: string }) {
             <DropdownMenuGroup>
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium">{currentUser.name}</span>
-                  <span className="text-xs font-normal text-muted-foreground">
-                    {currentUser.email}
-                  </span>
+                  <span className="text-sm font-medium">{displayName}</span>
+                  {displayEmail ? (
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {displayEmail}
+                    </span>
+                  ) : null}
                 </div>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+              <DropdownMenuItem render={<Link href="/dashboard/funding" />}>
+                Funding
+              </DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/developers" />}>Developers</DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/" />}>View public site</DropdownMenuItem>
-              <DropdownMenuItem onClick={logout}>Sign out</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void logout()}>Sign out</DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>

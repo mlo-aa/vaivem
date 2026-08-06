@@ -1,8 +1,8 @@
 /**
  * POST /api/claims/create
  *
- * Funds a claimable balance for the real USDC amount, stores the claim record,
- * returns { token, url, deadline }.
+ * Checks the sender's demo ledger, funds a claimable balance for the real USDC
+ * amount from the shared sponsor wallet, debits the ledger, stores the claim.
  */
 
 import { NextResponse } from "next/server"
@@ -19,17 +19,25 @@ import {
   type StoredClaim,
 } from "@/lib/server/claim-store"
 import type { ProtectionType } from "@/lib/types"
-import { currentOrg } from "@/lib/mock-data"
 import { isBelowMinimum, minAmountMessage, MIN_AMOUNT_USDC } from "@/lib/limits"
+import { requireOwnerId } from "@/lib/server/auth-session"
+import { debitForClaim, getBalance } from "@/lib/server/balance-store"
 
 export const dynamic = "force-dynamic"
 
 export async function POST(req: Request) {
+  const who = await requireOwnerId()
+  if (!who.ok) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
     const body = await req.json()
     const amount = Number(body.amount)
     const country = String(body.country ?? "BR")
-    const senderName = String(body.senderName ?? currentOrg.name)
+    const senderName = String(
+      body.senderName ?? who.name ?? who.email ?? "Vaivém sender",
+    )
     const recipientName = String(body.recipientName ?? "")
     const recipientEmail =
       body.recipientEmail != null ? String(body.recipientEmail) : null
@@ -59,7 +67,6 @@ export async function POST(req: Request) {
         { status: 400 },
       )
     }
-    // Only the PIX rail goes through Etherfuse. A Stellar-only claim can be any amount.
     if (allowPix && isBelowMinimum(amount)) {
       return NextResponse.json(
         {
@@ -83,6 +90,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "expirationDays invalid" }, { status: 400 })
     }
 
+    const balance = await getBalance(who.ownerId)
+    if (balance.amount + 1e-9 < amount) {
+      return NextResponse.json(
+        {
+          error: "insufficient_balance",
+          message: `Insufficient balance. You have ${balance.amount.toFixed(2)} USDC and need ${amount.toFixed(2)} USDC. Add funds on the Funding page.`,
+          available: balance.amount,
+          required: amount,
+        },
+        { status: 402 },
+      )
+    }
+
     const expiresInSeconds = Math.floor(expirationDays * 86400)
     const amountStr = amount.toFixed(2)
 
@@ -98,9 +118,26 @@ export async function POST(req: Request) {
     await recipientSecretsByBalanceId.set(balanceId, recipient.secret, deadline)
 
     const token = generateClaimToken()
+    try {
+      await debitForClaim(who.ownerId, amount, token)
+    } catch (err) {
+      if (err instanceof Error && err.message === "insufficient_balance") {
+        return NextResponse.json(
+          {
+            error: "insufficient_balance",
+            message:
+              "Insufficient balance. Add funds on the Funding page before creating a claim.",
+          },
+          { status: 402 },
+        )
+      }
+      throw err
+    }
+
     const now = new Date().toISOString()
     const record: StoredClaim = {
       token,
+      ownerId: who.ownerId,
       balanceId,
       recipientPublicKey: recipient.publicKey,
       amount,

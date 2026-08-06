@@ -1,6 +1,6 @@
 /**
  * GET  /api/claims/by-token/[token]  — PUBLIC (no secrets).
- * PATCH /api/claims/by-token/[token] — dashboard cancel/refund/extend + reconcile.
+ * PATCH /api/claims/by-token/[token] — reconcile (public) + owner cancel/refund/extend.
  */
 
 import { NextResponse } from "next/server"
@@ -12,6 +12,8 @@ import {
   updateStoredClaim,
 } from "@/lib/server/claim-store"
 import { reconcileClaimPayout } from "@/lib/server/reconcile-claim"
+import { optionalOwnerId } from "@/lib/server/auth-session"
+import { creditRefund } from "@/lib/server/balance-store"
 
 export const dynamic = "force-dynamic"
 
@@ -55,10 +57,14 @@ export async function PATCH(
 
   const action = body.action
   try {
-    // Safe for recipients: server re-reads Etherfuse; client cannot invent a status.
     if (action === "reconcile") {
       const updated = await reconcileClaimPayout(claim)
       return NextResponse.json({ claim: updated })
+    }
+
+    const ownerId = await optionalOwnerId()
+    if (!ownerId || claim.ownerId !== ownerId) {
+      return NextResponse.json({ error: "Claim not found" }, { status: 404 })
     }
 
     if (action === "cancel" || action === "refund") {
@@ -69,6 +75,13 @@ export async function PATCH(
           status: action === "cancel" ? "cancelled" : "refunded",
           txHash: hash,
         })
+        if (claim.ownerId && claim.amount > 0) {
+          try {
+            await creditRefund(claim.ownerId, claim.amount, claim.token)
+          } catch (ledgerErr) {
+            console.error("[claims/patch] ledger refund failed:", ledgerErr)
+          }
+        }
         return NextResponse.json({ claim: updated })
       } catch (err) {
         if (err instanceof StellarError) {

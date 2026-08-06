@@ -1,17 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server"
 import {
   COOKIE_NAME,
-  dashboardAuthConfigured,
   verifySessionToken,
-} from "@/lib/dashboard-auth"
-
-let warnedMissingPassword = false
+} from "@/lib/dashboard-session"
 
 function isProtectedPath(pathname: string): boolean {
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
     return true
   }
-  // All /api/claims* except the public by-token recipient routes.
+  if (pathname.startsWith("/api/funding")) {
+    return true
+  }
   if (pathname.startsWith("/api/claims")) {
     if (pathname.startsWith("/api/claims/by-token/")) return false
     return true
@@ -26,19 +25,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  if (!dashboardAuthConfigured()) {
-    if (!warnedMissingPassword) {
-      warnedMissingPassword = true
-      console.warn(
-        "[auth] DASHBOARD_PASSWORD is unset — /dashboard and /api/claims are public. Set it before any shared deploy.",
-      )
-    }
-    return NextResponse.next()
-  }
-
   const token = req.cookies.get(COOKIE_NAME)?.value
-  const ok = await verifySessionToken(token)
-  if (ok) return NextResponse.next()
+  const session = await verifySessionToken(token)
+  if (session) return NextResponse.next()
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -56,5 +45,7 @@ export const config = {
     "/dashboard/:path*",
     "/api/claims",
     "/api/claims/:path*",
+    "/api/funding",
+    "/api/funding/:path*",
   ],
 }

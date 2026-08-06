@@ -198,29 +198,9 @@ export async function listClaims(): Promise<Claim[]> {
 }
 
 export async function getClaim(token: string): Promise<Claim | null> {
-  // Prefer the dashboard list (reconciles cashing_out → Etherfuse) so detail
-  // gets the full row. Fall back to public by-token (also reconciles status).
-  try {
-    const list = await listClaims()
-    const full = list.find((c) => c.token.toUpperCase() === token.toUpperCase())
-    if (full) return full
-  } catch {
-    // fall through
-  }
-
-  const res = await fetch(
-    `${apiBase()}/api/claims/by-token/${encodeURIComponent(token)}`,
-  )
-  if (res.status === 404) return null
-  if (!res.ok) throw new Error("Failed to load claim")
-  const pub = await res.json()
-
-  return mapApiClaim({
-    ...pub,
-    purpose: "Payout",
-    recipientEmail: null,
-    createdAt: new Date(Number(pub.deadline) * 1000 - 7 * 86400000).toISOString(),
-  })
+  // Dashboard detail: only claims owned by the caller (list is scoped by ownerId).
+  const list = await listClaims()
+  return list.find((c) => c.token.toUpperCase() === token.toUpperCase()) ?? null
 }
 
 /** Public recipient view — never includes secrets. */

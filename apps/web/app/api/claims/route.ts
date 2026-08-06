@@ -1,17 +1,19 @@
 /**
  * GET /api/claims
- * Dashboard list of stored claims. Reconciles any cashing_out rows against Etherfuse.
+ * Dashboard list — only the caller's claims. Reconciles cashing_out rows.
  */
 
 import { NextResponse } from "next/server"
-import { listStoredClaims } from "@/lib/server/claim-store"
+import { listStoredClaimsByOwner } from "@/lib/server/claim-store"
 import { reconcileClaimPayout } from "@/lib/server/reconcile-claim"
+import { requireOwnerId } from "@/lib/server/auth-session"
 
 export const dynamic = "force-dynamic"
 
-function serialize(c: Awaited<ReturnType<typeof listStoredClaims>>[number]) {
+function serialize(c: Awaited<ReturnType<typeof listStoredClaimsByOwner>>[number]) {
   return {
     token: c.token,
+    ownerId: c.ownerId,
     amount: c.amount,
     displayAmount: c.displayAmount ?? c.amount,
     displayCurrency: c.displayCurrency ?? "USD",
@@ -36,8 +38,13 @@ function serialize(c: Awaited<ReturnType<typeof listStoredClaims>>[number]) {
 }
 
 export async function GET() {
+  const who = await requireOwnerId()
+  if (!who.ok) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
-    const claims = await listStoredClaims()
+    const claims = await listStoredClaimsByOwner(who.ownerId)
     const reconciled = await Promise.all(
       claims.map(async (c) => {
         if (c.status === "cashing_out" && c.payoutOrderId) {
