@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Check, Copy, Play, Terminal } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -17,14 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { mockApiResponse } from "@/lib/services"
 
-const ENDPOINTS = [
-  { method: "POST", path: "/v1/claims", desc: "Create and fund a claim link" },
-  { method: "GET", path: "/v1/claims/{id}", desc: "Retrieve a claim's status" },
-  { method: "POST", path: "/v1/claims/batch", desc: "Create claims in bulk" },
-  { method: "POST", path: "/v1/webhooks", desc: "Subscribe to payout events" },
-]
-
-  const CURL = `curl https://api.vaivem.app/v1/claims \\
+const CURL = `curl https://api.vaivem.app/v1/claims \\
   -H "Authorization: Bearer sk_live_••••" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -34,9 +28,9 @@ const ENDPOINTS = [
     "protection": "email"
   }'`
 
-  const NODE = `import { Vaivem } from "@vaivem/node"
+const NODE = `import { Vaivem } from "@vaivem/node"
 
-  const client = new Vaivem(process.env.VAIVEM_KEY)
+const client = new Vaivem(process.env.VAIVEM_KEY)
 
 const claim = await client.claims.create({
   amount: "500",
@@ -48,10 +42,19 @@ const claim = await client.claims.create({
 console.log(claim.claimUrl)`
 
 export function DevelopersView() {
+  const t = useTranslations("developers")
+  const tc = useTranslations("common")
   const [amount, setAmount] = useState("500")
   const [response, setResponse] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
+
+  const endpoints = [
+    { method: "POST", path: "/v1/claims", desc: t("epCreate") },
+    { method: "GET", path: "/v1/claims/{id}", desc: t("epGet") },
+    { method: "POST", path: "/v1/claims/batch", desc: t("epBatch") },
+    { method: "POST", path: "/v1/webhooks", desc: t("epWebhooks") },
+  ]
 
   function run() {
     setRunning(true)
@@ -70,17 +73,13 @@ export function DevelopersView() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Endpoints */}
-      <Card>
+      <Card className="rounded-2xl border-border/80 bg-card/80 shadow-lg shadow-black/20">
         <CardHeader>
-          <CardTitle>REST API</CardTitle>
-          <CardDescription>
-            A single integration for payouts across 30+ currencies. Funds settle on Stellar; recipients
-            never need a wallet.
-          </CardDescription>
+          <CardTitle>{t("apiTitle")}</CardTitle>
+          <CardDescription>{t("apiBody")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col">
-          {ENDPOINTS.map((e, i) => (
+          {endpoints.map((e, i) => (
             <div
               key={e.path}
               className="flex items-center gap-3 border-border py-3 data-[first=false]:border-t"
@@ -93,17 +92,18 @@ export function DevelopersView() {
                 {e.method}
               </Badge>
               <code className="font-mono text-sm text-foreground">{e.path}</code>
-              <span className="ml-auto hidden text-sm text-muted-foreground sm:block">{e.desc}</span>
+              <span className="ml-auto hidden text-sm text-muted-foreground sm:block">
+                {e.desc}
+              </span>
             </div>
           ))}
         </CardContent>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Code samples */}
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden rounded-2xl border-border/80 bg-card/80 shadow-lg shadow-black/20">
           <CardHeader>
-            <CardTitle className="text-base">Quickstart</CardTitle>
+            <CardTitle className="text-base">{t("quickstart")}</CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="curl">
@@ -116,6 +116,7 @@ export function DevelopersView() {
                   code={CURL}
                   copied={copied === "curl"}
                   onCopy={() => copy("curl", CURL)}
+                  copyLabel={tc("copy")}
                 />
               </TabsContent>
               <TabsContent value="node">
@@ -123,24 +124,24 @@ export function DevelopersView() {
                   code={NODE}
                   copied={copied === "node"}
                   onCopy={() => copy("node", NODE)}
+                  copyLabel={tc("copy")}
                 />
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
-        {/* Playground */}
-        <Card>
+        <Card className="rounded-2xl border-border/80 bg-card/80 shadow-lg shadow-black/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Terminal className="size-4 text-brand" />
-              Try it live
+              <Terminal className="size-4 text-primary" />
+              {t("playground")}
             </CardTitle>
-            <CardDescription>Send a test request against the sandbox.</CardDescription>
+            <CardDescription>{t("playgroundBody")}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <Field>
-              <FieldLabel htmlFor="pg-amount">Amount (BRL)</FieldLabel>
+              <FieldLabel htmlFor="pg-amount">{t("amountBrl")}</FieldLabel>
               <Input
                 id="pg-amount"
                 value={amount}
@@ -150,15 +151,15 @@ export function DevelopersView() {
             </Field>
             <Button onClick={run} disabled={running}>
               <Play data-icon="inline-start" />
-              {running ? "Sending…" : "Send test request"}
+              {running ? t("sending") : t("sendTest")}
             </Button>
             {response ? (
-              <pre className="max-h-64 overflow-auto rounded-lg bg-primary p-4 font-mono text-xs leading-relaxed text-primary-foreground">
+              <pre className="max-h-64 overflow-auto rounded-xl bg-primary p-4 font-mono text-xs leading-relaxed text-primary-foreground">
                 {response}
               </pre>
             ) : (
-              <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                Response will appear here
+              <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                {t("responsePlaceholder")}
               </div>
             )}
           </CardContent>
@@ -172,10 +173,12 @@ function CodeBlock({
   code,
   copied,
   onCopy,
+  copyLabel,
 }: {
   code: string
   copied: boolean
   onCopy: () => void
+  copyLabel: string
 }) {
   return (
     <div className="relative mt-3">
@@ -184,11 +187,11 @@ function CodeBlock({
         size="icon-sm"
         className="absolute right-2 top-2 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
         onClick={onCopy}
-        aria-label="Copy code"
+        aria-label={copyLabel}
       >
         {copied ? <Check /> : <Copy />}
       </Button>
-      <pre className="max-h-80 overflow-auto rounded-lg bg-primary p-4 font-mono text-xs leading-relaxed text-primary-foreground">
+      <pre className="max-h-80 overflow-auto rounded-xl bg-primary p-4 font-mono text-xs leading-relaxed text-primary-foreground">
         {code}
       </pre>
     </div>

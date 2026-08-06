@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
+import { Link, usePathname, useRouter } from '@/i18n/navigation'
 import { useEffect, useState } from 'react'
 import { Menu, Plus, Wallet as WalletIcon } from 'lucide-react'
 import {
@@ -22,10 +22,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { ButtonLink } from '@/components/ui/button-link'
+import { LanguageSwitcher } from '@/components/language-switcher'
 import { Logo } from '@/components/logo'
 import { formatUSDC } from '@/lib/format'
-import { CUSTODY_LINE, useSenderBalance } from '@/lib/use-sender-balance'
+import { useSenderBalance } from '@/lib/use-sender-balance'
 import { cn } from '@/lib/utils'
 import {
   Tooltip,
@@ -35,10 +35,11 @@ import {
 } from '@/components/ui/tooltip'
 
 const MOBILE_NAV = [
-  { label: 'Claims', href: '/dashboard', needsFunds: false },
-  { label: 'Create claim', href: '/dashboard/create', needsFunds: true },
-  { label: 'Funding', href: '/dashboard/funding', needsFunds: false },
-  { label: 'Developers', href: '/developers', needsFunds: false },
+  { labelKey: 'claims' as const, href: '/dashboard', needsFunds: false },
+  { labelKey: 'createClaim' as const, href: '/dashboard/create', needsFunds: true },
+  { labelKey: 'batchCsv' as const, href: '/dashboard/create/batch', needsFunds: true },
+  { labelKey: 'funding' as const, href: '/dashboard/funding', needsFunds: false },
+  { labelKey: 'developers' as const, href: '/developers', needsFunds: false },
 ]
 
 function initials(name: string) {
@@ -52,6 +53,10 @@ function initials(name: string) {
 }
 
 export function DashboardTopbar({ title }: { title: string }) {
+  const t = useTranslations('nav')
+  const tc = useTranslations('common')
+  const tCustody = useTranslations('custody')
+  const locale = useLocale()
   const [open, setOpen] = useState(false)
   const [displayName, setDisplayName] = useState('Sender')
   const [displayEmail, setDisplayEmail] = useState('')
@@ -92,7 +97,7 @@ export function DashboardTopbar({ title }: { title: string }) {
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger
               className="inline-flex size-9 items-center justify-center rounded-lg text-foreground lg:hidden"
-              aria-label="Open menu"
+              aria-label={tc('openMenu')}
             >
               <Menu className="size-5" />
             </SheetTrigger>
@@ -113,10 +118,10 @@ export function DashboardTopbar({ title }: { title: string }) {
                     return (
                       <span
                         key={item.href}
-                        title="Add funds on the Funding page before creating a claim."
+                        title={t('addFundsFirst')}
                         className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground/50"
                       >
-                        {item.label}
+                        {t(item.labelKey)}
                       </span>
                     )
                   }
@@ -132,7 +137,7 @@ export function DashboardTopbar({ title }: { title: string }) {
                           : 'text-muted-foreground hover:bg-secondary',
                       )}
                     >
-                      {item.label}
+                      {t(item.labelKey)}
                     </Link>
                   )
                 })}
@@ -150,13 +155,14 @@ export function DashboardTopbar({ title }: { title: string }) {
             >
               <WalletIcon className="size-4 text-muted-foreground" />
               <span className="text-sm font-medium tabular-nums">
-                {balance == null ? '—' : formatUSDC(balance)}
+                {balance == null ? '—' : formatUSDC(balance, locale)}
               </span>
             </Link>
             <p className="mt-0.5 max-w-[220px] text-right text-[10px] leading-tight text-muted-foreground">
-              {CUSTODY_LINE}
+              {tCustody('line')}
             </p>
           </div>
+          <LanguageSwitcher compact />
           <TooltipProvider>
             {createLocked ? (
               <Tooltip>
@@ -166,23 +172,25 @@ export function DashboardTopbar({ title }: { title: string }) {
                   }
                 >
                   <Plus data-icon="inline-start" />
-                  New claim
+                  {t('newClaim')}
                 </TooltipTrigger>
-                <TooltipContent>
-                  Add funds on the Funding page before creating a claim.
-                </TooltipContent>
+                <TooltipContent>{t('addFundsFirst')}</TooltipContent>
               </Tooltip>
             ) : (
-              <ButtonLink href="/dashboard/create" size="sm">
+              <Button
+                size="sm"
+                nativeButton={false}
+                render={<Link href="/dashboard/create" />}
+              >
                 <Plus data-icon="inline-start" />
-                New claim
-              </ButtonLink>
+                {t('newClaim')}
+              </Button>
             )}
           </TooltipProvider>
           <DropdownMenu>
             <DropdownMenuTrigger
               className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Account menu"
+              aria-label={tc('accountMenu')}
             >
               <Avatar className="size-9">
                 <AvatarFallback className="bg-navy text-navy-foreground text-xs">
@@ -206,13 +214,17 @@ export function DashboardTopbar({ title }: { title: string }) {
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuItem render={<Link href="/dashboard/funding" />}>
-                  Funding
+                  {t('funding')}
                 </DropdownMenuItem>
                 <DropdownMenuItem render={<Link href="/developers" />}>
-                  Developers
+                  {t('developers')}
                 </DropdownMenuItem>
-                <DropdownMenuItem render={<Link href="/" />}>View public site</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => void logout()}>Sign out</DropdownMenuItem>
+                <DropdownMenuItem render={<Link href="/" />}>
+                  {t('viewPublicSite')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void logout()}>
+                  {t('signOut')}
+                </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>

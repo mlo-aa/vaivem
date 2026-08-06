@@ -18,12 +18,14 @@ export const metadata: Metadata = {
   title: 'Vaivém — Send USDC with a link',
   description:
     'Create walletless payouts that recipients can claim on Stellar or withdraw through regional payment rails such as PIX.',
-  generator: 'v0.app',
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'light',
-  themeColor: '#0d1526',
+  colorScheme: 'light dark',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f7f6f2' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b1220' },
+  ],
 }
 
 export default function RootLayout({
@@ -32,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} bg-background`}>
+    <html suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="font-sans antialiased">
         {children}
         <Toaster position="top-center" richColors />

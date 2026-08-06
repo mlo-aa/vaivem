@@ -1,3 +1,6 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
 import {
   Ban,
   CheckCircle2,
@@ -15,19 +18,19 @@ import { relativeTime } from '@/lib/format'
 import type { Claim, ClaimEventType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-const EVENT_META: Record<ClaimEventType, { label: string; icon: LucideIcon }> = {
-  created: { label: 'Claim created', icon: Sparkles },
-  funds_locked: { label: 'Funds locked on Stellar', icon: Lock },
-  shared: { label: 'Link shared with recipient', icon: Link2 },
-  opened: { label: 'Recipient opened the link', icon: Eye },
-  verified: { label: 'Recipient verified identity', icon: ShieldCheck },
-  claimed: { label: 'Funds claimed', icon: HandCoins },
-  pix_initiated: { label: 'PIX withdrawal initiated', icon: Send },
-  pix_completed: { label: 'PIX withdrawal completed', icon: CheckCircle2 },
-  wallet_created: { label: 'Sponsored wallet created', icon: ShieldCheck },
-  cancelled: { label: 'Claim cancelled', icon: Ban },
-  refunded: { label: 'Funds refunded to sender', icon: RotateCcw },
-  expired: { label: 'Claim expired', icon: Ban },
+const EVENT_ICONS: Record<ClaimEventType, LucideIcon> = {
+  created: Sparkles,
+  funds_locked: Lock,
+  shared: Link2,
+  opened: Eye,
+  verified: ShieldCheck,
+  claimed: HandCoins,
+  pix_initiated: Send,
+  pix_completed: CheckCircle2,
+  wallet_created: ShieldCheck,
+  cancelled: Ban,
+  refunded: RotateCcw,
+  expired: Ban,
 }
 
 // Derive a plausible event history from the claim's current status.
@@ -71,11 +74,13 @@ function deriveEvents(claim: Claim): { event: ClaimEventType; timestamp: string 
 type ClaimStatusStep = 'shared' | 'viewed' | 'claimed' | 'cashing_out' | 'completed'
 
 export function ClaimTimeline({ claim }: { claim: Claim }) {
+  const t = useTranslations('dashboard.timeline')
+  const tTime = useTranslations('time')
   const events = deriveEvents(claim)
   return (
     <ol className="flex flex-col">
       {events.map((ev, i) => {
-        const meta = EVENT_META[ev.event]
+        const Icon = EVENT_ICONS[ev.event]
         const last = i === events.length - 1
         return (
           <li key={`${ev.event}-${i}`} className="flex gap-3">
@@ -86,13 +91,13 @@ export function ClaimTimeline({ claim }: { claim: Claim }) {
                   last ? 'bg-brand/15 text-[color-mix(in_oklab,var(--brand),black_40%)]' : 'bg-secondary text-muted-foreground',
                 )}
               >
-                <meta.icon className="size-4" />
+                <Icon className="size-4" />
               </span>
               {!last && <span className="my-1 w-px flex-1 bg-border" />}
             </div>
             <div className={cn('flex flex-col pb-5', last && 'pb-0')}>
-              <span className="text-sm font-medium">{meta.label}</span>
-              <span className="text-xs text-muted-foreground">{relativeTime(ev.timestamp)}</span>
+              <span className="text-sm font-medium">{t(ev.event)}</span>
+              <span className="text-xs text-muted-foreground">{relativeTime(ev.timestamp, tTime)}</span>
             </div>
           </li>
         )

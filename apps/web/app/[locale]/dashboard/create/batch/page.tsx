@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
+import { Link, useRouter } from '@/i18n/navigation'
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
 import { Button } from '@/components/ui/button'
 import { ButtonLink } from '@/components/ui/button-link'
@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatUSDC } from '@/lib/format'
+import { apiErrorKey, formatUSDC } from '@/lib/format'
 import { useSenderBalance } from '@/lib/use-sender-balance'
 import { createClaim } from '@/lib/services'
 import { claimShareUrl } from '@/components/share-panel'
@@ -47,6 +47,10 @@ function newBatchId(): string {
 }
 
 export default function BatchCreatePage() {
+  const t = useTranslations('batch')
+  const tCommon = useTranslations('common')
+  const tErrors = useTranslations('errors')
+  const locale = useLocale()
   const router = useRouter()
   const { balance, loading, funded, refresh } = useSenderBalance()
   const [stage, setStage] = useState<Stage>('upload')
@@ -119,6 +123,19 @@ export default function BatchCreatePage() {
           url: claimShareUrl(claim.token),
         })
       } catch (err) {
+        const raw = err instanceof Error ? err.message : 'create_failed'
+        const key = apiErrorKey(raw)
+        let errorLabel: string
+        try {
+          errorLabel =
+            key === 'amount_below_minimum'
+              ? tErrors('amount_below_minimum', { min: '1.00' })
+              : tErrors.has(key as 'create_failed')
+                ? tErrors(key as 'create_failed')
+                : tErrors('create_failed')
+        } catch {
+          errorLabel = tErrors('create_failed')
+        }
         out.push({
           line: row.line,
           recipientName: row.recipientName,
@@ -126,7 +143,7 @@ export default function BatchCreatePage() {
           amount: row.amount,
           message: row.message,
           status: 'error',
-          error: err instanceof Error ? err.message : 'create failed',
+          error: errorLabel,
         })
       }
       setResults([...out])
@@ -160,7 +177,7 @@ export default function BatchCreatePage() {
   if (loading || balance === 0) {
     return (
       <>
-        <DashboardTopbar title="Batch claims" />
+        <DashboardTopbar title={t('title')} />
         <main className="flex-1 p-4 sm:p-6">
           <Skeleton className="mx-auto h-64 max-w-lg w-full" />
         </main>
@@ -170,33 +187,26 @@ export default function BatchCreatePage() {
 
   return (
     <>
-      <DashboardTopbar title="Batch claims" />
+      <DashboardTopbar title={t('title')} />
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">
-            Upload a CSV to create many claims at once. Available balance:{' '}
-            <span className="font-medium text-foreground tabular-nums">
-              {formatUSDC(balance ?? 0)}
-            </span>
+            {t('available', { balance: formatUSDC(balance ?? 0, locale) })}
           </p>
           <Link
             href="/dashboard/create"
             className="text-sm text-foreground underline underline-offset-2"
           >
-            Create a single claim instead
+            {t('singleInstead')}
           </Link>
         </div>
 
         {stage === 'upload' || stage === 'preview' ? (
           <Card>
             <CardHeader>
-              <CardTitle>Upload CSV</CardTitle>
+              <CardTitle>{t('uploadTitle')}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Columns: <code className="text-xs">recipient_name</code>,{' '}
-                <code className="text-xs">recipient_email</code>,{' '}
-                <code className="text-xs">amount</code> (USDC),{' '}
-                <code className="text-xs">message</code>. PIX minimum applies (
-                1.00 USDC per row).
+                {t('uploadHint', { min: '1.00' })}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -206,17 +216,22 @@ export default function BatchCreatePage() {
                 onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
               />
               {fileName ? (
-                <p className="text-xs text-muted-foreground">File: {fileName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('fileLabel', { name: fileName })}
+                </p>
               ) : null}
 
               {validation && validation.errors.length > 0 ? (
                 <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
-                  <p className="font-medium text-destructive">Validation errors</p>
+                  <p className="font-medium text-destructive">
+                    {t('validationErrors')}
+                  </p>
                   <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
                     {validation.errors.map((e, i) => (
                       <li key={`${e.line}-${i}`}>
-                        {e.line > 0 ? `Line ${e.line}: ` : ''}
-                        {e.message}
+                        {e.line > 0
+                          ? t('lineError', { line: e.line, message: e.message })
+                          : e.message}
                       </li>
                     ))}
                   </ul>
@@ -229,13 +244,12 @@ export default function BatchCreatePage() {
         {stage === 'preview' && validation?.ok ? (
           <Card>
             <CardHeader>
-              <CardTitle>Preview</CardTitle>
+              <CardTitle>{t('previewTitle')}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {previewRows.length} claim{previewRows.length === 1 ? '' : 's'} · total{' '}
-                <span className="font-medium text-foreground tabular-nums">
-                  {formatUSDC(validation.totalUsdc)}
-                </span>
-                . Nothing is created until you confirm.
+                {t('previewSummary', {
+                  count: previewRows.length,
+                  total: formatUSDC(validation.totalUsdc, locale),
+                })}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -243,10 +257,10 @@ export default function BatchCreatePage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Line</TableHead>
-                      <TableHead>Recipient</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead className="text-right">USDC</TableHead>
+                      <TableHead>{t('columns.line')}</TableHead>
+                      <TableHead>{t('columns.recipient')}</TableHead>
+                      <TableHead>{t('columns.email')}</TableHead>
+                      <TableHead className="text-right">{t('columns.usdc')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -258,7 +272,7 @@ export default function BatchCreatePage() {
                           {row.recipientEmail}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {formatUSDC(row.amount)}
+                          {formatUSDC(row.amount, locale)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -270,7 +284,7 @@ export default function BatchCreatePage() {
               ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button type="button" onClick={() => void confirmCreate()}>
-                  Confirm and create {previewRows.length} claims
+                  {t('confirm', { count: previewRows.length })}
                 </Button>
                 <Button
                   type="button"
@@ -281,7 +295,7 @@ export default function BatchCreatePage() {
                     setFileName(null)
                   }}
                 >
-                  Cancel
+                  {tCommon('cancel')}
                 </Button>
               </div>
             </CardContent>
@@ -291,13 +305,16 @@ export default function BatchCreatePage() {
         {stage === 'creating' ? (
           <Card>
             <CardHeader>
-              <CardTitle>Creating claims…</CardTitle>
+              <CardTitle>{t('creating')}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {progress} / {validation?.rows.length ?? 0}
+                {t('progress', {
+                  current: progress,
+                  total: validation?.rows.length ?? 0,
+                })}
                 {batchId ? (
                   <>
                     {' '}
-                    · batch <span className="font-mono">{batchId}</span>
+                    · {t('batchId', { id: batchId })}
                   </>
                 ) : null}
               </p>
@@ -322,14 +339,16 @@ export default function BatchCreatePage() {
         {stage === 'done' ? (
           <Card>
             <CardHeader>
-              <CardTitle>Batch complete</CardTitle>
+              <CardTitle>{t('doneTitle')}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {okCount} succeeded
-                {failCount > 0 ? `, ${failCount} failed` : ''}.
+                {t('doneSummary', {
+                  ok: okCount,
+                  fail: failCount > 0 ? t('failPart', { n: failCount }) : '',
+                })}
                 {batchId ? (
                   <>
                     {' '}
-                    Batch id <span className="font-mono">{batchId}</span>
+                    {t('batchId', { id: batchId })}
                   </>
                 ) : null}
               </p>
@@ -339,20 +358,22 @@ export default function BatchCreatePage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Recipient</TableHead>
-                      <TableHead>Link / error</TableHead>
+                      <TableHead>{t('columns.status')}</TableHead>
+                      <TableHead>{t('columns.recipient')}</TableHead>
+                      <TableHead>{t('columns.link')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {results.map((r) => (
                       <TableRow key={r.line}>
-                        <TableCell>{r.status === 'ok' ? 'OK' : 'Error'}</TableCell>
+                        <TableCell>
+                          {r.status === 'ok' ? t('statusOk') : t('statusError')}
+                        </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
                             <span>{r.recipientName}</span>
                             <span className="text-xs text-muted-foreground">
-                              {formatUSDC(r.amount)}
+                              {formatUSDC(r.amount, locale)}
                             </span>
                           </div>
                         </TableCell>
@@ -377,9 +398,9 @@ export default function BatchCreatePage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" onClick={downloadResults}>
-                  Download results CSV
+                  {t('downloadResults')}
                 </Button>
-                <ButtonLink href="/dashboard">View claims</ButtonLink>
+                <ButtonLink href="/dashboard">{t('viewClaims')}</ButtonLink>
                 <Button
                   type="button"
                   variant="outline"
@@ -392,7 +413,7 @@ export default function BatchCreatePage() {
                     setProgress(0)
                   }}
                 >
-                  Upload another
+                  {t('uploadAnother')}
                 </Button>
               </div>
             </CardContent>

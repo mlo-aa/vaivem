@@ -14,3 +14,9 @@ export {
   minAmountInFiat,
   minAmountMessage,
 } from "./limits"
+export { KitMessagesProvider, useKitMessages, t } from "./i18n"
+export {
+  defaultMessages,
+  resolveMessages,
+} from "./messages"
+export type { KitMessages, KitLocale, DeepPartial } from "./messages"

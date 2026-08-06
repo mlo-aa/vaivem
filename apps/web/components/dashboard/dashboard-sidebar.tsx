@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { Link, usePathname } from '@/i18n/navigation'
 import { Link2, Plus, Code2, LifeBuoy, Wallet, Upload } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { cn } from '@/lib/utils'
@@ -14,19 +14,20 @@ import {
 } from '@/components/ui/tooltip'
 
 const NAV = [
-  { label: 'Claims', href: '/dashboard', icon: Link2, needsFunds: false },
-  { label: 'Create claim', href: '/dashboard/create', icon: Plus, needsFunds: true },
+  { labelKey: 'claims' as const, href: '/dashboard', icon: Link2, needsFunds: false },
+  { labelKey: 'createClaim' as const, href: '/dashboard/create', icon: Plus, needsFunds: true },
   {
-    label: 'Batch CSV',
+    labelKey: 'batchCsv' as const,
     href: '/dashboard/create/batch',
     icon: Upload,
     needsFunds: true,
   },
-  { label: 'Funding', href: '/dashboard/funding', icon: Wallet, needsFunds: false },
-  { label: 'Developers', href: '/developers', icon: Code2, needsFunds: false },
+  { labelKey: 'funding' as const, href: '/dashboard/funding', icon: Wallet, needsFunds: false },
+  { labelKey: 'developers' as const, href: '/developers', icon: Code2, needsFunds: false },
 ]
 
 export function DashboardSidebar() {
+  const t = useTranslations('nav')
   const pathname = usePathname()
   const { funded, loading } = useSenderBalance()
   const createLocked = !loading && !funded
@@ -64,18 +65,16 @@ export function DashboardSidebar() {
                     render={<button type="button" />}
                   >
                     <item.icon className="size-4.5 shrink-0" />
-                    {item.label}
+                    {t(item.labelKey)}
                   </TooltipTrigger>
-                  <TooltipContent side="right">
-                    Add funds on the Funding page before creating a claim.
-                  </TooltipContent>
+                  <TooltipContent side="right">{t('addFundsFirst')}</TooltipContent>
                 </Tooltip>
               )
             }
             return (
               <Link key={item.href} href={item.href} className={className}>
                 <item.icon className="size-4.5 shrink-0" />
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             )
           })}
@@ -87,7 +86,7 @@ export function DashboardSidebar() {
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
         >
           <LifeBuoy className="size-4.5 shrink-0" />
-          Support
+          {t('support')}
         </a>
       </div>
     </aside>

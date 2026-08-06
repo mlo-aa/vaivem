@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { QRCodeSVG } from 'qrcode.react'
 import { Check, Copy, Mail, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,8 @@ export function claimShareUrl(token: string): string {
 }
 
 export function SharePanel({ token, amountLabel }: { token: string; amountLabel: string }) {
+  const t = useTranslations('share')
+  const tCommon = useTranslations('common')
   const [copied, setCopied] = useState(false)
   // Recompute on the client so we pick up window.location.origin when env is unset.
   const url = useMemo(() => claimShareUrl(token), [token])
@@ -39,11 +42,12 @@ export function SharePanel({ token, amountLabel }: { token: string; amountLabel:
       /* clipboard may be blocked in the preview iframe */
     }
     setCopied(true)
-    toast.success('Claim link copied')
+    toast.success(t('linkCopied'))
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const waText = encodeURIComponent(`You've received ${amountLabel}. Claim it here: ${url}`)
+  const shareMessage = t('message', { amount: amountLabel, url })
+  const waText = encodeURIComponent(shareMessage)
 
   return (
     <div className="flex flex-col gap-5">
@@ -51,15 +55,13 @@ export function SharePanel({ token, amountLabel }: { token: string; amountLabel:
         <div className="rounded-xl bg-background p-3 ring-1 ring-border">
           <QRCodeSVG value={url} size={148} bgColor="transparent" fgColor="currentColor" />
         </div>
-        <p className="text-center text-sm text-muted-foreground">
-          Scan to open the claim on any phone
-        </p>
+        <p className="text-center text-sm text-muted-foreground">{t('scanHint')}</p>
       </div>
 
       <InputGroup>
         <InputGroupInput readOnly value={url} className="font-mono text-sm" />
         <InputGroupAddon align="inline-end">
-          <InputGroupButton onClick={copy} aria-label="Copy link">
+          <InputGroupButton onClick={copy} aria-label={tCommon('copy')}>
             {copied ? <Check /> : <Copy />}
           </InputGroupButton>
         </InputGroupAddon>
@@ -74,13 +76,13 @@ export function SharePanel({ token, amountLabel }: { token: string; amountLabel:
           nativeButton={false}
         >
           <MessageCircle data-icon="inline-start" />
-          WhatsApp
+          {t('whatsapp')}
         </Button>
         <Button
           variant="outline"
           render={
             <a
-              href={`mailto:?subject=You have a payout&body=${waText}`}
+              href={`mailto:?subject=${encodeURIComponent(t('emailSubject'))}&body=${waText}`}
               target="_blank"
               rel="noopener noreferrer"
             />
@@ -88,7 +90,7 @@ export function SharePanel({ token, amountLabel }: { token: string; amountLabel:
           nativeButton={false}
         >
           <Mail data-icon="inline-start" />
-          Email
+          {t('email')}
         </Button>
       </div>
     </div>

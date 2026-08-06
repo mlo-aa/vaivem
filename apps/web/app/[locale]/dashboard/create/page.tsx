@@ -1,14 +1,15 @@
 'use client'
 
 import { useEffect } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { Link, useRouter } from '@/i18n/navigation'
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
 import { CreateWizard } from '@/components/dashboard/create-wizard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSenderBalance } from '@/lib/use-sender-balance'
 
 export default function CreateClaimPage() {
+  const t = useTranslations('create')
   const router = useRouter()
   const { balance, loading, funded } = useSenderBalance()
 
@@ -20,7 +21,7 @@ export default function CreateClaimPage() {
   if (loading || balance === 0) {
     return (
       <>
-        <DashboardTopbar title="New claim" />
+        <DashboardTopbar title={t('title')} />
         <main className="flex-1 p-4 sm:p-6">
           <Skeleton className="mx-auto h-64 max-w-lg w-full" />
         </main>
@@ -30,15 +31,15 @@ export default function CreateClaimPage() {
 
   return (
     <>
-      <DashboardTopbar title="New claim" />
+      <DashboardTopbar title={t('title')} />
       <main className="flex-1 p-4 sm:p-6">
         <div className="mx-auto mb-4 max-w-lg text-sm text-muted-foreground">
-          Creating many payouts?{' '}
+          {t('batchHint')}{' '}
           <Link
             href="/dashboard/create/batch"
             className="text-foreground underline underline-offset-2"
           >
-            Upload a CSV batch
+            {t('batchLink')}
           </Link>
         </div>
         <CreateWizard />

@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
+import { useRouter } from '@/i18n/navigation'
 import {
   ArrowLeft,
   ArrowRight,
@@ -29,7 +30,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
-import { StatusBadge } from '@/components/status-badge'
 import { SharePanel } from '@/components/share-panel'
 import { ProcessSteps } from '@/components/process-steps'
 import { cn } from '@/lib/utils'
@@ -42,47 +42,30 @@ import { formatDisplay, formatUSDC, USD_TO_BRL } from '@/lib/format'
 import { MIN_AMOUNT_USDC } from '@/lib/limits'
 import type { Claim, DisplayCurrency, ProtectionType } from '@/lib/types'
 
-const PURPOSES = [
-  'Hackathon prize',
-  'Freelancer payment',
-  'Community reward',
-  'Refund',
-  'Grant',
-  'Event incentive',
-  'Other',
+const PURPOSE_OPTIONS = [
+  { id: 'hackathonPrize', value: 'Hackathon prize' },
+  { id: 'freelancerPayment', value: 'Freelancer payment' },
+  { id: 'communityReward', value: 'Community reward' },
+  { id: 'refund', value: 'Refund' },
+  { id: 'grant', value: 'Grant' },
+  { id: 'eventIncentive', value: 'Event incentive' },
+  { id: 'other', value: 'Other' },
+] as const
+
+const PROTECTION_OPTIONS: { value: ProtectionType; icon: typeof Globe }[] = [
+  { value: 'email', icon: Mail },
+  { value: 'code', icon: Lock },
+  { value: 'public', icon: Globe },
 ]
 
-const PROTECTION: { value: ProtectionType; label: string; description: string; icon: typeof Globe }[] = [
-  {
-    value: 'email',
-    label: 'Email verification',
-    description: 'Recipient confirms a code sent to their email.',
-    icon: Mail,
-  },
-  {
-    value: 'code',
-    label: 'Access code',
-    description: 'Share a private code out-of-band to unlock.',
-    icon: Lock,
-  },
-  {
-    value: 'public',
-    label: 'Public link',
-    description: 'Anyone with the link can claim. Best for open drops.',
-    icon: Globe,
-  },
-]
-
-const FUND_STEPS = [
-  'Reserving USDC from balance',
-  'Creating claimable balance on Stellar',
-  'Sponsoring recipient trustline',
-  'Publishing secure claim link',
-]
+const FUND_STEP_KEYS = ['reserving', 'creating', 'sponsoring', 'publishing'] as const
 
 type Stage = 'form' | 'funding' | 'done'
 
 export function CreateWizard() {
+  const t = useTranslations('create')
+  const tCommon = useTranslations('common')
+  const locale = useLocale()
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [stage, setStage] = useState<Stage>('form')
@@ -121,12 +104,19 @@ export function CreateWizard() {
   const belowMinimum = allowPix && numericAmount > 0 && usdcForAmount < MIN_AMOUNT_USDC
   // Rounded up so converting the shown value back never lands below the minimum.
   const minDisplayAmount = Math.ceil(MIN_AMOUNT_USDC * rate * 100) / 100
-  const minimumMessage = `Minimum payout is ${formatUSDC(
-    MIN_AMOUNT_USDC,
-  )} — about ${formatDisplay(
-    minDisplayAmount,
-    currency,
-  )} at the current rate. Smaller amounts are rejected by the PIX provider.`
+  const minimumMessage = t('minimumMessage', {
+    usdc: formatUSDC(MIN_AMOUNT_USDC, locale),
+    display: formatDisplay(minDisplayAmount, currency, locale),
+  })
+
+  function purposeLabel(value: string) {
+    const opt = PURPOSE_OPTIONS.find((p) => p.value === value)
+    return opt ? t(`purposes.${opt.id}`) : value
+  }
+
+  function protectionLabel(value: ProtectionType) {
+    return t(`protection.${value}.label`)
+  }
 
   // Recompute the USDC to lock whenever amount or currency changes (debounced).
   useEffect(() => {
@@ -144,19 +134,19 @@ export function CreateWizard() {
   }, [numericAmount, currency])
 
   function validateStep1() {
-    if (numericAmount <= 0) return 'Enter an amount greater than zero.'
+    if (numericAmount <= 0) return t('errors.amountZero')
     if (belowMinimum) return minimumMessage
-    if (numericAmount > 100000) return 'Amount exceeds the demo limit of 100,000.'
-    if (!allowStellar && !allowPix) return 'Enable at least one payout method.'
+    if (numericAmount > 100000) return t('errors.amountMax')
+    if (!allowStellar && !allowPix) return t('errors.needMethod')
     return null
   }
 
   function validateStep2() {
-    if (recipientName.trim().length < 2) return 'Enter the recipient name.'
+    if (recipientName.trim().length < 2) return t('errors.recipientName')
     if (protection === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))
-      return 'Enter a valid recipient email for email verification.'
+      return t('errors.recipientEmail')
     if (protection === 'code' && accessCode.trim().length < 4)
-      return 'Access code must be at least 4 characters.'
+      return t('errors.accessCodeShort')
     return null
   }
 
@@ -202,14 +192,14 @@ export function CreateWizard() {
     }
     try {
       if (fundingUsdc == null || fundingUsdc <= 0) {
-        throw new Error('USDC amount not ready — wait for the quote to finish.')
+        throw new Error(t('errors.quoteNotReady'))
       }
       // createClaim funds the exact USDC shown (fundingUsdc) and persists server-side.
       const shared = await createClaim(input, (s) => setFundStep(s))
       setClaim(shared)
       setStage('done')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create claim')
+      setError(err instanceof Error ? err.message : t('errors.createFailed'))
       setStage('form')
     }
   }
@@ -223,13 +213,19 @@ export function CreateWizard() {
               <ShieldCheck className="size-5" />
             </span>
             <div>
-              <h2 className="font-semibold">Locking funds on Stellar</h2>
+              <h2 className="font-semibold">{t('fundingTitle')}</h2>
               <p className="text-sm text-muted-foreground">
-                Securing {formatUSDC(fundingUsdc ?? 0)} for {recipientName}
+                {t('fundingSubtitle', {
+                  amount: formatUSDC(fundingUsdc ?? 0, locale),
+                  name: recipientName,
+                })}
               </p>
             </div>
           </div>
-          <ProcessSteps steps={FUND_STEPS} current={fundStep} />
+          <ProcessSteps
+            steps={FUND_STEP_KEYS.map((key) => t(`fundSteps.${key}`))}
+            current={fundStep}
+          />
         </CardContent>
       </Card>
     )
@@ -243,23 +239,24 @@ export function CreateWizard() {
             <CheckCircle2 className="size-7" />
           </span>
           <div>
-            <h2 className="text-xl font-semibold">Your claim link is live</h2>
+            <h2 className="text-xl font-semibold">{t('doneTitle')}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {formatDisplay(claim.displayAmount, claim.displayCurrency)} is locked and ready to
-              share.
+              {t('doneSubtitle', {
+                amount: formatDisplay(claim.displayAmount, claim.displayCurrency, locale),
+              })}
             </p>
           </div>
         </div>
         <SharePanel
           token={claim.token}
-          amountLabel={formatDisplay(claim.displayAmount, claim.displayCurrency)}
+          amountLabel={formatDisplay(claim.displayAmount, claim.displayCurrency, locale)}
         />
         <div className="flex flex-col gap-2 sm:flex-row">
           <ButtonLink href={`/dashboard/claims/${claim.token}`} className="flex-1">
-            View claim details
+            {t('viewDetails')}
           </ButtonLink>
           <Button variant="outline" className="flex-1" onClick={() => router.push('/dashboard')}>
-            Back to dashboard
+            {t('backToDashboard')}
           </Button>
         </div>
       </div>
@@ -282,7 +279,7 @@ export function CreateWizard() {
             <CardContent className="py-2">
               <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="amount">Payout amount</FieldLabel>
+                  <FieldLabel htmlFor="amount">{t('amountLabel')}</FieldLabel>
                   <div className="flex gap-2">
                     <Input
                       id="amount"
@@ -304,21 +301,19 @@ export function CreateWizard() {
                   {belowMinimum && (
                     <p className="text-sm text-destructive">{minimumMessage}</p>
                   )}
-                  <FieldDescription>
-                    Recipients receive USDC and can cash out in local currency.
-                  </FieldDescription>
+                  <FieldDescription>{t('amountHint')}</FieldDescription>
                 </Field>
 
                 <Field>
-                  <FieldLabel htmlFor="purpose">Purpose</FieldLabel>
+                  <FieldLabel htmlFor="purpose">{t('purposeLabel')}</FieldLabel>
                   <Select value={purpose} onValueChange={(v) => { if (v != null) setPurpose(v) }}>
                     <SelectTrigger id="purpose">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {PURPOSES.map((p) => (
-                        <SelectItem key={p} value={p}>
-                          {p}
+                      {PURPOSE_OPTIONS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          {t(`purposes.${p.id}`)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -326,27 +321,27 @@ export function CreateWizard() {
                 </Field>
 
                 <Field>
-                  <FieldLabel htmlFor="reference">Reference (optional)</FieldLabel>
+                  <FieldLabel htmlFor="reference">{t('referenceLabel')}</FieldLabel>
                   <Input
                     id="reference"
                     value={reference}
                     onChange={(e) => setReference(e.target.value)}
-                    placeholder="e.g. HACK-2025-1ST"
+                    placeholder={t('referencePlaceholder')}
                   />
                 </Field>
 
                 <FieldSet>
-                  <FieldLegend>Payout methods offered to recipient</FieldLegend>
+                  <FieldLegend>{t('methodsLegend')}</FieldLegend>
                   <FieldGroup className="gap-3">
                     <MethodToggle
-                      title="Keep as USDC on Stellar"
-                      description="Free sponsored wallet, no cash-out fees."
+                      title={t('methodStellarTitle')}
+                      description={t('methodStellarDesc')}
                       checked={allowStellar}
                       onChange={setAllowStellar}
                     />
                     <MethodToggle
-                      title="Cash out via PIX (Brazil)"
-                      description="Convert to BRL and withdraw to any PIX key."
+                      title={t('methodPixTitle')}
+                      description={t('methodPixDesc')}
                       checked={allowPix}
                       onChange={setAllowPix}
                     />
@@ -362,22 +357,20 @@ export function CreateWizard() {
             <CardContent className="py-2">
               <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="recipient">Recipient name</FieldLabel>
+                  <FieldLabel htmlFor="recipient">{t('recipientLabel')}</FieldLabel>
                   <Input
                     id="recipient"
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
-                    placeholder="Lucas Ferreira"
+                    placeholder={t('recipientPlaceholder')}
                   />
                 </Field>
 
                 <FieldSet>
-                  <FieldLegend>Protection</FieldLegend>
-                  <FieldDescription>
-                    Control who can open and claim this link.
-                  </FieldDescription>
+                  <FieldLegend>{t('protectionLegend')}</FieldLegend>
+                  <FieldDescription>{t('protectionHint')}</FieldDescription>
                   <div className="mt-2 grid gap-2">
-                    {PROTECTION.map((p) => (
+                    {PROTECTION_OPTIONS.map((p) => (
                       <button
                         key={p.value}
                         type="button"
@@ -400,8 +393,12 @@ export function CreateWizard() {
                           <p.icon className="size-4" />
                         </span>
                         <span className="flex flex-col">
-                          <span className="text-sm font-medium">{p.label}</span>
-                          <span className="text-xs text-muted-foreground">{p.description}</span>
+                          <span className="text-sm font-medium">
+                            {t(`protection.${p.value}.label`)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {t(`protection.${p.value}.description`)}
+                          </span>
                         </span>
                       </button>
                     ))}
@@ -410,57 +407,56 @@ export function CreateWizard() {
 
                 {protection === 'email' && (
                   <Field>
-                    <FieldLabel htmlFor="email">Recipient email</FieldLabel>
+                    <FieldLabel htmlFor="email">{t('emailLabel')}</FieldLabel>
                     <Input
                       id="email"
                       type="email"
                       value={recipientEmail}
                       onChange={(e) => setRecipientEmail(e.target.value)}
-                      placeholder="lucas@example.com"
+                      placeholder={t('emailPlaceholder')}
                     />
                   </Field>
                 )}
 
                 {protection === 'code' && (
                   <Field>
-                    <FieldLabel htmlFor="code">Access code</FieldLabel>
+                    <FieldLabel htmlFor="code">{t('accessCodeLabel')}</FieldLabel>
                     <Input
                       id="code"
                       value={accessCode}
                       onChange={(e) => setAccessCode(e.target.value)}
-                      placeholder="Set a private code"
+                      placeholder={t('accessCodePlaceholder')}
                     />
-                    <FieldDescription>Share this with the recipient separately.</FieldDescription>
+                    <FieldDescription>{t('accessCodeHint')}</FieldDescription>
                   </Field>
                 )}
 
                 <Field>
-                  <FieldLabel htmlFor="message">Message (optional)</FieldLabel>
+                  <FieldLabel htmlFor="message">{t('messageLabel')}</FieldLabel>
                   <Textarea
                     id="message"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Congratulations on winning first place!"
+                    placeholder={t('messagePlaceholder')}
                     rows={3}
                   />
                 </Field>
 
                 <Field>
-                  <FieldLabel htmlFor="expiration">Link expires in</FieldLabel>
+                  <FieldLabel htmlFor="expiration">{t('expirationLabel')}</FieldLabel>
                   <Select value={expiration} onValueChange={(v) => { if (v != null) setExpiration(v) }}>
                     <SelectTrigger id="expiration">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="3">3 days</SelectItem>
-                      <SelectItem value="7">7 days</SelectItem>
-                      <SelectItem value="14">14 days</SelectItem>
-                      <SelectItem value="30">30 days</SelectItem>
+                      {['3', '7', '14', '30'].map((n) => (
+                        <SelectItem key={n} value={n}>
+                          {t('expirationDays', { n: Number(n) })}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
-                  <FieldDescription>
-                    Unclaimed funds are automatically refunded to you after expiry.
-                  </FieldDescription>
+                  <FieldDescription>{t('expirationHint')}</FieldDescription>
                 </Field>
               </FieldGroup>
             </CardContent>
@@ -470,21 +466,28 @@ export function CreateWizard() {
         {step === 3 && (
           <Card>
             <CardContent className="flex flex-col gap-4 py-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">Review</h3>
-              <ReviewRow label="Recipient" value={recipientName} />
-              <ReviewRow label="Purpose" value={purpose} />
-              {reference && <ReviewRow label="Reference" value={reference} />}
+              <h3 className="text-sm font-semibold text-muted-foreground">{t('reviewTitle')}</h3>
+              <ReviewRow label={t('reviewRecipient')} value={recipientName} />
+              <ReviewRow label={t('reviewPurpose')} value={purposeLabel(purpose)} />
+              {reference && <ReviewRow label={t('reviewReference')} value={reference} />}
+              <ReviewRow label={t('reviewProtection')} value={protectionLabel(protection)} />
+              {protection === 'email' && (
+                <ReviewRow label={t('reviewEmail')} value={recipientEmail} />
+              )}
               <ReviewRow
-                label="Protection"
-                value={PROTECTION.find((p) => p.value === protection)?.label ?? ''}
+                label={t('reviewExpires')}
+                value={t('reviewExpiresValue', { n: Number(expiration) })}
               />
-              {protection === 'email' && <ReviewRow label="Email" value={recipientEmail} />}
-              <ReviewRow label="Expires in" value={`${expiration} days`} />
               <ReviewRow
-                label="Payout methods"
-                value={[allowStellar && 'Stellar', allowPix && 'PIX'].filter(Boolean).join(' · ')}
+                label={t('reviewMethods')}
+                value={[
+                  allowStellar && t('reviewMethodStellar'),
+                  allowPix && t('reviewMethodPix'),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               />
-              {message && <ReviewRow label="Message" value={message} />}
+              {message && <ReviewRow label={t('reviewMessage')} value={message} />}
             </CardContent>
           </Card>
         )}
@@ -493,22 +496,22 @@ export function CreateWizard() {
           {step > 1 ? (
             <Button variant="ghost" onClick={back}>
               <ArrowLeft data-icon="inline-start" />
-              Back
+              {tCommon('back')}
             </Button>
           ) : (
             <ButtonLink variant="ghost" href="/dashboard">
-              Cancel
+              {tCommon('cancel')}
             </ButtonLink>
           )}
           {step < 3 ? (
             <Button onClick={next} disabled={step === 1 && belowMinimum}>
-              Continue
+              {tCommon('continue')}
               <ArrowRight data-icon="inline-end" />
             </Button>
           ) : (
             <Button onClick={handleFund}>
               <ShieldCheck data-icon="inline-start" />
-              Fund and create link
+              {t('fundAndCreate')}
             </Button>
           )}
         </div>
@@ -520,44 +523,39 @@ export function CreateWizard() {
           <CardContent className="flex flex-col gap-5 py-2">
             <div className="flex items-center gap-2 text-navy-foreground/70">
               <Sparkles className="size-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Live quote</span>
+              <span className="text-xs font-medium uppercase tracking-wide">{t('liveQuote')}</span>
             </div>
             <div>
-              <p className="text-sm text-navy-foreground/70">You lock</p>
+              <p className="text-sm text-navy-foreground/70">{t('youLock')}</p>
               {quoting ? (
                 <Skeleton className="mt-1 h-9 w-40 bg-white/10" />
               ) : (
                 <p className="text-3xl font-semibold tabular-nums">
-                  {formatUSDC(fundingUsdc ?? 0)}
+                  {formatUSDC(fundingUsdc ?? 0, locale)}
                 </p>
               )}
               <p className="mt-1 text-sm text-navy-foreground/60">
                 {numericAmount > 0
-                  ? formatDisplay(numericAmount, currency)
-                  : 'Enter an amount'}
+                  ? formatDisplay(numericAmount, currency, locale)
+                  : t('enterAmount')}
               </p>
             </div>
             <div className="flex flex-col gap-2 border-t border-white/10 pt-4 text-sm">
               <QuoteRow
-                label="Reference rate"
+                label={t('referenceRate')}
                 value={
                   currency === 'BRL' && fundingUsdc
-                    ? `1 USDC ≈ ${fundingRate.toFixed(4)} BRL`
-                    : '1 USDC = 1 USD'
+                    ? t('rateBrl', { rate: fundingRate.toFixed(4) })
+                    : t('rateUsd')
                 }
               />
-              <QuoteRow
-                label="Cash-out fee"
-                value="0.20% (paid at claim)"
-              />
-              <QuoteRow label="Network fee" value="Sponsored" />
+              <QuoteRow label={t('cashOutFee')} value={t('cashOutFeeValue')} />
+              <QuoteRow label={t('networkFee')} value={t('networkFeeValue')} />
             </div>
             <div className="rounded-lg bg-white/5 p-3">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="size-4 text-brand" />
-                <span className="text-xs text-navy-foreground/80">
-                  Funds are locked on Stellar and fully refundable until claimed.
-                </span>
+                <span className="text-xs text-navy-foreground/80">{t('lockedHint')}</span>
               </div>
             </div>
           </CardContent>
@@ -568,7 +566,8 @@ export function CreateWizard() {
 }
 
 function Stepper({ step }: { step: number }) {
-  const labels = ['Amount', 'Recipient', 'Review']
+  const t = useTranslations('create')
+  const labels = [t('steps.amount'), t('steps.recipient'), t('steps.review')]
   return (
     <div className="flex items-center gap-2">
       {labels.map((label, i) => {

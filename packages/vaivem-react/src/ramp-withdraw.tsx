@@ -9,7 +9,15 @@ import {
   submitKyc,
   type PayoutFailureCode,
 } from "./api"
-import { isBelowMinimum, minAmountInFiat, minAmountMessage, MIN_AMOUNT_USDC } from "./limits"
+import {
+  KitMessagesProvider,
+  t,
+  useKitMessages,
+  useKitMessagesOptional,
+} from "./i18n"
+import { isBelowMinimum, minAmountInFiat, MIN_AMOUNT_USDC } from "./limits"
+import type { DeepPartial, KitLocale, KitMessages } from "./messages"
+import { resolveMessages } from "./messages"
 import { ProcessSteps } from "./process-steps"
 import type { KycStatus, PixKeyType } from "./types"
 import { useQuote } from "./use-quote"
@@ -31,8 +39,10 @@ export type RampWithdrawProps = {
   /** When set, settle via /api/claims/by-token/[token]/claim instead of bare /api/payouts/pix */
   claimToken?: string
   accessCode?: string
-  /** Standalone ramp defaults to English; ClaimLink passes pt-BR. */
-  locale?: "pt-BR" | "en"
+  /** Standalone ramp defaults to English; ClaimLink provides messages via context. */
+  locale?: KitLocale
+  /** Partial message overrides (standalone). Nested under ClaimLink, prefer ClaimLink `messages`. */
+  messages?: DeepPartial<KitMessages>
   /**
    * When true, show the simulated KYC step (format-only CPF/CNPJ check).
    * When false/undefined, skip KYC and go straight to the PIX form.
@@ -41,115 +51,20 @@ export type RampWithdrawProps = {
   demoMode?: boolean
 }
 
-const PIX_KEY_LABEL: Record<PixKeyType, string> = {
-  cpf: "CPF",
-  cnpj: "CNPJ",
-  email: "Email",
-  phone: "Phone",
-  random: "Random key",
-}
-
-const PIX_KEY_LABEL_PT: Record<PixKeyType, string> = {
-  cpf: "CPF",
-  cnpj: "CNPJ",
-  email: "e-mail",
-  phone: "telefone",
-  random: "chave aleatória",
-}
-
-const FAILURE_COPY: Record<
-  PayoutFailureCode,
-  { title: string; body: string; action: string }
-> = {
-  already_claimed: {
-    title: "Already claimed",
-    body: "This payout was already collected.",
-    action: "Close",
-  },
-  expired: {
-    title: "Payout expired",
-    body: "The claim window closed. Ask the sender for a new link.",
-    action: "Close",
-  },
-  anchor_rejected: {
-    title: "Payment provider rejected",
-    body: "The bank transfer could not be completed. Try again or contact the sender.",
-    action: "Try again",
-  },
-  insufficient_balance: {
-    title: "Sender out of funds",
-    body: "The sender wallet does not have enough USDC right now.",
-    action: "Close",
-  },
-  stuck_funded: {
-    title: "Still processing",
-    body: "Your payout was submitted but is not confirmed yet. Check back shortly.",
-    action: "Check status later",
-  },
-  payout_failed: {
-    title: "Payout failed",
-    body: "Something went wrong sending your money. You can try again.",
-    action: "Try again",
-  },
-  network: {
-    title: "Connection problem",
-    body: "We could not reach the payout service. Check your connection and try again.",
-    action: "Try again",
-  },
-}
-
-const FAILURE_COPY_PT: typeof FAILURE_COPY = {
-  already_claimed: {
-    title: "Este valor já foi recebido",
-    body: "Este pagamento já foi resgatado.",
-    action: "Fechar",
-  },
-  expired: {
-    title: "O prazo terminou",
-    body: "Peça um novo link para a pessoa que enviou o pagamento.",
-    action: "Fechar",
-  },
-  anchor_rejected: {
-    title: "O banco não aceitou o pagamento",
-    body: "Confira os dados da chave PIX ou tente novamente mais tarde.",
-    action: "Tentar novamente",
-  },
-  insufficient_balance: {
-    title: "A conta de envio está sem saldo",
-    body: "A pessoa que enviou precisa adicionar saldo antes de você tentar novamente.",
-    action: "Fechar",
-  },
-  stuck_funded: {
-    title: "Ainda estamos processando",
-    body: "O envio foi iniciado, mas ainda não foi confirmado. Consulte novamente em alguns minutos.",
-    action: "Verificar depois",
-  },
-  payout_failed: {
-    title: "Não foi possível enviar",
-    body: "Nada foi enviado. Você pode tentar novamente.",
-    action: "Tentar novamente",
-  },
-  network: {
-    title: "Sem conexão com o serviço",
-    body: "Confira sua internet e tente novamente.",
-    action: "Tentar novamente",
-  },
-}
-
-function validatePixKey(type: PixKeyType, key: string, pt: boolean): string | null {
+function validatePixKey(type: PixKeyType, key: string, m: KitMessages): string | null {
   const v = key.trim()
-  if (!v) return pt ? "Digite sua chave PIX." : "Enter your PIX key."
+  if (!v) return t(m, "pix.validation.empty")
   switch (type) {
     case "cpf":
-      return digitsOnly(v).length === 11 ? null : pt ? "O CPF deve ter 11 dígitos." : "CPF must have 11 digits."
+      return digitsOnly(v).length === 11 ? null : t(m, "pix.validation.cpf")
     case "cnpj":
-      return digitsOnly(v).length === 14 ? null : pt ? "O CNPJ deve ter 14 dígitos." : "CNPJ must have 14 digits."
+      return digitsOnly(v).length === 14 ? null : t(m, "pix.validation.cnpj")
     case "email":
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : pt ? "Digite um e-mail válido." : "Enter a valid email PIX key."
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : t(m, "pix.validation.email")
     case "phone":
-      return digitsOnly(v).length >= 10 ? null : pt ? "Digite um telefone válido." : "Enter a valid phone PIX key."
+      return digitsOnly(v).length >= 10 ? null : t(m, "pix.validation.phone")
     case "random":
-      return v.length >= 8 ? null : pt ? "A chave aleatória deve ter pelo menos 8 caracteres." : "Random keys are at least 8 characters."
+      return v.length >= 8 ? null : t(m, "pix.validation.random")
     default:
       return null
   }
@@ -157,7 +72,25 @@ function validatePixKey(type: PixKeyType, key: string, pt: boolean): string | nu
 
 type Stage = "kyc" | "cashout" | "processing" | "done" | "failed"
 
-export function RampWithdraw({
+export function RampWithdraw(props: RampWithdrawProps) {
+  const parent = useKitMessagesOptional()
+  const { locale, messages } = props
+
+  // Prefer parent ClaimLink context unless this instance supplies message overrides.
+  // `locale` alone may be passed through from ClaimLink for UX flags — do not re-wrap.
+  if (parent && messages === undefined) {
+    return <RampWithdrawInner {...props} />
+  }
+
+  const resolved = resolveMessages(locale ?? "en", messages)
+  return (
+    <KitMessagesProvider messages={resolved}>
+      <RampWithdrawInner {...props} />
+    </KitMessagesProvider>
+  )
+}
+
+function RampWithdrawInner({
   amount,
   country = "BR",
   onPaid,
@@ -169,6 +102,7 @@ export function RampWithdraw({
   locale = "en",
   demoMode = false,
 }: RampWithdrawProps) {
+  const m = useKitMessages()
   const [stage, setStage] = useState<Stage>(demoMode ? "kyc" : "cashout")
   const [error, setError] = useState<string | null>(null)
   const [failure, setFailure] = useState<{ code: PayoutFailureCode; message: string } | null>(
@@ -189,7 +123,7 @@ export function RampWithdraw({
   const [processStep, setProcessStep] = useState(0)
   const [reference, setReference] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
-  const pt = locale === "pt-BR"
+  const showTechnicalFailure = locale !== "pt-BR"
 
   // Checked before any request goes out — the provider rejects sub-minimum amounts.
   const belowMinimum = isBelowMinimum(amount)
@@ -205,39 +139,32 @@ export function RampWithdraw({
   )
 
   const brlAmount = quote ? Number(quote.destinationAmount) : null
-  const minimumMessage = minAmountMessage(
-    country,
-    quote ? Number(quote.etherfuseMidMarketRate) : null,
-  )
-  const localizedMinimumMessage = pt
-    ? `O valor mínimo é ${formatUSDC(MIN_AMOUNT_USDC)} — cerca de ${minAmountInFiat(
-        country,
-        quote ? Number(quote.etherfuseMidMarketRate) : null,
-      )} na cotação atual.`
-    : minimumMessage
+  const localizedMinimumMessage = t(m, "pix.minAmount", {
+    usdc: formatUSDC(MIN_AMOUNT_USDC),
+    fiat: minAmountInFiat(country, quote ? Number(quote.etherfuseMidMarketRate) : null),
+  })
   const canPay = !belowMinimum && !quoteError && !loading && Boolean(quote)
-  const displayedQuoteError =
-    pt && quoteError
-      ? errorKind === "network"
-        ? "Não foi possível consultar a cotação. Confira sua internet e tente novamente."
-        : errorKind === "provider"
-          ? "O serviço de cotação está indisponível no momento. Tente novamente."
-          : quoteError
-      : quoteError
+  const displayedQuoteError = quoteError
+    ? errorKind === "network"
+      ? t(m, "pix.quoteNetworkError")
+      : errorKind === "provider"
+        ? t(m, "pix.quoteProviderError")
+        : quoteError
+    : quoteError
 
   async function handleSubmitKyc() {
     setError(null)
     if (kycName.trim().length < 2) {
-      setError(pt ? "Digite seu nome completo." : "Enter your full legal name.")
+      setError(t(m, "kyc.errorName"))
       return
     }
     const idLen = digitsOnly(kycTaxId).length
     if (idLen !== 11 && idLen !== 14) {
-      setError(pt ? "Digite um CPF (11 dígitos) ou CNPJ (14 dígitos) válido." : "Enter a valid CPF (11 digits) or CNPJ (14 digits).")
+      setError(t(m, "kyc.errorTaxId"))
       return
     }
     if (!kycDob) {
-      setError(pt ? "Digite sua data de nascimento." : "Enter your date of birth.")
+      setError(t(m, "kyc.errorDob"))
       return
     }
     setKycSubmitting(true)
@@ -251,7 +178,7 @@ export function RampWithdraw({
     if (status === "approved") {
       setStage("cashout")
     } else {
-      setError(pt ? "Não foi possível validar os dados. Confira e tente novamente." : "We couldn't verify that identity. Check the details and try again.")
+      setError(t(m, "kyc.errorVerify"))
     }
   }
 
@@ -274,14 +201,14 @@ export function RampWithdraw({
       setError(localizedMinimumMessage)
       return
     }
-    const keyError = validatePixKey(pixKeyType, pixKey, pt)
+    const keyError = validatePixKey(pixKeyType, pixKey, m)
     if (keyError) {
       setError(keyError)
       return
     }
     if (!quote || secondsLeft <= 0) {
       void refresh({ force: true })
-      setError(pt ? "A cotação venceu. Atualizamos o valor — confira antes de continuar." : "Your quote expired. We refreshed it — confirm the new amount.")
+      setError(t(m, "pix.quoteExpired"))
       return
     }
     setStage("processing")
@@ -328,10 +255,13 @@ export function RampWithdraw({
       if (err instanceof PayoutError) {
         fail(err.code, err.message, err.meta)
       } else {
-        fail("network", err instanceof Error ? err.message : "Payout failed")
+        fail("network", err instanceof Error ? err.message : t(m, "pix.payoutFailed"))
       }
     }
   }
+
+  const failureCopy = failure ? m.failure[failure.code] : null
+  const keyTypeLabel = m.pix.keyTypes[pixKeyType]
 
   return (
     <div className="vv-kit">
@@ -339,43 +269,37 @@ export function RampWithdraw({
         <div className="vv-card">
           <div>
             <div className="vv-heading-row">
-              <h2 className="vv-title">
-                {pt ? "Verificação simulada" : "Simulated verification"}
-              </h2>
+              <h2 className="vv-title">{t(m, "kyc.title")}</h2>
               <span className="vv-demo-badge">DEMO</span>
             </div>
-            <p className="vv-desc">
-              {pt
-                ? "Nenhuma verificação de identidade real acontece. Só checamos se o CPF/CNPJ tem o número certo de dígitos."
-                : "No real identity check happens. We only check that the CPF/CNPJ has the right number of digits."}
-            </p>
+            <p className="vv-desc">{t(m, "kyc.description")}</p>
           </div>
           {kycSubmitting ? (
             <ProcessSteps
               current={kycStep}
-              steps={
-                pt
-                  ? ["Recebendo seus dados", "Validando o formato", "Liberando a demonstração"]
-                  : ["Receiving your details", "Validating the format", "Opening the demo payout"]
-              }
+              steps={[
+                t(m, "kyc.steps.receiving"),
+                t(m, "kyc.steps.validating"),
+                t(m, "kyc.steps.opening"),
+              ]}
             />
           ) : (
             <div>
               <div className="vv-field">
                 <label className="vv-label" htmlFor="vv-kyc-name">
-                  {pt ? "Nome completo" : "Full legal name"}
+                  {t(m, "kyc.nameLabel")}
                 </label>
                 <input
                   id="vv-kyc-name"
                   className="vv-input"
                   value={kycName}
                   onChange={(e) => setKycName(e.target.value)}
-                  placeholder={pt ? "Como aparece no documento" : "As it appears on your ID"}
+                  placeholder={t(m, "kyc.namePlaceholder")}
                 />
               </div>
               <div className="vv-field">
                 <label className="vv-label" htmlFor="vv-kyc-tax">
-                  {pt ? "CPF ou CNPJ" : "CPF or CNPJ"}
+                  {t(m, "kyc.taxLabel")}
                 </label>
                 <input
                   id="vv-kyc-tax"
@@ -385,15 +309,11 @@ export function RampWithdraw({
                   placeholder="000.000.000-00"
                   inputMode="numeric"
                 />
-                <span className="vv-hint">
-                  {pt
-                    ? "Simulação: qualquer CPF de 11 dígitos (não zero) passa."
-                    : "Simulation: any non-zero 11-digit CPF passes."}
-                </span>
+                <span className="vv-hint">{t(m, "kyc.taxHint")}</span>
               </div>
               <div className="vv-field">
                 <label className="vv-label" htmlFor="vv-kyc-dob">
-                  {pt ? "Data de nascimento" : "Date of birth"}
+                  {t(m, "kyc.dobLabel")}
                 </label>
                 <input
                   id="vv-kyc-dob"
@@ -414,7 +334,7 @@ export function RampWithdraw({
               onClick={handleSubmitKyc}
               disabled={belowMinimum}
             >
-              {pt ? "Continuar (simulado)" : "Continue (simulated)"}
+              {t(m, "kyc.continue")}
             </button>
           ) : null}
         </div>
@@ -423,15 +343,15 @@ export function RampWithdraw({
       {stage === "cashout" ? (
         <div className="vv-card">
           <div>
-            <h2 className="vv-title">{pt ? "Onde você quer receber?" : "Where should we send it?"}</h2>
+            <h2 className="vv-title">{t(m, "pix.title")}</h2>
             <p className="vv-desc">
-              {pt ? "Digite sua chave PIX. O dinheiro vai direto para sua conta." : `Enter your PIX key to receive ${formatUSDC(amount)} as BRL.`}
+              {t(m, "pix.description", { amount: formatUSDC(amount) })}
             </p>
           </div>
           <div>
             <div className="vv-field">
               <label className="vv-label" htmlFor="vv-pix-type">
-                {pt ? "Tipo de chave PIX" : "PIX key type"}
+                {t(m, "pix.keyTypeLabel")}
               </label>
               <select
                 id="vv-pix-type"
@@ -439,16 +359,16 @@ export function RampWithdraw({
                 value={pixKeyType}
                 onChange={(e) => setPixKeyType(e.target.value as PixKeyType)}
               >
-                <option value="cpf">CPF</option>
-                <option value="cnpj">CNPJ</option>
-                <option value="email">Email</option>
-                <option value="phone">{pt ? "Telefone" : "Phone"}</option>
-                <option value="random">{pt ? "Chave aleatória" : "Random key"}</option>
+                <option value="cpf">{m.pix.keyTypes.cpf}</option>
+                <option value="cnpj">{m.pix.keyTypes.cnpj}</option>
+                <option value="email">{m.pix.keyTypes.email}</option>
+                <option value="phone">{m.pix.keyTypes.phone}</option>
+                <option value="random">{m.pix.keyTypes.random}</option>
               </select>
             </div>
             <div className="vv-field">
               <label className="vv-label" htmlFor="vv-pix-key">
-                {pt ? "Chave PIX" : "PIX key"}
+                {t(m, "pix.keyLabel")}
               </label>
               <input
                 id="vv-pix-key"
@@ -460,14 +380,10 @@ export function RampWithdraw({
                     ? "you@email.com"
                     : pixKeyType === "phone"
                       ? "+55 11 90000-0000"
-                      : pt
-                        ? `Sua ${PIX_KEY_LABEL_PT[pixKeyType]}`
-                        : `Your ${PIX_KEY_LABEL[pixKeyType]}`
+                      : t(m, "pix.keyPlaceholder", { type: keyTypeLabel })
                 }
               />
-              <span className="vv-hint">
-                {pt ? "O valor costuma cair na conta em até 2 minutos." : "Funds arrive in your bank in under 2 minutes."}
-              </span>
+              <span className="vv-hint">{t(m, "pix.hint")}</span>
             </div>
           </div>
 
@@ -487,7 +403,7 @@ export function RampWithdraw({
             <>
               <div className="vv-stack">
                 <div className="vv-row">
-                  <span className="vv-muted">{pt ? "Você recebe" : "You receive"}</span>
+                  <span className="vv-muted">{t(m, "pix.youReceive")}</span>
                   <span className="vv-strong">{formatBRL(brlAmount ?? 0)}</span>
                 </div>
                 <div className="vv-countdown">
@@ -496,7 +412,7 @@ export function RampWithdraw({
                     style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
                   >
                     <RefreshCw className="vv-icon-sm" />
-                    {pt ? "Cotação atualiza em" : "Quote refreshes in"}
+                    {t(m, "pix.quoteRefreshes")}
                   </span>
                   <span className="vv-mono vv-strong">
                     {String(Math.floor(secondsLeft / 60)).padStart(1, "0")}:
@@ -506,24 +422,24 @@ export function RampWithdraw({
                 <details className="vv-disclosure vv-disclosure--rates">
                   <summary>
                     <ChevronDown className="vv-icon-sm" />
-                    {pt ? "Detalhes" : "Details"}
+                    {t(m, "pix.details")}
                   </summary>
                   <div className="vv-stack">
                     <div className="vv-row">
-                      <span className="vv-muted">{pt ? "Cotação Etherfuse" : "Etherfuse rate"}</span>
+                      <span className="vv-muted">{t(m, "pix.etherfuseRate")}</span>
                       <span className="vv-mono">
                         1 USDC = {Number(quote.exchangeRate).toFixed(4)} BRL
                       </span>
                     </div>
                     <div className="vv-row">
-                      <span className="vv-muted">{pt ? "Cotação de mercado" : "Mid-market"}</span>
+                      <span className="vv-muted">{t(m, "pix.midMarket")}</span>
                       <span className="vv-mono">
                         1 USDC = {Number(quote.etherfuseMidMarketRate).toFixed(4)} BRL
                       </span>
                     </div>
                     <div className="vv-row">
                       <span className="vv-muted">
-                        {pt ? "Tarifa" : "Provider fee"} ({(Number(quote.feeBps) / 100).toFixed(2)}%)
+                        {t(m, "pix.providerFee")} ({(Number(quote.feeBps) / 100).toFixed(2)}%)
                       </span>
                       <span className="vv-mono">{formatUSDC(Number(quote.feeAmount))}</span>
                     </div>
@@ -532,13 +448,7 @@ export function RampWithdraw({
               </div>
               <div className="vv-heading-row" style={{ marginTop: 8 }}>
                 <p className={quote.source === "mock" ? "vv-note vv-note--amber" : "vv-note"}>
-                  {quote.source === "mock"
-                    ? pt
-                      ? "Cotação simulada — serviço ao vivo indisponível"
-                      : "Simulated quote — live provider unavailable"
-                    : pt
-                      ? "Cotação ao vivo no ambiente de testes"
-                      : "Live quote from Etherfuse sandbox"}
+                  {quote.source === "mock" ? t(m, "pix.mockQuote") : t(m, "pix.liveQuote")}
                 </p>
                 {quote.source === "mock" ? <span className="vv-demo-badge">DEMO</span> : null}
               </div>
@@ -548,9 +458,7 @@ export function RampWithdraw({
           {error ? <p className="vv-error">{error}</p> : null}
           {brlAmount !== null ? (
             <p className="vv-expectation">
-              {pt
-                ? `${formatBRL(brlAmount)} deve chegar na sua chave PIX em até 2 minutos.`
-                : `${formatBRL(brlAmount)} should reach your PIX key in under 2 minutes.`}
+              {t(m, "pix.expectation", { amount: formatBRL(brlAmount) })}
             </p>
           ) : null}
 
@@ -560,7 +468,7 @@ export function RampWithdraw({
             onClick={handlePay}
             disabled={!canPay}
           >
-            {pt ? "Confirmar recebimento de" : "Claim"}{" "}
+            {t(m, "pix.claimButton")}{" "}
             {brlAmount !== null ? formatBRL(brlAmount) : formatUSDC(amount)}
           </button>
         </div>
@@ -569,18 +477,16 @@ export function RampWithdraw({
       {stage === "processing" ? (
         <div className="vv-card">
           <div>
-            <h2 className="vv-title">{pt ? "Enviando seu dinheiro" : "Sending your money"}</h2>
-            <p className="vv-desc">
-              {pt ? "Previsão: até 2 minutos. Você pode aguardar nesta tela." : "ETA: under 2 minutes. You can wait on this screen."}
-            </p>
+            <h2 className="vv-title">{t(m, "pix.processingTitle")}</h2>
+            <p className="vv-desc">{t(m, "pix.processingDesc")}</p>
           </div>
           <ProcessSteps
             current={processStep}
-            steps={
-              pt
-                ? ["Confirmando seus dados", "Enviando para sua chave PIX", "Confirmando o depósito"]
-                : ["Confirming your details", "Sending to your PIX key", "Confirming the deposit"]
-            }
+            steps={[
+              t(m, "pix.steps.confirming"),
+              t(m, "pix.steps.sending"),
+              t(m, "pix.steps.deposit"),
+            ]}
           />
         </div>
       ) : null}
@@ -588,16 +494,16 @@ export function RampWithdraw({
       {stage === "done" ? (
         <div className="vv-card">
           <div>
-            <h2 className="vv-title">{pt ? "Dinheiro enviado!" : "Money on the way!"}</h2>
+            <h2 className="vv-title">{t(m, "pix.doneTitle")}</h2>
             <p className="vv-desc">
-              {pt
-                ? `${brlAmount !== null ? formatBRL(brlAmount) : formatUSDC(amount)} está chegando na sua conta.`
-                : `${brlAmount !== null ? formatBRL(brlAmount) : formatUSDC(amount)} is landing in your account now.`}
+              {t(m, "pix.doneDesc", {
+                amount: brlAmount !== null ? formatBRL(brlAmount) : formatUSDC(amount),
+              })}
             </p>
           </div>
           {reference ? (
             <div className="vv-row">
-              <span className="vv-muted">{pt ? "Pedido PIX" : "PIX order"}</span>
+              <span className="vv-muted">{t(m, "pix.orderLabel")}</span>
               <span className="vv-mono" style={{ fontSize: 12, wordBreak: "break-all", textAlign: "right" }}>
                 {reference}
               </span>
@@ -605,7 +511,7 @@ export function RampWithdraw({
           ) : null}
           {txHash ? (
             <div className="vv-row">
-              <span className="vv-muted">{pt ? "Transação Stellar" : "Stellar transaction"}</span>
+              <span className="vv-muted">{t(m, "pix.txLabel")}</span>
               <a
                 className="vv-mono vv-receipt-link"
                 href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
@@ -619,20 +525,20 @@ export function RampWithdraw({
         </div>
       ) : null}
 
-      {stage === "failed" && failure ? (
+      {stage === "failed" && failure && failureCopy ? (
         <div className="vv-card">
           <div>
-            <h2 className="vv-title">
-              {(pt ? FAILURE_COPY_PT : FAILURE_COPY)[failure.code].title}
-            </h2>
-            <p className="vv-desc">
-              {(pt ? FAILURE_COPY_PT : FAILURE_COPY)[failure.code].body}
-            </p>
-            {!pt ? <p className="vv-error" style={{ marginTop: 8 }}>{failure.message}</p> : null}
+            <h2 className="vv-title">{failureCopy.title}</h2>
+            <p className="vv-desc">{failureCopy.body}</p>
+            {showTechnicalFailure ? (
+              <p className="vv-error" style={{ marginTop: 8 }}>
+                {failure.message}
+              </p>
+            ) : null}
           </div>
           {reference ? (
             <div className="vv-row">
-              <span className="vv-muted">{pt ? "Pedido PIX" : "PIX order"}</span>
+              <span className="vv-muted">{t(m, "pix.orderLabel")}</span>
               <span className="vv-mono" style={{ fontSize: 12, wordBreak: "break-all", textAlign: "right" }}>
                 {reference}
               </span>
@@ -640,7 +546,7 @@ export function RampWithdraw({
           ) : null}
           {txHash ? (
             <div className="vv-row">
-              <span className="vv-muted">{pt ? "Transação Stellar" : "Stellar transaction"}</span>
+              <span className="vv-muted">{t(m, "pix.txLabel")}</span>
               <a
                 className="vv-mono vv-receipt-link"
                 href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
@@ -659,7 +565,7 @@ export function RampWithdraw({
               setStage("cashout")
             }}
           >
-            {(pt ? FAILURE_COPY_PT : FAILURE_COPY)[failure.code].action}
+            {failureCopy.action}
           </button>
         </div>
       ) : null}

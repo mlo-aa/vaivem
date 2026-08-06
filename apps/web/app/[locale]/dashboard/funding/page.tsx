@@ -1,8 +1,9 @@
 'use client'
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import { QRCodeSVG } from 'qrcode.react'
+import { useRouter } from '@/i18n/navigation'
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
 import { Button } from '@/components/ui/button'
 import { ButtonLink } from '@/components/ui/button-link'
@@ -16,8 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatUSDC } from '@/lib/format'
-import { CUSTODY_LINE } from '@/lib/use-sender-balance'
+import { apiErrorKey, formatUSDC, toBcp47 } from '@/lib/format'
 
 const SANDBOX_FIAT_MAX = 500
 
@@ -62,11 +62,32 @@ type UsdcDepositInfo = {
   note?: string
 }
 
+const ERRORS_KEYS = new Set([
+  'Unauthorized',
+  'insufficient_balance',
+  'amount_below_minimum',
+  'amount_above_sandbox_limit',
+  'currency_invalid',
+  'amount_invalid',
+  'recipientName_required',
+  'accessCode_required',
+  'at_least_one_rail',
+  'create_failed',
+  'network',
+  'auth_misconfigured',
+  'unknown',
+])
+
 function hasPixCopyPaste(instructions: DepositInstructions): boolean {
   return Boolean(instructions.pixCopyPaste?.trim())
 }
 
 export default function FundingPage() {
+  const t = useTranslations('funding')
+  const tCustody = useTranslations('custody')
+  const tErrors = useTranslations('errors')
+  const tCommon = useTranslations('common')
+  const locale = useLocale()
   const router = useRouter()
   const redirected = useRef(false)
   const [method, setMethod] = useState<FundingMethod>('fiat')
@@ -86,6 +107,26 @@ export default function FundingPage() {
   const [orderStatus, setOrderStatus] = useState<string | null>(null)
   const [quotedUsdc, setQuotedUsdc] = useState<number | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+
+  function translateDataError(
+    code: string | undefined | null,
+    fallback: 'deposit_failed' | 'check_failed',
+  ): string {
+    const key = apiErrorKey(code)
+    if (key === 'amount_above_sandbox_limit') {
+      return t('errors.amount_above_sandbox_limit', {
+        max: SANDBOX_FIAT_MAX,
+        currency,
+      })
+    }
+    if (ERRORS_KEYS.has(key)) {
+      if (key === 'amount_below_minimum') {
+        return tErrors('amount_below_minimum', { min: '1.00' })
+      }
+      return tErrors(key as 'unknown')
+    }
+    return t(`errors.${fallback}`)
+  }
 
   const refreshBalance = useCallback(async () => {
     const res = await fetch('/api/funding/balance')
@@ -180,7 +221,7 @@ export default function FundingPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.message ?? data.error ?? 'Deposit failed')
+        setError(translateDataError(data.error, 'deposit_failed'))
         return
       }
       setOrderId(String(data.orderId))
@@ -190,7 +231,7 @@ export default function FundingPage() {
       setDepositNote(typeof data.note === 'string' ? data.note : null)
       await refreshBalance()
     } catch {
-      setError('Could not reach the funding service.')
+      setError(t('errors.reach_failed'))
     } finally {
       setPending(false)
     }
@@ -202,7 +243,7 @@ export default function FundingPage() {
       setCopied(key)
       setTimeout(() => setCopied(null), 2000)
     } catch {
-      setError('Could not copy to clipboard.')
+      setError(t('errors.clipboard_failed'))
     }
   }
 
@@ -213,7 +254,7 @@ export default function FundingPage() {
       const res = await fetch(`/api/funding/${encodeURIComponent(id)}`)
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Could not check order status')
+        setError(translateDataError(data.error, 'check_failed'))
         return
       }
       const next = await refreshBalance()
@@ -225,28 +266,25 @@ export default function FundingPage() {
         }
       }
     } catch {
-      setError('Could not reach the funding service.')
+      setError(t('errors.reach_failed'))
     } finally {
       setCheckingId(null)
     }
   }
 
   const showPixCopyPaste = instructions ? hasPixCopyPaste(instructions) : false
+  const dateLocale = toBcp47(locale)
 
   return (
     <>
-      <DashboardTopbar title="Funding" />
+      <DashboardTopbar title={t('title')} />
       <main className="flex-1 space-y-6 p-4 sm:p-6">
-        <p className="text-sm text-muted-foreground">{CUSTODY_LINE}</p>
+        <p className="text-sm text-muted-foreground">{tCustody('line')}</p>
 
         <div className="rounded-lg border border-border bg-secondary/40 px-4 py-3 text-sm">
-          <p className="font-medium">Sandbox funding</p>
+          <p className="font-medium">{t('sandboxTitle')}</p>
           <p className="mt-1 text-muted-foreground">
-            Two ways to fund: fiat on-ramp (
-            <strong className="text-foreground">BRL</strong> /{' '}
-            <strong className="text-foreground">MXN</strong>, max {SANDBOX_FIAT_MAX}) or send{' '}
-            <strong className="text-foreground">Etherfuse USDC</strong> on Stellar testnet with
-            your memo. Credits reconcile on every page load.
+            {t('sandboxBody', { max: SANDBOX_FIAT_MAX })}
           </p>
         </div>
 
@@ -257,7 +295,7 @@ export default function FundingPage() {
             variant={method === 'fiat' ? 'default' : 'outline'}
             onClick={() => setMethod('fiat')}
           >
-            Fiat on-ramp
+            {t('methodFiat')}
           </Button>
           <Button
             type="button"
@@ -265,25 +303,25 @@ export default function FundingPage() {
             variant={method === 'usdc' ? 'default' : 'outline'}
             onClick={() => setMethod('usdc')}
           >
-            USDC deposit
+            {t('methodUsdc')}
           </Button>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Demo balance</CardTitle>
-              <p className="text-sm text-muted-foreground">{CUSTODY_LINE}</p>
+              <CardTitle>{t('balanceTitle')}</CardTitle>
+              <p className="text-sm text-muted-foreground">{tCustody('line')}</p>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-3xl font-semibold tabular-nums">
-                {balance == null ? '—' : formatUSDC(balance)}
+                {balance == null ? '—' : formatUSDC(balance, locale)}
               </p>
               {(balance ?? 0) > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  <ButtonLink href="/dashboard/create">Create a claim</ButtonLink>
+                  <ButtonLink href="/dashboard/create">{t('createClaim')}</ButtonLink>
                   <ButtonLink href="/dashboard/create/batch" variant="outline">
-                    Batch from CSV
+                    {t('batchCsv')}
                   </ButtonLink>
                 </div>
               ) : null}
@@ -293,32 +331,30 @@ export default function FundingPage() {
           {method === 'usdc' ? (
             <Card>
               <CardHeader>
-                <CardTitle>Deposit USDC (Stellar)</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  For DAOs and treasuries that already hold USDC. Send to the sponsor address
-                  with your unique memo — credits appear after Horizon sees the payment.
-                </p>
+                <CardTitle>{t('usdcTitle')}</CardTitle>
+                <p className="text-sm text-muted-foreground">{t('usdcBody')}</p>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
                 {!usdcInfo ? (
-                  <p className="text-muted-foreground">Loading deposit details…</p>
+                  <p className="text-muted-foreground">{t('loadingUsdc')}</p>
                 ) : (
                   <>
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground">Required asset</p>
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {t('requiredAsset')}
+                      </p>
                       <p className="font-mono text-xs break-all">
                         {usdcInfo.assetCode}:
                         <span className="text-foreground">{usdcInfo.assetIssuer}</span>
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Payments in any other USDC (different issuer) are ignored and will not
-                        be credited.
+                        {t('otherUsdcIgnored')}
                       </p>
                     </div>
 
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground">
-                        Destination (sponsor)
+                        {t('destination')}
                       </p>
                       <p className="break-all font-mono text-xs">{usdcInfo.address}</p>
                       <Button
@@ -327,13 +363,13 @@ export default function FundingPage() {
                         size="sm"
                         onClick={() => void copyText(usdcInfo.address, 'address')}
                       >
-                        {copied === 'address' ? 'Copied' : 'Copy address'}
+                        {copied === 'address' ? tCommon('copied') : t('copyAddress')}
                       </Button>
                     </div>
 
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground">
-                        Memo (type: Hash) — required for attribution
+                        {t('memoLabel')}
                       </p>
                       <p className="break-all font-mono text-xs">{usdcInfo.memo}</p>
                       <Button
@@ -342,15 +378,14 @@ export default function FundingPage() {
                         size="sm"
                         onClick={() => void copyText(usdcInfo.memo, 'memo')}
                       >
-                        {copied === 'memo' ? 'Copied' : 'Copy memo hex'}
+                        {copied === 'memo' ? tCommon('copied') : t('copyMemo')}
                       </Button>
                     </div>
 
                     <div className="flex flex-col items-center gap-2 rounded-lg border border-border p-3">
                       <QRCodeSVG value={usdcInfo.address} size={160} bgColor="transparent" />
                       <p className="text-center text-xs text-muted-foreground">
-                        QR encodes the Stellar address — set memo type Hash and paste the hex
-                        in your wallet before sending.
+                        {t('addressQrHint')}
                       </p>
                     </div>
 
@@ -360,16 +395,16 @@ export default function FundingPage() {
                       size="sm"
                       onClick={() => void refreshBalance()}
                     >
-                      Check for deposits
+                      {t('checkDeposits')}
                     </Button>
 
                     {usdcCredits.length > 0 ? (
                       <div className="rounded-md border border-border bg-secondary/40 p-3">
-                        <p className="font-medium">Newly credited</p>
+                        <p className="font-medium">{t('newlyCredited')}</p>
                         <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
                           {usdcCredits.map((c) => (
                             <li key={c.txHash}>
-                              {formatUSDC(c.amount)} ·{' '}
+                              {formatUSDC(c.amount, locale)} ·{' '}
                               <span className="font-mono">{c.txHash.slice(0, 12)}…</span>
                             </li>
                           ))}
@@ -381,211 +416,212 @@ export default function FundingPage() {
               </CardContent>
             </Card>
           ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Deposit fiat → USDC</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Creates a live Etherfuse on-ramp order. After it completes, you go straight to
-                Create.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={onDeposit} className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium">Currency</span>
-                  <div className="flex gap-2">
-                    {(['BRL', 'MXN'] as const).map((c) => (
-                      <Button
-                        key={c}
-                        type="button"
-                        variant={currency === c ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setCurrency(c)}
-                      >
-                        {c}
-                      </Button>
-                    ))}
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('fiatTitle')}</CardTitle>
+                <p className="text-sm text-muted-foreground">{t('fiatBody')}</p>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={onDeposit} className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium">{t('currency')}</span>
+                    <div className="flex gap-2">
+                      {(['BRL', 'MXN'] as const).map((c) => (
+                        <Button
+                          key={c}
+                          type="button"
+                          variant={currency === c ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setCurrency(c)}
+                        >
+                          {c}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="fiat-amount" className="text-sm font-medium">
-                    Amount ({currency})
-                  </label>
-                  <Input
-                    id="fiat-amount"
-                    type="number"
-                    min={1}
-                    max={SANDBOX_FIAT_MAX}
-                    step="1"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    1–{SANDBOX_FIAT_MAX} {currency} · sandbox cap applies to both currencies
-                  </p>
-                </div>
-                {error ? <p className="text-sm text-destructive">{error}</p> : null}
-                <Button type="submit" disabled={pending}>
-                  {pending ? 'Creating order…' : `Create ${currency} deposit`}
-                </Button>
-              </form>
-
-              {instructions ? (
-                <div className="mt-4 space-y-3 rounded-lg border border-border p-3 text-sm">
-                  <p className="font-medium">
-                    {instructions.rail === 'pix' ? 'PIX deposit' : 'SPEI deposit'}
-                  </p>
-
-                  {instructions.rail === 'pix' ? (
-                    <>
-                      <p>
-                        Rail:{' '}
-                        <span className="font-medium">{instructions.depositBankName}</span>
-                      </p>
-                      <p>
-                        Amount:{' '}
-                        <span className="font-mono">
-                          {instructions.depositAmount} {currency}
-                        </span>
-                      </p>
-                      <p>Recipient: {instructions.depositAccountHolder}</p>
-
-                      {showPixCopyPaste ? (
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium text-muted-foreground">
-                            Pix copia e cola — pay from your banking app
-                          </p>
-                          <p className="break-all rounded-md bg-secondary p-2 font-mono text-xs">
-                            {instructions.pixCopyPaste}
-                          </p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void copyText(instructions.pixCopyPaste!, 'pix')}
-                          >
-                            {copied === 'pix' ? 'Copied' : 'Copy Pix code'}
-                          </Button>
-                          <div className="flex flex-col items-center gap-1 pt-2">
-                            <QRCodeSVG
-                              value={instructions.pixCopyPaste!}
-                              size={160}
-                              bgColor="transparent"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              Pix QR — scan in your banking app
-                            </p>
-                          </div>
-                        </div>
-                      ) : instructions.statusPage ? (
-                        <div className="space-y-3">
-                          <p className="text-xs text-muted-foreground">
-                            Payment instructions are not in the API response. Open the
-                            Etherfuse order page and tap{' '}
-                            <strong className="text-foreground">Get Transfer Details</strong>.
-                            In sandbox (verified 2026-08-06) that modal shows the BRL amount
-                            but no Pix copia-e-cola and no payable Pix QR — use Etherfuse
-                            sandbox tools to simulate fiat receipt, then return here.
-                          </p>
-                          <Button
-                            type="button"
-                            size="sm"
-                            render={
-                              <a
-                                href={instructions.statusPage}
-                                target="_blank"
-                                rel="noreferrer"
-                              />
-                            }
-                          >
-                            Abrir página de pagamento
-                          </Button>
-                          <div className="flex flex-col items-center gap-1 pt-1">
-                            <QRCodeSVG
-                              value={instructions.statusPage}
-                              size={160}
-                              bgColor="transparent"
-                            />
-                            <p className="max-w-[14rem] text-center text-xs text-muted-foreground">
-                              QR opens the order page — not a Pix code for your bank app
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void copyText(instructions.statusPage!, 'status')}
-                          >
-                            {copied === 'status' ? 'Copied link' : 'Copy order page link'}
-                          </Button>
-                        </div>
-                      ) : null}
-                    </>
-                  ) : (
-                    <>
-                      <p>
-                        Bank: <span className="font-mono">{instructions.depositBankName}</span>
-                      </p>
-                      <p>
-                        CLABE:{' '}
-                        <span className="font-mono">{instructions.depositClabe || '—'}</span>
-                      </p>
-                      <p>
-                        Amount:{' '}
-                        <span className="font-mono">
-                          {instructions.depositAmount} {currency}
-                        </span>
-                      </p>
-                      <p>Holder: {instructions.depositAccountHolder}</p>
-                    </>
-                  )}
-
-                  {quotedUsdc != null ? (
-                    <p>Credits ≈ {formatUSDC(quotedUsdc)} when the order completes</p>
-                  ) : null}
-                  {orderId ? (
-                    <p className="text-muted-foreground">
-                      Order <span className="font-mono">{orderId}</span> — status:{' '}
-                      {orderStatus ?? '…'}
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="fiat-amount" className="text-sm font-medium">
+                      {t('amountLabel', { currency })}
+                    </label>
+                    <Input
+                      id="fiat-amount"
+                      type="number"
+                      min={1}
+                      max={SANDBOX_FIAT_MAX}
+                      step="1"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t('amountHint', { max: SANDBOX_FIAT_MAX, currency })}
                     </p>
-                  ) : null}
-                  {depositNote ? (
-                    <p className="text-xs text-muted-foreground">{depositNote}</p>
-                  ) : null}
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
+                  </div>
+                  {error ? <p className="text-sm text-destructive">{error}</p> : null}
+                  <Button type="submit" disabled={pending}>
+                    {pending
+                      ? t('creatingOrder')
+                      : t('createDeposit', { currency })}
+                  </Button>
+                </form>
+
+                {instructions ? (
+                  <div className="mt-4 space-y-3 rounded-lg border border-border p-3 text-sm">
+                    <p className="font-medium">
+                      {instructions.rail === 'pix' ? t('pixDeposit') : t('speiDeposit')}
+                    </p>
+
+                    {instructions.rail === 'pix' ? (
+                      <>
+                        <p>{t('rail', { name: instructions.depositBankName })}</p>
+                        <p>
+                          {t('amountLine', {
+                            amount: instructions.depositAmount,
+                            currency,
+                          })}
+                        </p>
+                        <p>
+                          {t('recipient', { name: instructions.depositAccountHolder })}
+                        </p>
+
+                        {showPixCopyPaste ? (
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">
+                              {t('pixCopyTitle')}
+                            </p>
+                            <p className="break-all rounded-md bg-secondary p-2 font-mono text-xs">
+                              {instructions.pixCopyPaste}
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                void copyText(instructions.pixCopyPaste!, 'pix')
+                              }
+                            >
+                              {copied === 'pix' ? tCommon('copied') : t('copyPix')}
+                            </Button>
+                            <div className="flex flex-col items-center gap-1 pt-2">
+                              <QRCodeSVG
+                                value={instructions.pixCopyPaste!}
+                                size={160}
+                                bgColor="transparent"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                {t('pixQrHint')}
+                              </p>
+                            </div>
+                          </div>
+                        ) : instructions.statusPage ? (
+                          <div className="space-y-3">
+                            <p className="text-xs text-muted-foreground">
+                              {t('statusPageHint')}
+                            </p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              render={
+                                <a
+                                  href={instructions.statusPage}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                />
+                              }
+                            >
+                              {t('openPaymentPage')}
+                            </Button>
+                            <div className="flex flex-col items-center gap-1 pt-1">
+                              <QRCodeSVG
+                                value={instructions.statusPage}
+                                size={160}
+                                bgColor="transparent"
+                              />
+                              <p className="max-w-[14rem] text-center text-xs text-muted-foreground">
+                                {t('statusQrHint')}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                void copyText(instructions.statusPage!, 'status')
+                              }
+                            >
+                              {copied === 'status'
+                                ? t('copiedLink')
+                                : t('copyOrderLink')}
+                            </Button>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <p>{t('bank', { name: instructions.depositBankName })}</p>
+                        <p>
+                          {t('clabe', { clabe: instructions.depositClabe || '—' })}
+                        </p>
+                        <p>
+                          {t('amountLine', {
+                            amount: instructions.depositAmount,
+                            currency,
+                          })}
+                        </p>
+                        <p>
+                          {t('holder', { name: instructions.depositAccountHolder })}
+                        </p>
+                      </>
+                    )}
+
+                    {quotedUsdc != null ? (
+                      <p>
+                        {t('creditsApprox', {
+                          usdc: formatUSDC(quotedUsdc, locale),
+                        })}
+                      </p>
+                    ) : null}
+                    {orderId ? (
+                      <p className="text-muted-foreground">
+                        {t('orderStatus', {
+                          id: orderId,
+                          status: orderStatus ?? '…',
+                        })}
+                      </p>
+                    ) : null}
+                    {depositNote ? (
+                      <p className="text-xs text-muted-foreground">{depositNote}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
           )}
         </div>
 
         {pendingOrders.length > 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle>Pending deposits</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Orders waiting on Etherfuse. Status is refreshed on every page load; use Check
-                status after completing payment in the sandbox.
-              </p>
+              <CardTitle>{t('pendingTitle')}</CardTitle>
+              <p className="text-sm text-muted-foreground">{t('pendingBody')}</p>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>When</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Fiat</TableHead>
-                    <TableHead>USDC</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead>{t('when')}</TableHead>
+                    <TableHead>{t('order')}</TableHead>
+                    <TableHead>{t('fiat')}</TableHead>
+                    <TableHead>{tCommon('usdc')}</TableHead>
+                    <TableHead>{t('status')}</TableHead>
+                    <TableHead className="text-right">{t('action')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {pendingOrders.map((row) => (
                     <TableRow key={row.orderId}>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {new Date(row.createdAt).toLocaleString()}
+                        {new Date(row.createdAt).toLocaleString(dateLocale)}
                       </TableCell>
                       <TableCell className="max-w-[10rem] truncate font-mono text-xs">
                         {row.orderId}
@@ -593,7 +629,9 @@ export default function FundingPage() {
                       <TableCell className="tabular-nums">
                         {row.fiatAmount} {row.currency}
                       </TableCell>
-                      <TableCell className="tabular-nums">{formatUSDC(row.usdcAmount)}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {formatUSDC(row.usdcAmount, locale)}
+                      </TableCell>
                       <TableCell>{row.status}</TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -603,7 +641,9 @@ export default function FundingPage() {
                           disabled={checkingId === row.orderId}
                           onClick={() => void checkStatus(row.orderId)}
                         >
-                          {checkingId === row.orderId ? 'Checking…' : 'Check status'}
+                          {checkingId === row.orderId
+                            ? t('checking')
+                            : t('checkStatus')}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -616,29 +656,31 @@ export default function FundingPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Ledger</CardTitle>
+            <CardTitle>{t('ledgerTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             {ledger.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No entries yet.</p>
+              <p className="text-sm text-muted-foreground">{t('noEntries')}</p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>When</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Ref</TableHead>
+                    <TableHead>{t('when')}</TableHead>
+                    <TableHead>{t('type')}</TableHead>
+                    <TableHead>{t('amount')}</TableHead>
+                    <TableHead>{t('ref')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {ledger.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {new Date(row.createdAt).toLocaleString()}
+                        {new Date(row.createdAt).toLocaleString(dateLocale)}
                       </TableCell>
                       <TableCell>{row.type}</TableCell>
-                      <TableCell className="tabular-nums">{formatUSDC(row.amount)}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {formatUSDC(row.amount, locale)}
+                      </TableCell>
                       <TableCell className="font-mono text-xs">{row.ref}</TableCell>
                     </TableRow>
                   ))}

@@ -1,3 +1,6 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { STATUS_META } from '@/lib/format'
 import type { ClaimStatus } from '@/lib/types'
@@ -18,6 +21,7 @@ export function StatusBadge({
   status: ClaimStatus
   className?: string
 }) {
+  const t = useTranslations('status')
   const meta = STATUS_META[status] ?? { label: status, tone: 'muted' }
   return (
     <span
@@ -28,7 +32,7 @@ export function StatusBadge({
       )}
     >
       <span className="size-1.5 rounded-full bg-current opacity-70" />
-      {meta.label}
+      {t(status)}
     </span>
   )
 }

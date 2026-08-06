@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useLocale, useTranslations } from 'next-intl'
+import { Link, useRouter } from '@/i18n/navigation'
 import {
   ArrowLeft,
   Ban,
@@ -46,22 +46,27 @@ import type { Claim } from '@/lib/types'
 import { toast } from 'sonner'
 
 export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
+  const t = useTranslations('dashboard.detail')
+  const tStatus = useTranslations('status')
+  const tTime = useTranslations('time')
+  const tCommon = useTranslations('common')
+  const locale = useLocale()
   const router = useRouter()
   const [claim, setClaim] = useState(initialClaim)
   const [pending, setPending] = useState<'cancel' | 'refund' | 'extend' | null>(null)
 
   const active = isActiveStatus(claim.status)
   const canRefund = active && claim.status !== 'claimed' && claim.status !== 'cashing_out'
-  const expiry = timeUntil(claim.expiresAt)
+  const expiry = timeUntil(claim.expiresAt, tTime)
 
   async function handleCancel() {
     setPending('cancel')
     try {
       const updated = await cancelClaim(claim)
       setClaim(updated)
-      toast.success('Claim cancelled and funds returned')
+      toast.success(t('toastCancelled'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Cancel failed')
+      toast.error(err instanceof Error ? err.message : t('toastCancelFailed'))
     } finally {
       setPending(null)
     }
@@ -72,9 +77,9 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
     try {
       const updated = await refundClaim(claim)
       setClaim(updated)
-      toast.success('Funds refunded to your balance')
+      toast.success(t('toastRefunded'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Refund failed')
+      toast.error(err instanceof Error ? err.message : t('toastRefundFailed'))
     } finally {
       setPending(null)
     }
@@ -85,12 +90,24 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
     try {
       const updated = await extendExpiration(claim, 7)
       setClaim(updated)
-      toast.success('Expiration extended by 7 days')
+      toast.success(t('toastExtended'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Extend failed')
+      toast.error(err instanceof Error ? err.message : t('toastExtendFailed'))
     } finally {
       setPending(null)
     }
+  }
+
+  function protectionLabel() {
+    if (claim.protectionType === 'email') return t('protectionEmail')
+    if (claim.protectionType === 'code') return t('protectionCode')
+    return t('protectionPublic')
+  }
+
+  function payoutLabel() {
+    if (claim.payoutMethod === 'pix') return t('payoutPix')
+    if (claim.payoutMethod === 'stellar') return t('payoutStellar')
+    return t('payoutNotChosen')
   }
 
   return (
@@ -100,19 +117,19 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
         className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
-        All claims
+        {t('allClaims')}
       </Link>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">
-              {formatDisplay(claim.displayAmount, claim.displayCurrency)}
+              {formatDisplay(claim.displayAmount, claim.displayCurrency, locale)}
             </h1>
             <StatusBadge status={claim.status} />
           </div>
           <p className="text-sm text-muted-foreground">
-            {formatUSDC(claim.amount)} · {claim.purpose}
+            {formatUSDC(claim.amount, locale)} · {claim.purpose}
             {claim.reference ? ` · ${claim.reference}` : ''}
           </p>
         </div>
@@ -126,7 +143,7 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
                 ) : (
                   <CalendarClock data-icon="inline-start" />
                 )}
-                Extend 7 days
+                {t('extend7Days')}
               </Button>
             )}
             {canRefund && (
@@ -138,12 +155,13 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
                     ) : (
                       <RotateCcw data-icon="inline-start" />
                     )}
-                    Refund
+                    {t('refund')}
                   </Button>
                 }
-                title="Refund this payout?"
-                description="The locked USDC will be returned to your organization balance. The claim link will stop working immediately."
-                confirmLabel="Refund funds"
+                title={t('refundTitle')}
+                description={t('refundDescription')}
+                confirmLabel={t('refundConfirm')}
+                keepLabel={t('keepIt')}
                 onConfirm={handleRefund}
               />
             )}
@@ -155,12 +173,13 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
                   ) : (
                     <Ban data-icon="inline-start" />
                   )}
-                  Cancel
+                  {tCommon('cancel')}
                 </Button>
               }
-              title="Cancel this claim?"
-              description="This permanently voids the link and returns funds to your balance. This cannot be undone."
-              confirmLabel="Cancel claim"
+              title={t('cancelTitle')}
+              description={t('cancelDescription')}
+              confirmLabel={t('cancelConfirm')}
+              keepLabel={t('keepIt')}
               onConfirm={handleCancel}
             />
           </div>
@@ -171,42 +190,24 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
         <div className="flex flex-col gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Details</CardTitle>
+              <CardTitle>{t('details')}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <Detail label="Recipient" value={claim.recipientName} />
+              <Detail label={t('recipient')} value={claim.recipientName} />
               <Detail
-                label="Contact"
-                value={claim.recipientEmail ? maskEmail(claim.recipientEmail) : 'Public link'}
+                label={t('contact')}
+                value={claim.recipientEmail ? maskEmail(claim.recipientEmail) : t('publicLink')}
               />
+              <Detail label={t('protection')} value={protectionLabel()} />
+              <Detail label={t('payoutMethod')} value={payoutLabel()} />
+              <Detail label={t('created')} value={formatDateTime(claim.createdAt, locale)} />
               <Detail
-                label="Protection"
-                value={
-                  claim.protectionType === 'email'
-                    ? 'Email verification'
-                    : claim.protectionType === 'code'
-                      ? 'Access code'
-                      : 'Public link'
-                }
-              />
-              <Detail
-                label="Payout method"
-                value={
-                  claim.payoutMethod === 'pix'
-                    ? 'PIX (BRL)'
-                    : claim.payoutMethod === 'stellar'
-                      ? 'Stellar wallet'
-                      : 'Not yet chosen'
-                }
-              />
-              <Detail label="Created" value={formatDateTime(claim.createdAt)} />
-              <Detail
-                label={expiry.expired ? 'Expired' : 'Expires'}
-                value={expiry.expired ? formatDateTime(claim.expiresAt) : expiry.label}
+                label={expiry.expired ? t('expired') : t('expires')}
+                value={expiry.expired ? formatDateTime(claim.expiresAt, locale) : expiry.label}
               />
               {claim.stellarTransactionHash && (
                 <div className="sm:col-span-2">
-                  <p className="text-xs font-medium text-muted-foreground">Stellar transaction</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t('stellarTx')}</p>
                   <a
                     href={`https://stellar.expert/explorer/testnet/tx/${claim.stellarTransactionHash}`}
                     target="_blank"
@@ -220,13 +221,13 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
               )}
               {claim.withdrawalReference && (
                 <div className="sm:col-span-2">
-                  <p className="text-xs font-medium text-muted-foreground">PIX order</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t('pixOrder')}</p>
                   <p className="mt-1 font-mono text-sm">{claim.withdrawalReference}</p>
                 </div>
               )}
               {claim.message && (
                 <div className="sm:col-span-2">
-                  <p className="text-xs font-medium text-muted-foreground">Message to recipient</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t('messageToRecipient')}</p>
                   <p className="mt-1 rounded-lg bg-secondary p-3 text-sm">{claim.message}</p>
                 </div>
               )}
@@ -235,7 +236,7 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
 
           <Card>
             <CardHeader>
-              <CardTitle>Timeline</CardTitle>
+              <CardTitle>{t('timeline')}</CardTitle>
             </CardHeader>
             <CardContent>
               <ClaimTimeline claim={claim} />
@@ -247,12 +248,12 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
           {active ? (
             <Card>
               <CardHeader>
-                <CardTitle>Share</CardTitle>
+                <CardTitle>{t('share')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <SharePanel
                   token={claim.token}
-                  amountLabel={formatDisplay(claim.displayAmount, claim.displayCurrency)}
+                  amountLabel={formatDisplay(claim.displayAmount, claim.displayCurrency, locale)}
                 />
                 <Separator className="my-4" />
                 <Button
@@ -261,7 +262,7 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
                   render={<Link href={`/claim/${claim.token}`} target="_blank" />}
                   nativeButton={false}
                 >
-                  Preview recipient view
+                  {t('previewRecipient')}
                   <ExternalLink data-icon="inline-end" />
                 </Button>
               </CardContent>
@@ -269,14 +270,14 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle>Status</CardTitle>
+                <CardTitle>{t('status')}</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
-                  This claim is {claim.status}. No further action is required.
+                  {t('statusBody', { status: tStatus(claim.status) })}
                 </p>
                 <Button variant="outline" onClick={() => router.push('/dashboard/create')}>
-                  Create a new claim
+                  {t('createNew')}
                 </Button>
               </CardContent>
             </Card>
@@ -301,12 +302,14 @@ function ConfirmAction({
   title,
   description,
   confirmLabel,
+  keepLabel,
   onConfirm,
 }: {
   trigger: React.ReactElement
   title: string
   description: string
   confirmLabel: string
+  keepLabel: string
   onConfirm: () => void
 }) {
   return (
@@ -318,7 +321,7 @@ function ConfirmAction({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Keep it</AlertDialogCancel>
+          <AlertDialogCancel>{keepLabel}</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm}>{confirmLabel}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

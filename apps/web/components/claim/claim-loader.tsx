@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import { ClaimFlow, type PublicClaimView } from "@/components/claim/claim-flow"
 import { ClaimShell } from "@/components/claim/claim-shell"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -8,6 +9,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { getPublicClaim } from "@/lib/services"
 
 export function ClaimLoader({ token }: { token: string }) {
+  const t = useTranslations("claim")
   const [claim, setClaim] = useState<PublicClaimView | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
 
@@ -20,31 +22,31 @@ export function ClaimLoader({ token }: { token: string }) {
         setClaim(found)
       } catch {
         if (cancelled) return
-        setError("Não foi possível carregar o pagamento. Tente novamente.")
+        setError(t("loadError"))
         setClaim(null)
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, t])
 
   if (claim === undefined) {
     return (
       <ClaimShell>
-        <div className="mx-auto w-full max-w-md">
-          <div className="mb-6 flex flex-col items-center gap-2">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-12 w-48" />
-            <Skeleton className="h-4 w-24" />
+        <div className="mx-auto w-full max-w-md space-y-6">
+          <div className="flex flex-col items-center gap-3">
+            <Skeleton className="h-4 w-32 rounded-full" />
+            <Skeleton className="h-14 w-52 rounded-2xl" />
+            <Skeleton className="h-4 w-24 rounded-full" />
           </div>
-          <Card>
+          <Card className="rounded-2xl border-black/5 shadow-sm">
             <CardHeader>
               <Skeleton className="h-5 w-40" />
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-12 w-full rounded-xl" />
+              <Skeleton className="h-12 w-full rounded-xl" />
             </CardContent>
           </Card>
         </div>
@@ -55,11 +57,13 @@ export function ClaimLoader({ token }: { token: string }) {
   if (claim === null) {
     return (
       <ClaimShell>
-        <Card className="mx-auto w-full max-w-md">
-          <CardHeader>
-            <p className="text-lg font-semibold text-foreground">Link não encontrado</p>
-            <p className="text-sm text-muted-foreground">
-              {error ?? "Este link não existe ou foi removido."}
+        <Card className="mx-auto w-full max-w-md rounded-2xl border-black/5 shadow-sm">
+          <CardHeader className="space-y-2">
+            <p className="text-xl font-semibold tracking-tight text-foreground">
+              {t("notFound")}
+            </p>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {error ?? t("notFoundBody")}
             </p>
           </CardHeader>
         </Card>
@@ -68,18 +72,17 @@ export function ClaimLoader({ token }: { token: string }) {
   }
 
   if (["completed", "claimed", "refunded", "cancelled", "expired"].includes(claim.status)) {
+    const received =
+      claim.status === "completed" || claim.status === "claimed"
     return (
       <ClaimShell>
-        <Card className="mx-auto w-full max-w-md">
-          <CardHeader>
-            <p className="text-lg font-semibold text-foreground">
-              {claim.status === "completed" || claim.status === "claimed"
-                ? "Este valor já foi recebido"
-                : "Pagamento indisponível"}
+        <Card className="mx-auto w-full max-w-md rounded-2xl border-black/5 shadow-sm">
+          <CardHeader className="space-y-2">
+            <p className="text-xl font-semibold tracking-tight text-foreground">
+              {received ? t("alreadyReceived") : t("unavailable")}
             </p>
-            <p className="text-sm text-muted-foreground">
-              Este pagamento não está mais disponível. Se precisar, peça um novo link para a
-              pessoa que enviou.
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {t("unavailableBody")}
             </p>
           </CardHeader>
         </Card>

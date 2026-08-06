@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Search, Wallet } from 'lucide-react'
+import { useRouter } from '@/i18n/navigation'
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
 import { ClaimsTable } from '@/components/dashboard/claims-table'
 import {
@@ -24,12 +25,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { listClaims } from '@/lib/services'
 import { isActiveStatus } from '@/lib/format'
 import { useSenderBalance } from '@/lib/use-sender-balance'
-import { useMemo, useState } from 'react'
 import type { Claim } from '@/lib/types'
 
 type Filter = 'all' | 'active' | 'completed' | 'refunded'
 
 export default function DashboardPage() {
+  const t = useTranslations('dashboard')
   const router = useRouter()
   const { balance, loading: balanceLoading, funded } = useSenderBalance()
   const [query, setQuery] = useState('')
@@ -86,7 +87,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <DashboardTopbar title="Claims" />
+      <DashboardTopbar title={t('title')} />
       <main className="flex-1 space-y-5 p-4 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <InputGroup className="sm:max-w-xs">
@@ -94,7 +95,7 @@ export default function DashboardPage() {
               <Search />
             </InputGroupAddon>
             <InputGroupInput
-              placeholder="Search recipient, token, purpose"
+              placeholder={t('searchPlaceholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -106,10 +107,10 @@ export default function DashboardPage() {
             }}
             className="w-fit"
           >
-            <ToggleGroupItem value="all">All</ToggleGroupItem>
-            <ToggleGroupItem value="active">Active</ToggleGroupItem>
-            <ToggleGroupItem value="completed">Completed</ToggleGroupItem>
-            <ToggleGroupItem value="refunded">Closed</ToggleGroupItem>
+            <ToggleGroupItem value="all">{t('filterAll')}</ToggleGroupItem>
+            <ToggleGroupItem value="active">{t('filterActive')}</ToggleGroupItem>
+            <ToggleGroupItem value="completed">{t('filterCompleted')}</ToggleGroupItem>
+            <ToggleGroupItem value="refunded">{t('filterClosed')}</ToggleGroupItem>
           </ToggleGroup>
         </div>
 
@@ -128,17 +129,15 @@ export default function DashboardPage() {
                 {funded ? <Search /> : <Wallet />}
               </EmptyMedia>
               <EmptyTitle>
-                {funded ? 'No claims yet' : 'Add funds to send a claim'}
+                {funded ? t('emptyTitle') : t('emptyUnfunded')}
               </EmptyTitle>
               <EmptyDescription>
-                {funded
-                  ? 'Create a claim to lock USDC and share a payout link.'
-                  : 'Your demo balance is empty. Fund with fiat or USDC first, then create a claim.'}
+                {funded ? t('emptyFunded') : t('emptyUnfundedBody')}
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
               <ButtonLink href={funded ? '/dashboard/create' : '/dashboard/funding'}>
-                {funded ? 'Create claim' : 'Go to funding'}
+                {funded ? t('createClaim') : t('goFunding')}
               </ButtonLink>
             </EmptyContent>
           </Empty>
@@ -148,10 +147,8 @@ export default function DashboardPage() {
               <EmptyMedia variant="icon">
                 <Search />
               </EmptyMedia>
-              <EmptyTitle>No claims found</EmptyTitle>
-              <EmptyDescription>
-                Try adjusting your search or filters to find what you&apos;re looking for.
-              </EmptyDescription>
+              <EmptyTitle>{t('noResultsTitle')}</EmptyTitle>
+              <EmptyDescription>{t('noResultsBody')}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}

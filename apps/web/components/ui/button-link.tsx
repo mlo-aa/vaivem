@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import type { ComponentProps } from 'react'
+import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
 
 type ButtonProps = ComponentProps<typeof Button>
@@ -11,7 +11,7 @@ interface ButtonLinkProps extends Omit<ButtonProps, 'render' | 'nativeButton'> {
 }
 
 /**
- * A Button that renders as a Next.js Link. Base UI needs `nativeButton={false}`
+ * A Button that renders as a locale-aware Link. Base UI needs `nativeButton={false}`
  * when the rendered element is not a native <button>.
  */
 export function ButtonLink({ href, target, rel, children, ...props }: ButtonLinkProps) {

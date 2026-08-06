@@ -1,7 +1,9 @@
 'use client'
 
 import { FormEvent, Suspense, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { useRouter } from '@/i18n/navigation'
 import { Logo } from '@/components/logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +17,8 @@ import {
 const RESEND_COOLDOWN_SECONDS = 60
 
 function LoginInner() {
+  const t = useTranslations('login')
+  const te = useTranslations('errors')
   const router = useRouter()
   const search = useSearchParams()
   const next = search.get('next') || '/dashboard'
@@ -30,9 +34,14 @@ function LoginInner() {
 
   useEffect(() => {
     if (cooldown <= 0) return
-    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(timer)
   }, [cooldown])
+
+  function translateError(code: unknown) {
+    if (typeof code === 'string' && te.has(code)) return te(code)
+    return te('unknown')
+  }
 
   async function requestCode(targetEmail: string) {
     setPending(true)
@@ -46,7 +55,7 @@ function LoginInner() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.message ?? data.error ?? 'Could not send code')
+        setError(translateError(data.error))
         return false
       }
       if (data.devMode && data.code) {
@@ -55,7 +64,7 @@ function LoginInner() {
       setCooldown(RESEND_COOLDOWN_SECONDS)
       return true
     } catch {
-      setError('Could not reach the login service.')
+      setError(te('network'))
       return false
     } finally {
       setPending(false)
@@ -85,14 +94,14 @@ function LoginInner() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.message ?? data.error ?? 'Invalid code')
+        setError(translateError(data.error))
         setCode('')
         return
       }
       router.replace(callbackUrl)
       router.refresh()
     } catch {
-      setError('Could not reach the login service.')
+      setError(te('network'))
     } finally {
       setPending(false)
     }
@@ -102,12 +111,10 @@ function LoginInner() {
     <Card className="w-full max-w-sm">
       <CardHeader>
         <CardTitle>
-          {step === 'email' ? 'Sign in' : 'Enter your code'}
+          {step === 'email' ? t('title') : t('enterCode')}
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          {step === 'email'
-            ? 'Sender console — we’ll email you a 6-digit code. Recipients never need an account.'
-            : `We sent a code to ${email}.`}
+          {step === 'email' ? t('subtitle') : t('codeSent', { email })}
         </p>
       </CardHeader>
       <CardContent>
@@ -115,7 +122,7 @@ function LoginInner() {
           <form onSubmit={onEmailSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="email" className="text-sm font-medium">
-                Email
+                {t('emailLabel')}
               </label>
               <Input
                 id="email"
@@ -124,19 +131,19 @@ function LoginInner() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="you@company.com"
+                placeholder={t('emailPlaceholder')}
               />
             </div>
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
             <Button type="submit" disabled={pending}>
-              {pending ? 'Sending…' : 'Continue'}
+              {pending ? t('sending') : t('sendCode')}
             </Button>
           </form>
         ) : (
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <label htmlFor="login-otp" className="text-sm font-medium">
-                6-digit code
+                {t('enterCode')}
               </label>
               <InputOTP
                 id="login-otp"
@@ -184,7 +191,7 @@ function LoginInner() {
               disabled={pending || code.length !== 6}
               onClick={() => void verify(code)}
             >
-              {pending ? 'Verifying…' : 'Sign in'}
+              {pending ? t('verifying') : t('verify')}
             </Button>
 
             <div className="flex items-center justify-between gap-2 text-sm">
@@ -198,7 +205,7 @@ function LoginInner() {
                   setDevCode(null)
                 }}
               >
-                Change email
+                {t('changeEmail')}
               </button>
               <button
                 type="button"
@@ -206,7 +213,7 @@ function LoginInner() {
                 disabled={cooldown > 0 || pending}
                 onClick={() => void onResend()}
               >
-                {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+                {cooldown > 0 ? `${t('resend')} (${cooldown}s)` : t('resend')}
               </button>
             </div>
           </div>
@@ -218,7 +225,8 @@ function LoginInner() {
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background px-4">
+    <div className="dark relative flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4">
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_rgba(34,197,94,0.12),_transparent_55%)]" />
       <Logo />
       <Suspense fallback={<Card className="h-48 w-full max-w-sm animate-pulse" />}>
         <LoginInner />
