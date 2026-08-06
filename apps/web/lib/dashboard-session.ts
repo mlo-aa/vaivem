@@ -14,13 +14,33 @@ export interface SessionPayload {
 
 type GlobalAuth = typeof globalThis & { __vaivemAuthSecret?: string }
 
+export class AuthSecretError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "AuthSecretError"
+  }
+}
+
+/** True when AUTH_SECRET is present (required on Vercel / production). */
+export function hasAuthSecret(): boolean {
+  return Boolean(process.env.AUTH_SECRET && process.env.AUTH_SECRET.length > 0)
+}
+
+function requiresAuthSecret(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL === "1" ||
+    Boolean(process.env.VERCEL_ENV)
+  )
+}
+
 function getSecret(): string {
   const fromEnv = process.env.AUTH_SECRET
   if (fromEnv && fromEnv.length > 0) return fromEnv
 
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "[auth] AUTH_SECRET is required in production. Set it in the environment before starting the server.",
+  if (requiresAuthSecret()) {
+    throw new AuthSecretError(
+      "[auth] AUTH_SECRET is required in production. Set it in the Vercel project Environment Variables (Production + Preview) and redeploy.",
     )
   }
 

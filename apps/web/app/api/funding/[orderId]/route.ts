@@ -7,7 +7,7 @@ import { NextResponse } from "next/server"
 import { requireOwnerId } from "@/lib/server/auth-session"
 import { getPendingDeposit } from "@/lib/server/balance-store"
 import { EtherfuseError } from "@/lib/server/etherfuse"
-import { reconcileOneDeposit } from "@/lib/server/reconcile-funding"
+import { reconcileOneDeposit, syncProviderOnrampsForOwner } from "@/lib/server/reconcile-funding"
 
 export const dynamic = "force-dynamic"
 
@@ -27,11 +27,11 @@ export async function GET(
 
   const pending = await getPendingDeposit(orderId)
   if (!pending || pending.ownerId !== who.ownerId) {
-    // Still try reconcile in case the row was already credited/removed.
     return NextResponse.json({ error: "Deposit not found" }, { status: 404 })
   }
 
   try {
+    await syncProviderOnrampsForOwner(who.ownerId)
     const row = await reconcileOneDeposit(orderId, who.ownerId)
     if (!row) {
       return NextResponse.json({ error: "Deposit not found" }, { status: 404 })

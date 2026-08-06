@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server"
 import {
+  AuthSecretError,
   COOKIE_NAME,
+  hasAuthSecret,
   verifySessionToken,
 } from "@/lib/dashboard-session"
 
@@ -18,6 +20,21 @@ function isProtectedPath(pathname: string): boolean {
   return false
 }
 
+function misconfiguredResponse(pathname: string) {
+  const message =
+    "AUTH_SECRET is not set on this deployment. Add it in Vercel → Project Settings → Environment Variables (Production and Preview), then redeploy."
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json(
+      { error: "auth_misconfigured", message },
+      { status: 503 },
+    )
+  }
+  return new NextResponse(message, {
+    status: 503,
+    headers: { "content-type": "text/plain; charset=utf-8" },
+  })
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
@@ -25,9 +42,27 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  const token = req.cookies.get(COOKIE_NAME)?.value
-  const session = await verifySessionToken(token)
-  if (session) return NextResponse.next()
+  // Vercel Edge: missing AUTH_SECRET used to throw → MIDDLEWARE_INVOCATION_FAILED.
+  if (
+    !hasAuthSecret() &&
+    (process.env.NODE_ENV === "production" ||
+      process.env.VERCEL === "1" ||
+      Boolean(process.env.VERCEL_ENV))
+  ) {
+    return misconfiguredResponse(pathname)
+  }
+
+  try {
+    const token = req.cookies.get(COOKIE_NAME)?.value
+    const session = await verifySessionToken(token)
+    if (session) return NextResponse.next()
+  } catch (err) {
+    if (err instanceof AuthSecretError) {
+      return misconfiguredResponse(pathname)
+    }
+    console.error("[middleware]", err)
+    return misconfiguredResponse(pathname)
+  }
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

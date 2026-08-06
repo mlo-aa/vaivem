@@ -293,6 +293,42 @@ export function getOrder(orderId: string) {
   return request<RampOrderStatus>(`/ramp/order/${encodeURIComponent(orderId)}`)
 }
 
+export interface RampOrderListItem {
+  orderId: string
+  status: string
+  orderType?: string
+  sourceAsset?: string
+  targetAsset?: string
+  amountInFiat?: string
+  amountInTokens?: string
+  depositClabe?: string
+  bankAccountId?: string
+  createdAt?: string
+  completedAt?: string
+  [key: string]: unknown
+}
+
+/** List org orders (sandbox supports customerId filter). */
+export async function listOrders(params?: {
+  customerId?: string
+  pageSize?: number
+  pageNumber?: number
+}): Promise<RampOrderListItem[]> {
+  const customerId = params?.customerId ?? ORG_ID
+  if (!customerId) {
+    throw new EtherfuseError("ETHERFUSE_ORG_ID no configurada", 500)
+  }
+  const qs = new URLSearchParams({
+    customerId,
+    pageSize: String(params?.pageSize ?? 50),
+    pageNumber: String(params?.pageNumber ?? 1),
+  })
+  const res = await request<{ items?: RampOrderListItem[] }>(
+    `/ramp/orders?${qs}`,
+  )
+  return res.items ?? []
+}
+
 /**
  * Turns an upstream 4xx into something a user can act on.
  * Etherfuse often answers with no body, in which case `request` only knows the status.

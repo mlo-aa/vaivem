@@ -18,5 +18,8 @@ node_modules
 
 spike-state.json
 
+# Local dev funding ledger (no KV)
+apps/web/.data/
+
 # Leftover single-app dirs if OS file locks blocked the move
 _trash_*/

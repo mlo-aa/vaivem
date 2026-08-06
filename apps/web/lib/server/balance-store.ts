@@ -11,10 +11,27 @@ import "server-only"
 
 import { kv } from "@vercel/kv"
 
+import {
+  fileBackfillOwnerPending,
+  fileGetBalance,
+  fileGetLedger,
+  fileGetPending,
+  fileHasDepositRef,
+  fileMarkDepositCredited,
+  fileListOwnerPending,
+  fileRemovePending,
+  fileSavePending,
+  fileScanPendingForOwner,
+  fileSetOwnerPendingList,
+  fileWriteBalance,
+  fileWriteLedger,
+} from "@/lib/server/funding-file-store"
+
 const BALANCE_PREFIX = "balance:"
 const LEDGER_PREFIX = "ledger:"
 const PENDING_PREFIX = "funding:"
 const OWNER_PENDING_PREFIX = "funding-pending:"
+const CREDITED_ORDER_PREFIX = "deposit-credited:"
 const LEDGER_MAX = 200
 
 export type LedgerEntryType = "deposit" | "claim_funded" | "refund"
@@ -48,6 +65,10 @@ const memoryLedgers = new Map<string, LedgerEntry[]>()
 const memoryPending = new Map<string, PendingDeposit>()
 const memoryOwnerPending = new Map<string, string[]>()
 
+function useFileStore(): boolean {
+  return !kvConfigured()
+}
+
 function kvConfigured(): boolean {
   return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
 }
@@ -72,9 +93,41 @@ function roundUsdc(n: number): number {
   return Math.round(n * 100) / 100
 }
 
+function creditedOrderKey(orderId: string) {
+  return `${CREDITED_ORDER_PREFIX}${orderId}`
+}
+
+export async function isDepositCreditedGlobally(
+  orderId: string,
+): Promise<boolean> {
+  if (kvConfigured()) {
+    if (await kv.get(creditedOrderKey(orderId))) return true
+  } else if (useFileStore()) {
+    if (await fileHasDepositRef(orderId)) return true
+  } else {
+    for (const entries of memoryLedgers.values()) {
+      if (entries.some((e) => e.type === "deposit" && e.ref === orderId)) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+async function markDepositCreditedGlobally(orderId: string): Promise<void> {
+  if (kvConfigured()) {
+    await kv.set(creditedOrderKey(orderId), true)
+  } else if (useFileStore()) {
+    await fileMarkDepositCredited(orderId)
+  }
+}
+
 export async function getBalance(ownerId: string): Promise<SenderBalance> {
   if (kvConfigured()) {
     const row = await kv.get<SenderBalance>(balanceKey(ownerId))
+    if (row) return row
+  } else if (useFileStore()) {
+    const row = await fileGetBalance(ownerId)
     if (row) return row
   } else {
     const row = memoryBalances.get(ownerId)
@@ -91,12 +144,17 @@ export async function getLedger(ownerId: string): Promise<LedgerEntry[]> {
   if (kvConfigured()) {
     return (await kv.get<LedgerEntry[]>(ledgerKey(ownerId))) ?? []
   }
+  if (useFileStore()) {
+    return fileGetLedger(ownerId)
+  }
   return memoryLedgers.get(ownerId) ?? []
 }
 
 async function writeBalance(balance: SenderBalance): Promise<void> {
   if (kvConfigured()) {
     await kv.set(balanceKey(balance.ownerId), balance)
+  } else if (useFileStore()) {
+    await fileWriteBalance(balance)
   } else {
     memoryBalances.set(balance.ownerId, balance)
   }
@@ -107,6 +165,8 @@ async function appendLedger(ownerId: string, entry: LedgerEntry): Promise<void> 
   const next = [entry, ...list].slice(0, LEDGER_MAX)
   if (kvConfigured()) {
     await kv.set(ledgerKey(ownerId), next)
+  } else if (useFileStore()) {
+    await fileWriteLedger(ownerId, next)
   } else {
     memoryLedgers.set(ownerId, next)
   }
@@ -138,21 +198,27 @@ async function applyDelta(
   return balance
 }
 
-/** Credit USDC after a completed on-ramp. Idempotent via pending.credited / ledger ref. */
+/** Credit USDC after a completed on-ramp. Idempotent via ledger ref / global order key. */
 export async function creditDeposit(
   ownerId: string,
   usdcAmount: number,
   orderId: string,
 ): Promise<SenderBalance> {
-  const ledger = await getLedger(ownerId)
-  if (ledger.some((e) => e.type === "deposit" && e.ref === orderId)) {
+  if (await isDepositCreditedGlobally(orderId)) {
     return getBalance(ownerId)
   }
-  return applyDelta(ownerId, usdcAmount, {
+  const ledger = await getLedger(ownerId)
+  if (ledger.some((e) => e.type === "deposit" && e.ref === orderId)) {
+    await markDepositCreditedGlobally(orderId)
+    return getBalance(ownerId)
+  }
+  const balance = await applyDelta(ownerId, usdcAmount, {
     type: "deposit",
     amount: usdcAmount,
     ref: orderId,
   })
+  await markDepositCreditedGlobally(orderId)
+  return balance
 }
 
 /** Debit when creating a claim. Throws if short. */
@@ -192,6 +258,9 @@ export async function listOwnerPendingOrderIds(ownerId: string): Promise<string[
   if (kvConfigured()) {
     return (await kv.get<string[]>(ownerPendingKey(ownerId))) ?? []
   }
+  if (useFileStore()) {
+    return fileListOwnerPending(ownerId)
+  }
   return memoryOwnerPending.get(ownerId) ?? []
 }
 
@@ -203,6 +272,8 @@ async function writeOwnerPendingList(ownerId: string, orderIds: string[]): Promi
     } else {
       await kv.set(ownerPendingKey(ownerId), unique, { ex: 60 * 60 * 24 * 14 })
     }
+  } else if (useFileStore()) {
+    await fileSetOwnerPendingList(ownerId, unique)
   } else if (unique.length === 0) {
     memoryOwnerPending.delete(ownerId)
   } else {
@@ -247,6 +318,10 @@ export async function backfillOwnerPendingList(ownerId: string): Promise<void> {
         err instanceof Error ? err.message : err,
       )
     }
+  } else if (useFileStore()) {
+    for (const pending of await fileScanPendingForOwner(ownerId)) {
+      if (!pending.credited) found.push(pending.orderId)
+    }
   } else {
     for (const pending of memoryPending.values()) {
       if (pending.ownerId === ownerId && !pending.credited) {
@@ -266,6 +341,8 @@ export async function backfillOwnerPendingList(ownerId: string): Promise<void> {
 export async function savePendingDeposit(pending: PendingDeposit): Promise<void> {
   if (kvConfigured()) {
     await kv.set(pendingKey(pending.orderId), pending, { ex: 60 * 60 * 24 * 7 })
+  } else if (useFileStore()) {
+    await fileSavePending(pending)
   } else {
     memoryPending.set(pending.orderId, pending)
   }
@@ -278,6 +355,9 @@ export async function getPendingDeposit(
   if (kvConfigured()) {
     return (await kv.get<PendingDeposit>(pendingKey(orderId))) ?? null
   }
+  if (useFileStore()) {
+    return fileGetPending(orderId)
+  }
   return memoryPending.get(orderId) ?? null
 }
 
@@ -288,6 +368,8 @@ export async function removePendingDeposit(
 ): Promise<void> {
   if (kvConfigured()) {
     await kv.del(pendingKey(orderId))
+  } else if (useFileStore()) {
+    await fileRemovePending(orderId, ownerId)
   } else {
     memoryPending.delete(orderId)
   }
@@ -296,5 +378,17 @@ export async function removePendingDeposit(
     ownerId,
     list.filter((id) => id !== orderId),
   )
+}
+
+/** Upsert a pending row without duplicating the owner index merge logic. */
+export async function upsertPendingDeposit(pending: PendingDeposit): Promise<void> {
+  if (kvConfigured()) {
+    await kv.set(pendingKey(pending.orderId), pending, { ex: 60 * 60 * 24 * 7 })
+  } else if (useFileStore()) {
+    await fileSavePending(pending)
+  } else {
+    memoryPending.set(pending.orderId, pending)
+  }
+  await addToOwnerPending(pending.ownerId, pending.orderId)
 }
 
