@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { Search, Wallet } from 'lucide-react'
-import { useRouter } from '@/i18n/navigation'
+import { Link, useRouter } from '@/i18n/navigation'
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
 import { ClaimsTable } from '@/components/dashboard/claims-table'
 import {
@@ -23,7 +23,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Skeleton } from '@/components/ui/skeleton'
 import { listClaims } from '@/lib/services'
-import { isActiveStatus } from '@/lib/format'
+import { formatUSDC, isActiveStatus } from '@/lib/format'
 import { useSenderBalance } from '@/lib/use-sender-balance'
 import type { Claim } from '@/lib/types'
 
@@ -31,6 +31,8 @@ type Filter = 'all' | 'active' | 'completed' | 'refunded'
 
 export default function DashboardPage() {
   const t = useTranslations('dashboard')
+  const tCustody = useTranslations('custody')
+  const locale = useLocale()
   const router = useRouter()
   const { balance, loading: balanceLoading, funded } = useSenderBalance()
   const [query, setQuery] = useState('')
@@ -55,7 +57,6 @@ export default function DashboardPage() {
     }
   }, [])
 
-  // First-time sender: no funds and no claims → funding, not an empty claims list.
   useEffect(() => {
     if (loading || balanceLoading) return
     if (claims.length === 0 && balance === 0) {
@@ -85,19 +86,51 @@ export default function DashboardPage() {
   const bootstrapping =
     loading || balanceLoading || (claims.length === 0 && balance === 0)
 
+  const activeCount = claims.filter((c) => isActiveStatus(c.status)).length
+
   return (
     <>
       <DashboardTopbar title={t('title')} />
-      <main className="flex-1 space-y-5 p-4 sm:p-6">
+      <main className="flex-1 space-y-6 px-4 pb-10 sm:px-8 lg:px-8">
+        {/* Bento: hero balance + compact stats */}
+        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+          <Link
+            href="/dashboard/funding"
+            className="rounded-[1.25rem] bg-primary p-6 text-primary-foreground transition-opacity duration-150 hover:opacity-95 sm:p-7"
+          >
+            <p className="text-sm font-medium text-primary-foreground/70">
+              {tCustody('line')}
+            </p>
+            <p className="mt-3 text-4xl font-semibold tracking-[-0.02em] tabular-nums sm:text-5xl">
+              {balance == null ? '—' : formatUSDC(balance, locale)}
+            </p>
+          </Link>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-[1.25rem] bg-surface p-6 dark:border dark:border-border">
+              <p className="text-sm text-muted-foreground">{t('filterAll')}</p>
+              <p className="mt-2 text-3xl font-semibold tracking-[-0.02em] tabular-nums">
+                {claims.length}
+              </p>
+            </div>
+            <div className="rounded-[1.25rem] bg-surface p-6 dark:border dark:border-border">
+              <p className="text-sm text-muted-foreground">{t('filterActive')}</p>
+              <p className="mt-2 text-3xl font-semibold tracking-[-0.02em] tabular-nums">
+                {activeCount}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <InputGroup className="sm:max-w-xs">
+          <InputGroup className="rounded-full border-transparent bg-surface sm:max-w-xs dark:border dark:border-border">
             <InputGroupAddon>
-              <Search />
+              <Search className="text-muted-foreground" />
             </InputGroupAddon>
             <InputGroupInput
               placeholder={t('searchPlaceholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              className="bg-transparent"
             />
           </InputGroup>
           <ToggleGroup
@@ -105,25 +138,45 @@ export default function DashboardPage() {
             onValueChange={(v) => {
               if (v[0]) setFilter(v[0] as Filter)
             }}
-            className="w-fit"
+            className="w-fit gap-1 rounded-full bg-surface p-1 dark:border dark:border-border"
           >
-            <ToggleGroupItem value="all">{t('filterAll')}</ToggleGroupItem>
-            <ToggleGroupItem value="active">{t('filterActive')}</ToggleGroupItem>
-            <ToggleGroupItem value="completed">{t('filterCompleted')}</ToggleGroupItem>
-            <ToggleGroupItem value="refunded">{t('filterClosed')}</ToggleGroupItem>
+            <ToggleGroupItem
+              value="all"
+              className="rounded-full px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
+            >
+              {t('filterAll')}
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="active"
+              className="rounded-full px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
+            >
+              {t('filterActive')}
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="completed"
+              className="rounded-full px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
+            >
+              {t('filterCompleted')}
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="refunded"
+              className="rounded-full px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
+            >
+              {t('filterClosed')}
+            </ToggleGroupItem>
           </ToggleGroup>
         </div>
 
         {bootstrapping ? (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-24 w-full rounded-[1.25rem]" />
+            <Skeleton className="h-24 w-full rounded-[1.25rem]" />
+            <Skeleton className="h-24 w-full rounded-[1.25rem]" />
           </div>
         ) : filtered.length > 0 ? (
           <ClaimsTable claims={filtered} />
         ) : claims.length === 0 ? (
-          <Empty className="rounded-xl border border-dashed border-border">
+          <Empty className="rounded-[1.25rem] bg-surface p-8 dark:border dark:border-border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 {funded ? <Search /> : <Wallet />}
@@ -142,7 +195,7 @@ export default function DashboardPage() {
             </EmptyContent>
           </Empty>
         ) : (
-          <Empty className="rounded-xl border border-dashed border-border">
+          <Empty className="rounded-[1.25rem] bg-surface p-8 dark:border dark:border-border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <Search />

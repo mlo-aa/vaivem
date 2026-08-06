@@ -33,14 +33,14 @@ export function DashboardSidebar() {
   const createLocked = !loading && !funded
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-sidebar lg:flex">
-      <div className="flex h-16 items-center px-6">
+    <aside className="hidden w-64 shrink-0 flex-col border-r border-transparent bg-background lg:flex dark:border-border">
+      <div className="flex h-[4.5rem] items-center px-6">
         <Link href="/dashboard" aria-label="Vaivém dashboard">
           <Logo />
         </Link>
       </div>
       <TooltipProvider>
-        <nav className="flex flex-1 flex-col gap-1 px-3 py-4" aria-label="Dashboard">
+        <nav className="flex flex-1 flex-col gap-1 px-3 py-2" aria-label="Dashboard">
           {NAV.map((item) => {
             const active =
               item.href === '/dashboard'
@@ -50,12 +50,12 @@ export function DashboardSidebar() {
                   : pathname.startsWith(item.href)
             const locked = item.needsFunds && createLocked
             const className = cn(
-              'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
+              'flex w-full items-center gap-3 rounded-full px-4 py-2.5 text-left text-sm font-medium transition-colors duration-150',
               locked
                 ? 'cursor-not-allowed text-muted-foreground/50'
                 : active
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-surface hover:text-foreground',
             )
             if (locked) {
               return (
@@ -80,10 +80,10 @@ export function DashboardSidebar() {
           })}
         </nav>
       </TooltipProvider>
-      <div className="border-t border-border p-3">
+      <div className="border-t border-transparent p-3 dark:border-border">
         <a
           href="mailto:support@vaivem.app"
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+          className="flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-surface hover:text-foreground"
         >
           <LifeBuoy className="size-4.5 shrink-0" />
           {t('support')}

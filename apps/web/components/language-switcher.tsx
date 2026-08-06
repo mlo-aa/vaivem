@@ -26,7 +26,7 @@ export function LanguageSwitcher({
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-0.5 rounded-full border border-border bg-card/80 p-0.5',
+        'inline-flex items-center gap-0.5 rounded-full bg-surface p-0.5 dark:border dark:border-border',
         className,
       )}
       role="group"
@@ -38,14 +38,14 @@ export function LanguageSwitcher({
           type="button"
           onClick={() => router.replace(pathname, { locale: loc })}
           className={cn(
-            'rounded-full px-2 py-1 text-xs font-medium transition-colors',
+            'rounded-full px-2.5 py-1 text-xs font-medium transition-colors duration-150',
             locale === loc
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground',
           )}
           aria-pressed={locale === loc}
         >
-          {compact ? LABELS[loc] : LABELS[loc]}
+          {LABELS[loc]}
         </button>
       ))}
     </div>

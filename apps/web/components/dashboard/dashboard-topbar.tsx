@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl'
 import { Link, usePathname, useRouter } from '@/i18n/navigation'
 import { useEffect, useState } from 'react'
-import { Menu, Plus, Wallet as WalletIcon } from 'lucide-react'
+import { Menu, Plus } from 'lucide-react'
 import {
   Sheet,
   SheetContent,
@@ -23,6 +23,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Logo } from '@/components/logo'
 import { formatUSDC } from '@/lib/format'
 import { useSenderBalance } from '@/lib/use-sender-balance'
@@ -55,7 +56,6 @@ function initials(name: string) {
 export function DashboardTopbar({ title }: { title: string }) {
   const t = useTranslations('nav')
   const tc = useTranslations('common')
-  const tCustody = useTranslations('custody')
   const locale = useLocale()
   const [open, setOpen] = useState(false)
   const [displayName, setDisplayName] = useState('Sender')
@@ -91,17 +91,17 @@ export function DashboardTopbar({ title }: { title: string }) {
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-lg">
-      <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
-        <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 bg-background">
+      <div className="flex items-center justify-between gap-4 px-4 py-5 sm:px-8 lg:px-8">
+        <div className="flex min-w-0 items-center gap-3">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger
-              className="inline-flex size-9 items-center justify-center rounded-lg text-foreground lg:hidden"
+              className="inline-flex size-10 items-center justify-center rounded-full bg-surface text-foreground transition-colors duration-150 lg:hidden dark:border dark:border-border"
               aria-label={tc('openMenu')}
             >
               <Menu className="size-5" />
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0">
+            <SheetContent side="left" className="w-72 border-border bg-background p-0">
               <SheetHeader className="h-16 justify-center px-6">
                 <SheetTitle className="flex items-center">
                   <Logo />
@@ -119,7 +119,7 @@ export function DashboardTopbar({ title }: { title: string }) {
                       <span
                         key={item.href}
                         title={t('addFundsFirst')}
-                        className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground/50"
+                        className="rounded-full px-4 py-2.5 text-sm font-medium text-muted-foreground/50"
                       >
                         {t(item.labelKey)}
                       </span>
@@ -131,10 +131,10 @@ export function DashboardTopbar({ title }: { title: string }) {
                       href={item.href}
                       onClick={() => setOpen(false)}
                       className={cn(
-                        'rounded-lg px-3 py-2.5 text-sm font-medium',
+                        'rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-150',
                         active
-                          ? 'bg-secondary text-foreground'
-                          : 'text-muted-foreground hover:bg-secondary',
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:bg-surface hover:text-foreground',
                       )}
                     >
                       {t(item.labelKey)}
@@ -144,25 +144,17 @@ export function DashboardTopbar({ title }: { title: string }) {
               </nav>
             </SheetContent>
           </Sheet>
-          <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+          <h1 className="truncate text-3xl font-semibold tracking-[-0.02em] text-foreground sm:text-[2.75rem]">
+            {title}
+          </h1>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="hidden flex-col items-end sm:flex">
-            <Link
-              href="/dashboard/funding"
-              className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 hover:bg-secondary/60"
-            >
-              <WalletIcon className="size-4 text-muted-foreground" />
-              <span className="text-sm font-medium tabular-nums">
-                {balance == null ? '—' : formatUSDC(balance, locale)}
-              </span>
-            </Link>
-            <p className="mt-0.5 max-w-[220px] text-right text-[10px] leading-tight text-muted-foreground">
-              {tCustody('line')}
-            </p>
-          </div>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <span className="hidden tabular-nums text-sm font-medium text-muted-foreground sm:inline">
+            {balance == null ? '—' : formatUSDC(balance, locale)}
+          </span>
           <LanguageSwitcher compact />
+          <ThemeToggle />
           <TooltipProvider>
             {createLocked ? (
               <Tooltip>
@@ -192,13 +184,13 @@ export function DashboardTopbar({ title }: { title: string }) {
               className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={tc('accountMenu')}
             >
-              <Avatar className="size-9">
-                <AvatarFallback className="bg-navy text-navy-foreground text-xs">
+              <Avatar className="size-10">
+                <AvatarFallback className="bg-surface text-xs font-medium text-foreground dark:border dark:border-border">
                   {initials(displayName)}
                 </AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56 rounded-2xl border-border bg-popover">
               <DropdownMenuGroup>
                 <DropdownMenuLabel>
                   <div className="flex flex-col">
