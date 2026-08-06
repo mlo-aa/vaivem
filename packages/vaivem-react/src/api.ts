@@ -93,6 +93,7 @@ export class PayoutError extends Error {
   constructor(
     readonly code: PayoutFailureCode,
     message: string,
+    readonly meta: { txHash?: string; orderId?: string } = {},
   ) {
     super(message)
     this.name = "PayoutError"
@@ -182,6 +183,7 @@ export async function executePixPayout(
   throw new PayoutError(
     "stuck_funded",
     "The payout was submitted but is still processing. Check back shortly.",
+    { orderId, txHash: txHash || undefined },
   )
 }
 
@@ -201,7 +203,14 @@ export async function claimByToken(
       body: JSON.stringify(body),
     },
   )
-  const data = await res.json()
+  const data = (await res.json()) as {
+    status?: string
+    error?: string
+    message?: string
+    txHash?: string
+    orderId?: string
+    claim?: { txHash?: string | null; payoutOrderId?: string | null }
+  }
   onStep?.(3)
   if (!res.ok && res.status !== 202) {
     throw classifyHttpError(res.status, data)
@@ -210,12 +219,32 @@ export async function claimByToken(
     throw new PayoutError(
       "stuck_funded",
       data.message ?? "The payout is still processing.",
+      {
+        txHash: data.txHash
+          ? String(data.txHash)
+          : data.claim?.txHash
+            ? String(data.claim.txHash)
+            : undefined,
+        orderId: data.orderId
+          ? String(data.orderId)
+          : data.claim?.payoutOrderId
+            ? String(data.claim.payoutOrderId)
+            : undefined,
+      },
     )
   }
   onStep?.(4)
   return {
     status: String(data.status ?? "completed"),
-    txHash: data.txHash ? String(data.txHash) : undefined,
-    orderId: data.orderId ? String(data.orderId) : undefined,
+    txHash: data.txHash
+      ? String(data.txHash)
+      : data.claim?.txHash
+        ? String(data.claim.txHash)
+        : undefined,
+    orderId: data.orderId
+      ? String(data.orderId)
+      : data.claim?.payoutOrderId
+        ? String(data.claim.payoutOrderId)
+        : undefined,
   }
 }

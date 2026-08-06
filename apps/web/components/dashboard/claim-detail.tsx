@@ -208,7 +208,7 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
                 <div className="sm:col-span-2">
                   <p className="text-xs font-medium text-muted-foreground">Stellar transaction</p>
                   <a
-                    href="https://stellar.expert"
+                    href={`https://stellar.expert/explorer/testnet/tx/${claim.stellarTransactionHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-1 inline-flex items-center gap-1.5 font-mono text-sm text-info hover:underline"
@@ -216,6 +216,12 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
                     {maskStellarAddress(claim.stellarTransactionHash)}
                     <ExternalLink className="size-3.5" />
                   </a>
+                </div>
+              )}
+              {claim.withdrawalReference && (
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-medium text-muted-foreground">PIX order</p>
+                  <p className="mt-1 font-mono text-sm">{claim.withdrawalReference}</p>
                 </div>
               )}
               {claim.message && (

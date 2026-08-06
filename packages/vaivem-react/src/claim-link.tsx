@@ -177,7 +177,12 @@ export function ClaimLink({
     }
   }
 
-  function fail(code: PayoutFailureCode, message: string) {
+  function fail(
+    code: PayoutFailureCode,
+    message: string,
+    meta?: { txHash?: string; orderId?: string },
+  ) {
+    if (meta?.txHash) setTxHash(meta.txHash)
     setFailure({ code, message })
     setStage("failed")
     onStatus?.("failed")
@@ -218,7 +223,7 @@ export function ClaimLink({
       onClaimed?.({ txHash: result.txHash, status: "completed" })
     } catch (err) {
       if (err instanceof PayoutError) {
-        fail(err.code, err.message)
+        fail(err.code, err.message, err.meta)
       } else {
         fail("network", err instanceof Error ? err.message : pt ? "Não foi possível receber." : "Claim failed")
       }
@@ -362,7 +367,6 @@ export function ClaimLink({
           accessCode={requiresCode ? entered : undefined}
           onStatus={onStatus}
           onPaid={(info) => onClaimed?.({ txHash: info.txHash, status: info.status })}
-          onFailed={(info) => fail(info.code, info.message)}
         />
       ) : null}
 
@@ -377,14 +381,21 @@ export function ClaimLink({
         <div className="vv-card">
           <h2 className="vv-title">{pt ? "Dinheiro enviado!" : "Money on the way!"}</h2>
           <p className="vv-desc">
-            {pt ? `${formatUSDC(amount)} foi enviado para sua carteira digital.` : `${formatUSDC(amount)} is being sent to your digital wallet.`}
+            {pt
+              ? `${formatUSDC(amount)} foi enviado para sua carteira digital.`
+              : `${formatUSDC(amount)} is being sent to your digital wallet.`}
           </p>
           {txHash ? (
             <div className="vv-row">
-              <span className="vv-muted">{pt ? "Comprovante digital" : "Transaction"}</span>
-              <span className="vv-mono" style={{ fontSize: 11 }}>
-                {txHash.slice(0, 12)}…
-              </span>
+              <span className="vv-muted">{pt ? "Transação Stellar" : "Stellar transaction"}</span>
+              <a
+                className="vv-mono vv-receipt-link"
+                href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {txHash.slice(0, 8)}…{txHash.slice(-8)}
+              </a>
             </div>
           ) : null}
         </div>
@@ -401,6 +412,19 @@ export function ClaimLink({
             </p>
             {!pt ? <p className="vv-error" style={{ marginTop: 8 }}>{failure.message}</p> : null}
           </div>
+          {txHash ? (
+            <div className="vv-row">
+              <span className="vv-muted">{pt ? "Transação Stellar" : "Stellar transaction"}</span>
+              <a
+                className="vv-mono vv-receipt-link"
+                href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {txHash.slice(0, 8)}…{txHash.slice(-8)}
+              </a>
+            </div>
+          ) : null}
           <button type="button" className="vv-btn" onClick={() => setStage("choose")}>
             {(pt ? FAILURE_COPY_PT : FAILURE_COPY)[failure.code].action}
           </button>

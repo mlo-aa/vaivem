@@ -357,6 +357,19 @@
   padding: 0;
 }
 
+.vv-receipt-link {
+  font-size: 12px;
+  color: var(--vv-fg);
+  text-align: right;
+  word-break: break-all;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.vv-receipt-link:hover {
+  color: var(--vv-brand);
+}
+
 .vv-disclosure {
   border-radius: 8px;
 }

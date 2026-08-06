@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Check, Copy, Mail, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,9 +12,25 @@ import {
 } from '@/components/ui/input-group'
 import { toast } from 'sonner'
 
+/**
+ * Builds the absolute claim URL recipients open.
+ *
+ * Wrong previously: hardcoded `https://vaivem.app/br/{token}` — that path never
+ * existed in this app (`/claim/{token}` is the real route), so shared links and
+ * QR codes pointed at a dead URL even when the token in the store was valid.
+ */
+export function claimShareUrl(token: string): string {
+  const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')
+  const fromWindow =
+    typeof window !== 'undefined' ? window.location.origin.replace(/\/$/, '') : ''
+  const base = fromEnv || fromWindow
+  return `${base}/claim/${encodeURIComponent(token)}`
+}
+
 export function SharePanel({ token, amountLabel }: { token: string; amountLabel: string }) {
   const [copied, setCopied] = useState(false)
-  const url = `https://vaivem.app/br/${token}`
+  // Recompute on the client so we pick up window.location.origin when env is unset.
+  const url = useMemo(() => claimShareUrl(token), [token])
 
   async function copy() {
     try {

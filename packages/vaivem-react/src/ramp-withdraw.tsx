@@ -246,7 +246,13 @@ export function RampWithdraw({
     }
   }
 
-  function fail(code: PayoutFailureCode, message: string) {
+  function fail(
+    code: PayoutFailureCode,
+    message: string,
+    meta?: { txHash?: string; orderId?: string },
+  ) {
+    if (meta?.txHash) setTxHash(meta.txHash)
+    if (meta?.orderId) setReference(meta.orderId)
     setFailure({ code, message })
     setStage("failed")
     onStatus?.("failed")
@@ -295,7 +301,7 @@ export function RampWithdraw({
 
       const payout = await executePixPayout(amount, apiBaseUrl, (s) => setProcessStep(s))
       setReference(payout.orderId)
-      setTxHash(payout.txHash)
+      if (payout.txHash) setTxHash(payout.txHash)
       setStage("done")
       onStatus?.("completed")
       onPaid?.({
@@ -306,7 +312,7 @@ export function RampWithdraw({
       })
     } catch (err) {
       if (err instanceof PayoutError) {
-        fail(err.code, err.message)
+        fail(err.code, err.message, err.meta)
       } else {
         fail("network", err instanceof Error ? err.message : "Payout failed")
       }
@@ -572,16 +578,23 @@ export function RampWithdraw({
           </div>
           {reference ? (
             <div className="vv-row">
-              <span className="vv-muted">{pt ? "Referência" : "Reference"}</span>
-              <span className="vv-mono">{reference}</span>
+              <span className="vv-muted">{pt ? "Pedido PIX" : "PIX order"}</span>
+              <span className="vv-mono" style={{ fontSize: 12, wordBreak: "break-all", textAlign: "right" }}>
+                {reference}
+              </span>
             </div>
           ) : null}
           {txHash ? (
             <div className="vv-row">
-              <span className="vv-muted">{pt ? "Comprovante digital" : "Transaction"}</span>
-              <span className="vv-mono" style={{ fontSize: 11 }}>
-                {txHash.slice(0, 12)}…
-              </span>
+              <span className="vv-muted">{pt ? "Transação Stellar" : "Stellar transaction"}</span>
+              <a
+                className="vv-mono vv-receipt-link"
+                href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {txHash.slice(0, 8)}…{txHash.slice(-8)}
+              </a>
             </div>
           ) : null}
         </div>
@@ -598,6 +611,27 @@ export function RampWithdraw({
             </p>
             {!pt ? <p className="vv-error" style={{ marginTop: 8 }}>{failure.message}</p> : null}
           </div>
+          {reference ? (
+            <div className="vv-row">
+              <span className="vv-muted">{pt ? "Pedido PIX" : "PIX order"}</span>
+              <span className="vv-mono" style={{ fontSize: 12, wordBreak: "break-all", textAlign: "right" }}>
+                {reference}
+              </span>
+            </div>
+          ) : null}
+          {txHash ? (
+            <div className="vv-row">
+              <span className="vv-muted">{pt ? "Transação Stellar" : "Stellar transaction"}</span>
+              <a
+                className="vv-mono vv-receipt-link"
+                href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {txHash.slice(0, 8)}…{txHash.slice(-8)}
+              </a>
+            </div>
+          ) : null}
           <button
             type="button"
             className="vv-btn"
