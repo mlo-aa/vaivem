@@ -390,6 +390,48 @@ export async function claimBalance(
 }
 
 /**
+ * Move USDC from a 0-XLM sponsored recipient account back to the sponsor
+ * (fee-bumped). Used when a PIX claim consumed the claimable balance but the
+ * off-ramp failed before settlement — so we can recreate escrow.
+ */
+export async function returnSponsoredUsdcToSponsor(
+  recipientSecret: string,
+  amount: string,
+): Promise<{ hash: string }> {
+  const sponsor = getSponsorKeypair()
+  const recipient = Keypair.fromSecret(recipientSecret)
+  const USDC = getUsdcAsset()
+  const server = getServer()
+
+  const acc = await server.loadAccount(recipient.publicKey())
+  const inner = new TransactionBuilder(acc, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(
+      Operation.payment({
+        destination: sponsor.publicKey(),
+        asset: USDC,
+        amount: String(amount),
+      }),
+    )
+    .setTimeout(120)
+    .build()
+  inner.sign(recipient)
+
+  const bump = TransactionBuilder.buildFeeBumpTransaction(
+    sponsor,
+    (Number(BASE_FEE) * 2).toString(),
+    inner,
+    NETWORK_PASSPHRASE,
+  )
+  bump.sign(sponsor)
+
+  const res = await submitTransaction(bump, "returnSponsoredUsdcToSponsor")
+  return { hash: res.hash }
+}
+
+/**
  * Non-custodial Stellar path: claim the claimable balance and immediately
  * forward USDC to the recipient's own address in the same fee-bumped tx.
  * After this, delete the hosted secret — we must not retain a key that

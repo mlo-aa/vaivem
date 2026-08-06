@@ -1,7 +1,6 @@
 /**
  * Reconcile pending on-ramp deposits against Etherfuse.
- * Survives page navigation, dev restarts (file store), and lost pending rows
- * by syncing completed org on-ramps from GET /ramp/orders.
+ * Only reconciles orders that already have a pending deposit row for this owner.
  */
 
 import "server-only"
@@ -37,11 +36,6 @@ function usdcFromOrder(order: RampOrderListItem | { amountInTokens?: unknown }):
   return roundUsdc(Number(raw))
 }
 
-function fiatCurrency(raw: unknown): "MXN" | "BRL" {
-  const c = String(raw ?? "MXN").toUpperCase()
-  return c === "BRL" ? "BRL" : "MXN"
-}
-
 function isOnrampOrder(order: RampOrderListItem): boolean {
   const type = String(order.orderType ?? "").toLowerCase()
   if (type.includes("onramp") || type.includes("on_ramp")) return true
@@ -50,8 +44,9 @@ function isOnrampOrder(order: RampOrderListItem): boolean {
 }
 
 /**
- * Pull org on-ramps from Etherfuse and recover rows lost when pending storage
- * was in-memory only. Completed orders credit the active owner once (demo org).
+ * Sync status for this owner's pending on-ramps against Etherfuse.
+ * Never attributes unknown org-level orders to the current user — only
+ * reconcile orders we already have a pending deposit record for.
  */
 export async function syncProviderOnrampsForOwner(ownerId: string): Promise<void> {
   let orders: RampOrderListItem[] = []
@@ -75,28 +70,20 @@ export async function syncProviderOnrampsForOwner(ownerId: string): Promise<void
     const orderId = order.orderId
     if (!orderId || creditedHere.has(orderId)) continue
 
-    const status = normalizeStatus(order.status)
-    const usdcAmount = usdcFromOrder(order)
     const existing = await getPendingDeposit(orderId)
+    // Skip orphans: completed org orders without our pending row must not
+    // credit whoever happens to load the balance page.
+    if (!existing || existing.ownerId !== ownerId) continue
+
     const globallyCredited = await isDepositCreditedGlobally(orderId)
     if (globallyCredited) continue
 
+    const status = normalizeStatus(order.status)
+    const usdcAmount = usdcFromOrder(order)
+
     if (status === "completed") {
-      const amount = usdcAmount || existing?.usdcAmount || 0
+      const amount = usdcAmount || existing.usdcAmount || 0
       if (amount <= 0) continue
-      if (!existing) {
-        await upsertPendingDeposit({
-          orderId,
-          ownerId,
-          currency: fiatCurrency(order.sourceAsset),
-          fiatAmount: Number(order.amountInFiat ?? 0) || 0,
-          usdcAmount: amount,
-          createdAt: order.createdAt ?? new Date().toISOString(),
-          credited: false,
-        })
-      } else if (existing.ownerId !== ownerId) {
-        continue
-      }
       await creditDeposit(ownerId, amount, orderId)
       await removePendingDeposit(orderId, ownerId)
       creditedHere.add(orderId)
@@ -104,15 +91,11 @@ export async function syncProviderOnrampsForOwner(ownerId: string): Promise<void
     }
 
     if (status === "failed" || status === "cancelled") {
-      if (existing?.ownerId === ownerId) {
-        await removePendingDeposit(orderId, ownerId)
-      }
+      await removePendingDeposit(orderId, ownerId)
       continue
     }
 
-    if (existing?.ownerId !== ownerId) continue
-
-    if (usdcAmount > 0 && existing && existing.usdcAmount !== usdcAmount) {
+    if (usdcAmount > 0 && existing.usdcAmount !== usdcAmount) {
       await upsertPendingDeposit({ ...existing, usdcAmount })
     }
   }

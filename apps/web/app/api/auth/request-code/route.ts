@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       ok: true,
       email,
       expiresInSeconds: 600,
-      ...(devMode
+      ...(devMode && process.env.NODE_ENV !== "production"
         ? { devMode: true as const, code: created.code }
         : { devMode: false as const }),
     })

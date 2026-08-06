@@ -1,24 +1,31 @@
 /**
  * POST /api/claims/by-token/[token]/claim
  *
- * rail=pix  → claim CB, then Etherfuse offramp from sponsor (after reclaim path)
- *             Actually: claim CB then payAnchor via existing payout helpers using
- *             sponsor after consolidating — see body.
+ * rail=pix  → quote + off-ramp order FIRST, then claim CB, then payAnchor.
+ *             If the provider fails before claim, the escrow CB stays intact.
+ *             If payout fails after claim, USDC returns to sponsor and we
+ *             recreate the claimable balance so the link stays claimable.
  * rail=stellar → claimAndForward to recipient's own address (non-custodial).
  *
- * Body: { rail, accessCode?, walletAddress?, amount? }
+ * Body: { rail, accessCode?, walletAddress? }
  */
 
 import { NextResponse } from "next/server"
 import {
   claimAndForward,
   claimBalance,
+  createClaimableBalance,
   getSponsorPublicKey,
   payAnchor,
+  returnSponsoredUsdcToSponsor,
   StellarError,
 } from "@/lib/server/stellar"
 import { recipientSecretsByBalanceId } from "@/lib/server/claim-secrets"
-import { getStoredClaim, updateStoredClaim } from "@/lib/server/claim-store"
+import {
+  getStoredClaim,
+  updateStoredClaim,
+  type StoredClaim,
+} from "@/lib/server/claim-store"
 import {
   createOrder,
   createQuote,
@@ -35,6 +42,17 @@ const POLL_TIMEOUT_MS = 90_000
 
 function classifyError(message: string): { code: string; message: string } {
   const m = message.toLowerCase()
+  if (
+    m.includes("failedtogetquote") ||
+    m.includes("etherfuse 424") ||
+    m.includes("provider_rejected")
+  ) {
+    return {
+      code: "provider_rejected",
+      message:
+        "The payment provider could not quote this payout right now. Try again later or keep the USDC on Stellar.",
+    }
+  }
   if (m.includes("op_does_not_exist") || m.includes("not found")) {
     return {
       code: "already_claimed",
@@ -80,6 +98,40 @@ async function pollOrder(orderId: string): Promise<{ status: string }> {
     await new Promise((r) => setTimeout(r, POLL_MS))
   }
   return { status: "stuck_funded" }
+}
+
+/**
+ * After claimBalance consumed the CB but the off-ramp did not settle,
+ * return USDC to the sponsor and recreate escrow so the link stays claimable.
+ */
+async function restoreEscrowAfterFailedPayout(
+  claim: StoredClaim,
+  secret: string,
+): Promise<StoredClaim> {
+  const amount = claim.amount.toFixed(2)
+  await returnSponsoredUsdcToSponsor(secret, amount)
+
+  const remaining = Math.max(60, claim.deadline - Math.floor(Date.now() / 1000))
+  const { balanceId, deadline } = await createClaimableBalance(
+    claim.recipientPublicKey,
+    amount,
+    remaining,
+  )
+
+  await recipientSecretsByBalanceId.delete(claim.balanceId)
+  await recipientSecretsByBalanceId.set(balanceId, secret, deadline)
+
+  const updated = await updateStoredClaim(claim.token, {
+    balanceId,
+    deadline,
+    expiresAt: new Date(deadline * 1000).toISOString(),
+    status: "shared",
+    payoutMethod: null,
+    payoutOrderId: null,
+    txHash: null,
+    claimedAt: null,
+  })
+  return updated ?? { ...claim, balanceId, deadline, status: "shared" }
 }
 
 export async function POST(
@@ -147,6 +199,9 @@ export async function POST(
 
   await updateStoredClaim(token, { status: "cashing_out" })
 
+  /** True only after claimBalance succeeds — triggers escrow restore on failure. */
+  let escrowClaimed = false
+
   try {
     if (rail === "stellar") {
       const wallet = String(body.walletAddress ?? "").trim()
@@ -179,23 +234,7 @@ export async function POST(
       })
     }
 
-    // PIX: claim escrow to sponsored account, return USDC to sponsor via
-    // refund path is not available before deadline — instead claim then
-    // pay Etherfuse from sponsor (sponsor funded CB; for sandbox we pay
-    // offramp from sponsor and leave sponsored account with claimed USDC
-    // as accounting residue) OR claim CB and payAnchor from sponsor after
-    // sponsor already locked funds in CB.
-    //
-    // Correct spend-once path: claim CB, then run offramp paying from sponsor
-    // only if we first move funds back. Practical sandbox path used here:
-    // 1) claimBalance (recipient holds USDC)
-    // 2) create quote+order with sponsor publicKey and payAnchor from sponsor
-    //    (requires sponsor still holds liquid USDC — same as verified spike
-    //    when CB amount is small / sponsor pre-funded). Mark complete after poll.
-    //
-    // Prefer: claim then pay from sponsor using existing payAnchor (verified).
-    await claimBalance(claim.balanceId, secret)
-
+    // PIX: provider quote + order BEFORE touching the claimable balance.
     const bankAccountId = requireBankAccountId()
     const sourceAsset = getUsdcAssetId()
     const publicKey = getSponsorPublicKey()
@@ -214,6 +253,11 @@ export async function POST(
       useAnchor: true,
     })
     const { orderId, withdrawAnchorAccount, withdrawMemo } = order.offramp
+
+    // Anchor destination is ready — now claim the escrow.
+    await claimBalance(claim.balanceId, secret)
+    escrowClaimed = true
+
     const { hash } = await payAnchor(
       withdrawAnchorAccount,
       withdrawMemo,
@@ -222,6 +266,7 @@ export async function POST(
 
     const polled = await pollOrder(orderId)
     if (polled.status === "stuck_funded") {
+      // Anchor payment submitted; do not pretend the link is still claimable.
       await updateStoredClaim(token, {
         status: "cashing_out",
         payoutMethod: "pix",
@@ -241,7 +286,13 @@ export async function POST(
       )
     }
     if (polled.status === "failed") {
-      await updateStoredClaim(token, { status: "shared", payoutOrderId: orderId })
+      // Sponsor already paid the anchor — leave residue accounting; mark unavailable.
+      await updateStoredClaim(token, {
+        status: "cashing_out",
+        payoutMethod: "pix",
+        payoutOrderId: orderId,
+        txHash: hash,
+      })
       return NextResponse.json(
         {
           error: "anchor_rejected",
@@ -270,7 +321,6 @@ export async function POST(
       claim: updated,
     })
   } catch (err) {
-    await updateStoredClaim(token, { status: claim.status })
     const raw =
       err instanceof EtherfuseError || err instanceof StellarError
         ? err.message
@@ -279,6 +329,31 @@ export async function POST(
           : "unknown error"
     const classified = classifyError(raw)
     console.error("[claims/claim] failed:", raw)
+
+    if (escrowClaimed) {
+      try {
+        await restoreEscrowAfterFailedPayout(claim, secret)
+      } catch (restoreErr) {
+        console.error(
+          "[claims/claim] escrow restore failed:",
+          restoreErr instanceof Error ? restoreErr.message : restoreErr,
+        )
+        // Never leave status as claimable without a CB.
+        await updateStoredClaim(token, { status: "cashing_out" })
+        return NextResponse.json(
+          {
+            error: "payout_failed",
+            message:
+              "The payout failed and escrow could not be restored automatically. Contact the sender.",
+            detail: raw,
+          },
+          { status: 502 },
+        )
+      }
+    } else {
+      await updateStoredClaim(token, { status: "shared" })
+    }
+
     return NextResponse.json(
       { error: classified.code, message: classified.message, detail: raw },
       { status: 502 },

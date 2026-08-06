@@ -1,37 +1,40 @@
-import Link from 'next/link'
-import { Logo } from '@/components/logo'
+'use client'
 
-const COLUMNS = [
-  {
-    title: 'Product',
-    links: [
-      { label: 'How it works', href: '/#how-it-works' },
-      { label: 'Use cases', href: '/#use-cases' },
-      { label: 'Demo claim', href: '/claim/demo-active' },
-      { label: 'Dashboard', href: '/dashboard' },
-    ],
-  },
-  {
-    title: 'Developers',
-    links: [
-      { label: 'Documentation', href: '/developers' },
-      { label: 'API reference', href: '/developers' },
-      { label: 'Webhooks', href: '/developers' },
-      { label: 'Status', href: '/developers' },
-    ],
-  },
-  {
-    title: 'Company',
-    links: [
-      { label: 'About', href: '/' },
-      { label: 'Security', href: '/#security' },
-      { label: 'Privacy', href: '/' },
-      { label: 'Terms', href: '/' },
-    ],
-  },
-]
+import { useTranslations } from 'next-intl'
+import { Logo } from '@/components/logo'
+import { Link } from '@/i18n/navigation'
 
 export function MarketingFooter() {
+  const t = useTranslations('landing')
+  const year = new Date().getFullYear()
+
+  const columns = [
+    {
+      title: t('footerProduct'),
+      links: [
+        { label: t('footerHow'), href: '/#how-it-works' as const },
+        { label: t('footerProblem'), href: '/#problem' as const },
+        { label: t('footerProof'), href: '/#proof' as const },
+        { label: t('footerDashboard'), href: '/dashboard' as const },
+      ],
+    },
+    {
+      title: t('footerDevelopers'),
+      links: [
+        { label: t('footerDocs'), href: '/developers' as const },
+        { label: t('footerApi'), href: '/developers' as const },
+      ],
+    },
+    {
+      title: t('footerCompany'),
+      links: [
+        { label: t('footerAbout'), href: '/' as const },
+        { label: t('footerPrivacy'), href: '/' as const },
+        { label: t('footerTerms'), href: '/' as const },
+      ],
+    },
+  ]
+
   return (
     <footer className="border-t border-border bg-background">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-8">
@@ -39,11 +42,10 @@ export function MarketingFooter() {
           <div className="max-w-xs">
             <Logo />
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              Walletless USDC payouts on Stellar, with local cash-out through rails like PIX. Built
-              for Latin America.
+              {t('footerBlurb')}
             </p>
           </div>
-          {COLUMNS.map((col) => (
+          {columns.map((col) => (
             <div key={col.title}>
               <h3 className="text-sm font-semibold">{col.title}</h3>
               <ul className="mt-4 flex flex-col gap-3">
@@ -62,8 +64,8 @@ export function MarketingFooter() {
           ))}
         </div>
         <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-border pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center">
-          <p>© {new Date().getFullYear()} Vaivém. Not a bank. USDC is issued by Circle.</p>
-          <p>Powered by Stellar</p>
+          <p>{t('footerLegal', { year })}</p>
+          <p>{t('footerPowered')}</p>
         </div>
       </div>
     </footer>

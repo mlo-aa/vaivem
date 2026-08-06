@@ -13,6 +13,10 @@ Verified against Etherfuse sandbox and Stellar testnet. Source scripts: `spike/s
 - The mock fallback is for **provider outages only** (5xx, timeout, network). A 4xx is returned to the client with the upstream status, because the provider is up and the request is what is wrong — reporting it as "live provider unavailable" would be false.
 - In `/api/payouts/pix` the fallback is additionally scoped **by phase**: config and quote may degrade to a mock (nothing has moved yet), while an order or anchor-payment failure is always reported. A 200 after a failed payment shows "Money on the way!" to someone who received nothing.
 
+### BRL off-ramp (USDC → PIX)
+
+- **2026-08-06:** `POST /ramp/quote` with `type: "offramp"`, `targetAsset: "BRL"` returned HTTP **424** `FailedToGetQuote` for every amount tested (≥1 USDC). MXN off-ramp quotes on the same org still returned 200. Product claim PIX path must not consume the Stellar claimable balance until a quote+order succeeds.
+
 ### BRL on-ramp (fiat → USDC, funding)
 
 - **2026-08-05:** `POST /ramp/quote` with `type: "onramp"`, `sourceAsset: "BRL"`, `targetAsset: USDC:GBBD47…` returned HTTP **424** `FailedToGetQuote` for every amount tested on our sandbox org. The app correctly blocked BRL funding with an explicit message rather than failing silently.

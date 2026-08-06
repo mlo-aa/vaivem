@@ -61,11 +61,7 @@ function Hero() {
       />
       <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 sm:px-8 lg:grid-cols-2 lg:gap-14 lg:py-22">
         <FadeIn>
-          <span className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1 text-xs font-medium text-muted-foreground dark:border dark:border-border">
-            <span className="size-1.5 rounded-full bg-primary" />
-            {t('heroEyebrow')}
-          </span>
-          <h1 className="mt-5 text-balance text-4xl font-semibold leading-[1.05] tracking-[-0.02em] sm:text-5xl lg:text-6xl">
+          <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-[-0.02em] sm:text-5xl lg:text-6xl">
             {t('heroTitle')}
           </h1>
           <p className="mt-5 max-w-md text-pretty text-[15px] leading-relaxed text-muted-foreground sm:text-lg">
@@ -369,8 +365,8 @@ function Proof() {
   const corridors = [
     { rail: t('corridorBrlOn'), status: t('corridorLive') },
     { rail: t('corridorMxnOn'), status: t('corridorLive') },
-    { rail: t('corridorBrlOff'), status: t('corridorLive') },
-    { rail: t('corridorMxnOff'), status: t('corridorLive') },
+    { rail: t('corridorBrlOff'), status: t('corridorDown') },
+    { rail: t('corridorMxnOff'), status: t('corridorSoon') },
   ]
 
   return (
@@ -429,6 +425,9 @@ function Proof() {
               </div>
             ))}
           </div>
+          <p className="mt-4 max-w-3xl text-pretty text-sm leading-relaxed text-muted-foreground">
+            {t('corridorNote')}
+          </p>
         </FadeIn>
       </div>
     </section>

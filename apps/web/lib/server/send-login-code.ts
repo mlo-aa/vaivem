@@ -10,6 +10,11 @@ export async function sendLoginCode(
   const from = process.env.EMAIL_FROM || "Vaivém <onboarding@resend.dev>"
 
   if (!apiKey) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "Email delivery is not configured (RESEND_API_KEY). Cannot send login codes in production.",
+      )
+    }
     console.log(
       `\n========== VAIVÉM DEV LOGIN CODE ==========\n` +
         `email: ${email}\n` +
