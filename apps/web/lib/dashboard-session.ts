@@ -12,12 +12,27 @@ export interface SessionPayload {
   exp: number
 }
 
+type GlobalAuth = typeof globalThis & { __vaivemAuthSecret?: string }
+
 function getSecret(): string {
-  return (
-    process.env.AUTH_SECRET ||
-    process.env.RESEND_API_KEY ||
-    "vaivem-dev-auth-secret"
-  )
+  const fromEnv = process.env.AUTH_SECRET
+  if (fromEnv && fromEnv.length > 0) return fromEnv
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[auth] AUTH_SECRET is required in production. Set it in the environment before starting the server.",
+    )
+  }
+
+  const g = globalThis as GlobalAuth
+  if (!g.__vaivemAuthSecret) {
+    g.__vaivemAuthSecret = `${crypto.randomUUID()}${crypto.randomUUID()}`
+    console.warn(
+      "[auth] AUTH_SECRET is unset. Using an ephemeral per-process secret. " +
+        "Set AUTH_SECRET in apps/web/.env.local so Edge middleware and Node API routes share the same signing key.",
+    )
+  }
+  return g.__vaivemAuthSecret
 }
 
 function bytesToBase64Url(bytes: ArrayBuffer | Uint8Array): string {

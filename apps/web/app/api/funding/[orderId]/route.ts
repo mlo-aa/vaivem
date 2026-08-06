@@ -1,16 +1,13 @@
 /**
  * GET /api/funding/[orderId]
- * Poll Etherfuse on-ramp; credit the sender ledger when the order completes.
+ * Reconcile one on-ramp against Etherfuse; credit ledger when completed.
  */
 
 import { NextResponse } from "next/server"
 import { requireOwnerId } from "@/lib/server/auth-session"
-import {
-  creditDeposit,
-  getPendingDeposit,
-  markPendingCredited,
-} from "@/lib/server/balance-store"
-import { EtherfuseError, getOrder } from "@/lib/server/etherfuse"
+import { getPendingDeposit } from "@/lib/server/balance-store"
+import { EtherfuseError } from "@/lib/server/etherfuse"
+import { reconcileOneDeposit } from "@/lib/server/reconcile-funding"
 
 export const dynamic = "force-dynamic"
 
@@ -29,63 +26,31 @@ export async function GET(
   }
 
   const pending = await getPendingDeposit(orderId)
-  if (!pending) {
-    return NextResponse.json({ error: "Deposit not found" }, { status: 404 })
-  }
-  if (pending.ownerId !== who.ownerId) {
+  if (!pending || pending.ownerId !== who.ownerId) {
+    // Still try reconcile in case the row was already credited/removed.
     return NextResponse.json({ error: "Deposit not found" }, { status: 404 })
   }
 
   try {
-    const order = await getOrder(orderId)
-    const status = String(order.status ?? "").toLowerCase()
-
-    if (status === "completed" && !pending.credited) {
-      await creditDeposit(pending.ownerId, pending.usdcAmount, orderId)
-      await markPendingCredited(orderId)
-      return NextResponse.json({
-        orderId,
-        status: "completed",
-        credited: true,
-        usdcAmount: pending.usdcAmount,
-        currency: pending.currency,
-        fiatAmount: pending.fiatAmount,
-      })
+    const row = await reconcileOneDeposit(orderId, who.ownerId)
+    if (!row) {
+      return NextResponse.json({ error: "Deposit not found" }, { status: 404 })
     }
-
-    if (status === "completed" && pending.credited) {
-      return NextResponse.json({
-        orderId,
-        status: "completed",
-        credited: true,
-        usdcAmount: pending.usdcAmount,
-        currency: pending.currency,
-        fiatAmount: pending.fiatAmount,
-      })
-    }
-
-    if (status === "failed" || status === "cancelled") {
-      return NextResponse.json({
-        orderId,
-        status,
-        credited: false,
-        usdcAmount: pending.usdcAmount,
-        currency: pending.currency,
-        fiatAmount: pending.fiatAmount,
-      })
-    }
-
     return NextResponse.json({
-      orderId,
-      status: status || "pending",
-      credited: false,
-      usdcAmount: pending.usdcAmount,
-      currency: pending.currency,
-      fiatAmount: pending.fiatAmount,
+      orderId: row.orderId,
+      status: row.status,
+      credited: row.credited || row.status === "completed",
+      usdcAmount: row.usdcAmount,
+      currency: row.currency,
+      fiatAmount: row.fiatAmount,
     })
   } catch (err) {
     const message =
-      err instanceof EtherfuseError ? err.message : err instanceof Error ? err.message : "error"
+      err instanceof EtherfuseError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : "error"
     console.error("[funding/poll]", message)
     return NextResponse.json({ error: message }, { status: 502 })
   }

@@ -126,23 +126,6 @@ export async function getStoredClaim(token: string): Promise<StoredClaim | null>
   return { ...raw, ownerId: raw.ownerId ?? "" }
 }
 
-export async function listStoredClaims(): Promise<StoredClaim[]> {
-  if (kvConfigured()) {
-    const tokens = (await kv.smembers(INDEX_KEY)) as string[]
-    const claims: StoredClaim[] = []
-    for (const t of tokens ?? []) {
-      const c = await getStoredClaim(t)
-      if (c) claims.push(c)
-    }
-    return claims.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    )
-  }
-  return [...memory.values()].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  )
-}
-
 /** Claims owned by a single sender. */
 export async function listStoredClaimsByOwner(ownerId: string): Promise<StoredClaim[]> {
   if (!ownerId) return []

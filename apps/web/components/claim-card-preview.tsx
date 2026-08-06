@@ -33,7 +33,7 @@ export function ClaimCardPreview({ className }: { className?: string }) {
       <div className="mt-6 rounded-2xl bg-secondary p-4">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">From</span>
-          <span className="font-medium">Brazil Builders Hackathon</span>
+          <span className="font-medium">Acme Payments</span>
         </div>
         <div className="mt-2 flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Network</span>

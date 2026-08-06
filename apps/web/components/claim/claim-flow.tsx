@@ -34,6 +34,7 @@ export function ClaimFlow({ claim }: { claim: PublicClaimView }) {
       claimToken={claim.token}
       requiresCode={claim.requiresCode || claim.protectionType === "code"}
       showDemoCodeHint={demoMode && claim.protectionType === "code"}
+      demoMode={demoMode}
       apiBaseUrl=""
       onStatus={(status) => {
         // Status mapping: cashing_out while polling; completed only on success.

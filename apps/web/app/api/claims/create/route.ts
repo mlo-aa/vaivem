@@ -35,9 +35,8 @@ export async function POST(req: Request) {
     const body = await req.json()
     const amount = Number(body.amount)
     const country = String(body.country ?? "BR")
-    const senderName = String(
-      body.senderName ?? who.name ?? who.email ?? "Vaivém sender",
-    )
+    // Never trust client-supplied senderName for branding — use the session.
+    const senderName = who.name?.trim() || who.email || "Vaivém sender"
     const recipientName = String(body.recipientName ?? "")
     const recipientEmail =
       body.recipientEmail != null ? String(body.recipientEmail) : null
@@ -174,6 +173,8 @@ export async function POST(req: Request) {
       balanceId,
       hash,
       amount,
+      ownerId: who.ownerId,
+      senderName,
     })
   } catch (err) {
     const message =

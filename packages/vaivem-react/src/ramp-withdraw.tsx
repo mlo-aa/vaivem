@@ -33,6 +33,12 @@ export type RampWithdrawProps = {
   accessCode?: string
   /** Standalone ramp defaults to English; ClaimLink passes pt-BR. */
   locale?: "pt-BR" | "en"
+  /**
+   * When true, show the simulated KYC step (format-only CPF/CNPJ check).
+   * When false/undefined, skip KYC and go straight to the PIX form.
+   * Host should pass NEXT_PUBLIC_DEMO_MODE === "true".
+   */
+  demoMode?: boolean
 }
 
 const PIX_KEY_LABEL: Record<PixKeyType, string> = {
@@ -161,14 +167,17 @@ export function RampWithdraw({
   claimToken,
   accessCode,
   locale = "en",
+  demoMode = false,
 }: RampWithdrawProps) {
-  const [stage, setStage] = useState<Stage>("kyc")
+  const [stage, setStage] = useState<Stage>(demoMode ? "kyc" : "cashout")
   const [error, setError] = useState<string | null>(null)
   const [failure, setFailure] = useState<{ code: PayoutFailureCode; message: string } | null>(
     null,
   )
 
-  const [kycStatus, setKycStatus] = useState<KycStatus>("not_started")
+  const [kycStatus, setKycStatus] = useState<KycStatus>(
+    demoMode ? "not_started" : "approved",
+  )
   const [kycName, setKycName] = useState("")
   const [kycTaxId, setKycTaxId] = useState("")
   const [kycDob, setKycDob] = useState("")
@@ -191,7 +200,7 @@ export function RampWithdraw({
     country,
     {
       apiBaseUrl,
-      enabled: quoteEnabled && kycStatus === "approved" && !belowMinimum,
+      enabled: quoteEnabled && (!demoMode || kycStatus === "approved") && !belowMinimum,
     },
   )
 
@@ -326,19 +335,19 @@ export function RampWithdraw({
 
   return (
     <div className="vv-kit">
-      {stage === "kyc" ? (
+      {stage === "kyc" && demoMode ? (
         <div className="vv-card">
           <div>
             <div className="vv-heading-row">
               <h2 className="vv-title">
-                {pt ? "Validação para demonstração" : "Demo verification"}
+                {pt ? "Verificação simulada" : "Simulated verification"}
               </h2>
-              <span className="vv-demo-badge">{pt ? "DEMO" : "DEMO"}</span>
+              <span className="vv-demo-badge">DEMO</span>
             </div>
             <p className="vv-desc">
               {pt
-                ? "Nesta versão, validamos apenas o formato do CPF ou CNPJ. Não é uma consulta a bases oficiais."
-                : "This version only validates the CPF/CNPJ format. It does not check an official registry."}
+                ? "Nenhuma verificação de identidade real acontece. Só checamos se o CPF/CNPJ tem o número certo de dígitos."
+                : "No real identity check happens. We only check that the CPF/CNPJ has the right number of digits."}
             </p>
           </div>
           {kycSubmitting ? (
@@ -377,7 +386,9 @@ export function RampWithdraw({
                   inputMode="numeric"
                 />
                 <span className="vv-hint">
-                  {pt ? "Pessoa física usa CPF; empresa usa CNPJ." : "Individuals use CPF; businesses use CNPJ."}
+                  {pt
+                    ? "Simulação: qualquer CPF de 11 dígitos (não zero) passa."
+                    : "Simulation: any non-zero 11-digit CPF passes."}
                 </span>
               </div>
               <div className="vv-field">
@@ -403,7 +414,7 @@ export function RampWithdraw({
               onClick={handleSubmitKyc}
               disabled={belowMinimum}
             >
-              {pt ? "Validar e continuar" : "Verify and continue"}
+              {pt ? "Continuar (simulado)" : "Continue (simulated)"}
             </button>
           ) : null}
         </div>
@@ -519,15 +530,18 @@ export function RampWithdraw({
                   </div>
                 </details>
               </div>
-              <p className={quote.source === "mock" ? "vv-note vv-note--amber" : "vv-note"}>
-                {quote.source === "mock"
-                  ? pt
-                    ? "Cotação simulada — serviço ao vivo indisponível"
-                    : "Simulated quote — live provider unavailable"
-                  : pt
-                    ? "Cotação ao vivo no ambiente de testes"
-                    : "Live quote from Etherfuse sandbox"}
-              </p>
+              <div className="vv-heading-row" style={{ marginTop: 8 }}>
+                <p className={quote.source === "mock" ? "vv-note vv-note--amber" : "vv-note"}>
+                  {quote.source === "mock"
+                    ? pt
+                      ? "Cotação simulada — serviço ao vivo indisponível"
+                      : "Simulated quote — live provider unavailable"
+                    : pt
+                      ? "Cotação ao vivo no ambiente de testes"
+                      : "Live quote from Etherfuse sandbox"}
+                </p>
+                {quote.source === "mock" ? <span className="vv-demo-badge">DEMO</span> : null}
+              </div>
             </>
           )}
 

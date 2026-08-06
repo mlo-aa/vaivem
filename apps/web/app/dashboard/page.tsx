@@ -1,10 +1,19 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Search, Wallet } from 'lucide-react'
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
 import { ClaimsTable } from '@/components/dashboard/claims-table'
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
+import { ButtonLink } from '@/components/ui/button-link'
 import {
   InputGroup,
   InputGroupAddon,
@@ -14,11 +23,15 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Skeleton } from '@/components/ui/skeleton'
 import { listClaims } from '@/lib/services'
 import { isActiveStatus } from '@/lib/format'
+import { useSenderBalance } from '@/lib/use-sender-balance'
+import { useMemo, useState } from 'react'
 import type { Claim } from '@/lib/types'
 
 type Filter = 'all' | 'active' | 'completed' | 'refunded'
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const { balance, loading: balanceLoading, funded } = useSenderBalance()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [claims, setClaims] = useState<Claim[]>([])
@@ -41,6 +54,14 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // First-time sender: no funds and no claims → funding, not an empty claims list.
+  useEffect(() => {
+    if (loading || balanceLoading) return
+    if (claims.length === 0 && balance === 0) {
+      router.replace('/dashboard/funding')
+    }
+  }, [loading, balanceLoading, claims.length, balance, router])
+
   const filtered = useMemo(() => {
     return claims.filter((c) => {
       const matchesQuery =
@@ -59,6 +80,9 @@ export default function DashboardPage() {
       return matchesQuery && matchesFilter
     })
   }, [claims, query, filter])
+
+  const bootstrapping =
+    loading || balanceLoading || (claims.length === 0 && balance === 0)
 
   return (
     <>
@@ -89,7 +113,7 @@ export default function DashboardPage() {
           </ToggleGroup>
         </div>
 
-        {loading ? (
+        {bootstrapping ? (
           <div className="flex flex-col gap-2">
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
@@ -97,6 +121,27 @@ export default function DashboardPage() {
           </div>
         ) : filtered.length > 0 ? (
           <ClaimsTable claims={filtered} />
+        ) : claims.length === 0 ? (
+          <Empty className="rounded-xl border border-dashed border-border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                {funded ? <Search /> : <Wallet />}
+              </EmptyMedia>
+              <EmptyTitle>
+                {funded ? 'No claims yet' : 'Add funds to send a claim'}
+              </EmptyTitle>
+              <EmptyDescription>
+                {funded
+                  ? 'Create a claim to lock USDC and share a payout link.'
+                  : 'Your demo balance is empty. Fund with MXN first, then create a claim.'}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <ButtonLink href={funded ? '/dashboard/create' : '/dashboard/funding'}>
+                {funded ? 'Create claim' : 'Go to funding'}
+              </ButtonLink>
+            </EmptyContent>
+          </Empty>
         ) : (
           <Empty className="rounded-xl border border-dashed border-border">
             <EmptyHeader>

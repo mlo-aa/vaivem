@@ -30,6 +30,10 @@ export type ClaimLinkProps = {
   fiatAmount?: number
   /** When set, PIX/Stellar settle via /api/claims/by-token/[token]/claim */
   claimToken?: string
+  /**
+   * When true, RampWithdraw shows simulated KYC. Pass host NEXT_PUBLIC_DEMO_MODE.
+   */
+  demoMode?: boolean
 }
 
 type Stage = "unlock" | "choose" | "withdraw" | "stellar-processing" | "stellar-done" | "failed"
@@ -129,6 +133,7 @@ export function ClaimLink({
   locale = "pt-BR",
   fiatAmount,
   claimToken,
+  demoMode = false,
 }: ClaimLinkProps) {
   const [stage, setStage] = useState<Stage>(requiresCode ? "unlock" : "choose")
   const [entered, setEntered] = useState("")
@@ -365,6 +370,7 @@ export function ClaimLink({
           apiBaseUrl={apiBaseUrl}
           claimToken={claimToken}
           accessCode={requiresCode ? entered : undefined}
+          demoMode={demoMode}
           onStatus={onStatus}
           onPaid={(info) => onClaimed?.({ txHash: info.txHash, status: info.status })}
         />

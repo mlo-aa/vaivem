@@ -3,13 +3,12 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 /**
- * Persistent honesty badge. Rendered on any screen still backed by mock data.
- * It must not be hidden — it signals that the numbers are demo values, not
- * live API responses.
+ * Honesty badge for screens where something is actually simulated
+ * (mock quote/payout, simulated KYC). Do not mount on live dashboard hops.
  */
 export function DemoBadge({
   className,
-  label = 'Demo data',
+  label = 'Simulated',
 }: {
   className?: string
   label?: string

@@ -2,29 +2,27 @@ import type {
   Claim,
   ClaimStatus,
   DisplayCurrency,
-  KycStatus,
-  PixPayout,
-  Quote,
-  Wallet,
 } from "./types"
-import { currentOrg, currentUser } from "./mock-data"
 import { USD_TO_BRL } from "./format"
-import { isBelowMinimum, minAmountMessage } from "./limits"
-import {
-  authAdapter,
-  etherfuseAdapter,
-  randomStellarAddress,
-  randomToken,
-  randomTxHash,
-  stellarAdapter,
-} from "./adapters"
-
-export const QUOTE_TTL_MS = 120_000
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 function apiBase() {
   return process.env.NEXT_PUBLIC_VAIVEM_API_BASE ?? ""
+}
+
+function randomTxHash(): string {
+  const chars = "abcdef0123456789"
+  return Array.from({ length: 64 }, () =>
+    chars[Math.floor(Math.random() * chars.length)],
+  ).join("")
+}
+
+function randomToken(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+  return Array.from({ length: 6 }, () =>
+    chars[Math.floor(Math.random() * chars.length)],
+  ).join("")
 }
 
 export interface CreateClaimInput {
@@ -52,11 +50,12 @@ export function mapApiClaim(row: Record<string, unknown>): Claim {
   const amount = Number(row.amount)
   const displayAmount = Number(row.displayAmount ?? amount)
   const displayCurrency = (row.displayCurrency === "USD" ? "USD" : "BRL") as DisplayCurrency
+  const ownerId = String(row.ownerId ?? "")
   return {
     id: `clm_${token}`,
     token,
-    senderId: currentUser.id,
-    organizationId: currentOrg.id,
+    senderId: ownerId,
+    organizationId: ownerId,
     recipientName: String(row.recipientName ?? ""),
     recipientEmail: row.recipientEmail != null ? String(row.recipientEmail) : null,
     recipientCountry: String(row.country ?? "BR"),
@@ -91,24 +90,9 @@ export async function getFundingUsdc(
   return Math.round(usdc * 100) / 100
 }
 
-export async function getPixQuote(usdc: number, country: "BR" | "MX" = "BR"): Promise<Quote> {
-  if (isBelowMinimum(usdc)) {
-    throw new Error(minAmountMessage(country === "MX" ? "MXN" : "BRL"))
-  }
-  const res = await fetch(`${apiBase()}/api/quote`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount: usdc, country }),
-  })
-  const data = await res.json().catch(() => null)
-  if (!res.ok) {
-    throw new Error(data?.message ?? data?.error ?? "Quote request failed")
-  }
-  return data as Quote
-}
-
 /**
  * Funds on-chain + persists server-side. USDC amount must match what the wizard displayed.
+ * Sender name comes from the authenticated session on the server — not from the client.
  */
 export async function createClaim(
   input: CreateClaimInput,
@@ -129,7 +113,6 @@ export async function createClaim(
       displayAmount: input.amount,
       displayCurrency: input.displayCurrency,
       country: input.recipientCountry,
-      senderName: currentOrg.name,
       recipientName: input.recipientName,
       recipientEmail: input.recipientEmail ?? null,
       message: input.message ?? null,
@@ -138,7 +121,6 @@ export async function createClaim(
       expirationDays: input.expirationDays,
       purpose: input.purpose,
       reference: input.reference ?? null,
-      // The server only enforces the provider minimum when PIX is on offer.
       allowPix: input.allowPix,
       allowStellar: input.allowStellar,
     }),
@@ -149,11 +131,12 @@ export async function createClaim(
   onStep?.(3)
   onStep?.(4)
 
+  const ownerId = String(data.ownerId ?? "")
   return {
     id: `clm_${data.token}`,
     token: String(data.token),
-    senderId: currentUser.id,
-    organizationId: currentOrg.id,
+    senderId: ownerId,
+    organizationId: ownerId,
     recipientName: input.recipientName,
     recipientEmail: input.recipientEmail ?? null,
     recipientCountry: input.recipientCountry,
@@ -176,20 +159,6 @@ export async function createClaim(
   }
 }
 
-/** @deprecated Prefer createClaim which funds + stores in one call. */
-export async function fundClaim(
-  claim: Claim,
-  onStep?: (step: number) => void,
-): Promise<Claim> {
-  const steps = 4
-  for (let i = 1; i <= steps; i++) {
-    await delay(400)
-    onStep?.(i)
-  }
-  const { hash } = await stellarAdapter.lockFunds(claim.amount.toFixed(2))
-  return { ...claim, status: "funded", stellarTransactionHash: hash }
-}
-
 export async function listClaims(): Promise<Claim[]> {
   const res = await fetch(`${apiBase()}/api/claims`)
   if (!res.ok) throw new Error("Failed to list claims")
@@ -198,7 +167,6 @@ export async function listClaims(): Promise<Claim[]> {
 }
 
 export async function getClaim(token: string): Promise<Claim | null> {
-  // Dashboard detail: only claims owned by the caller (list is scoped by ownerId).
   const list = await listClaims()
   return list.find((c) => c.token.toUpperCase() === token.toUpperCase()) ?? null
 }
@@ -249,7 +217,6 @@ export async function cancelClaim(claim: Claim): Promise<Claim> {
 }
 
 export async function refundClaim(claim: Claim): Promise<Claim> {
-  // Server reads balanceId from the stored record — not lastBalanceId in memory.
   return patchClaim(claim.token, { action: "refund" })
 }
 
@@ -257,102 +224,7 @@ export async function extendExpiration(claim: Claim, days: number): Promise<Clai
   return patchClaim(claim.token, { action: "extend", days })
 }
 
-export async function sendVerificationCode(): Promise<{ sent: true }> {
-  await delay(700)
-  return { sent: true }
-}
-
-export async function verifyRecipient(code: string): Promise<{ ok: boolean }> {
-  await delay(700)
-  return authAdapter.verifyOtp(code)
-}
-
-export interface KycInput {
-  fullName: string
-  taxId: string
-  dateOfBirth: string
-}
-
-export async function submitKyc(
-  input: KycInput,
-  onStep?: (step: number) => void,
-): Promise<{ status: KycStatus }> {
-  const steps = 3
-  for (let i = 1; i <= steps; i++) {
-    await delay(700)
-    onStep?.(i)
-  }
-  const digits = input.taxId.replace(/\D/g, "")
-  const valid = (digits.length === 11 || digits.length === 14) && !/^0+$/.test(digits)
-  return { status: valid ? "approved" : "rejected" }
-}
-
-export async function createEmbeddedWallet(
-  onStep?: (step: number) => void,
-): Promise<Wallet> {
-  const steps = 4
-  for (let i = 1; i <= steps; i++) {
-    await delay(750)
-    onStep?.(i)
-  }
-  const { address } = await stellarAdapter.createSponsoredAccount()
-  return {
-    id: `wal_${randomToken().toLowerCase()}`,
-    userId: "usr_recipient",
-    stellarAddress: address || randomStellarAddress(),
-    usdcBalance: 0,
-    sponsored: true,
-    createdAt: new Date().toISOString(),
-  }
-}
-
-export async function claimToWallet(wallet: Wallet, amount: number): Promise<Wallet> {
-  await delay(800)
-  void amount
-  return { ...wallet, usdcBalance: wallet.usdcBalance + amount }
-}
-
-export interface PixWithdrawalInput {
-  fullName: string
-  cpf: string
-  pixKeyType: PixPayout["pixKeyType"]
-  pixKey: string
-  amountUSDC: number
-}
-
-export async function initiatePixWithdrawal(
-  input: PixWithdrawalInput,
-  quote: Quote,
-  onStep?: (step: number) => void,
-): Promise<PixPayout> {
-  const steps = 4
-  for (let i = 1; i <= steps; i++) {
-    await delay(850)
-    onStep?.(i)
-  }
-  const { reference } = await etherfuseAdapter.createPixOrder(input.amountUSDC)
-  return {
-    id: `pxo_${randomToken().toLowerCase()}`,
-    claimId: "clm_demo",
-    cpf: input.cpf,
-    pixKeyType: input.pixKeyType,
-    maskedPixKey: input.pixKey,
-    amountBRL: Number(quote.destinationAmount),
-    amountUSDC: input.amountUSDC,
-    exchangeRate: Number(quote.exchangeRate),
-    fee: Number(quote.feeAmount),
-    status: "completed",
-    provider: "Etherfuse",
-    reference,
-    createdAt: new Date().toISOString(),
-  }
-}
-
-export async function getWithdrawalStatus(): Promise<PixPayout["status"]> {
-  await delay(400)
-  return "completed"
-}
-
+/** Fake /v1 response for the developers playground only. */
 export function mockApiResponse(amount: string) {
   const token = randomToken()
   return {

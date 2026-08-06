@@ -7,7 +7,6 @@ import {
   COOKIE_NAME,
   createSessionToken,
   isValidEmail,
-  MAX_AGE_SECONDS,
   normalizeEmail,
   sessionCookieOptions,
 } from "@/lib/dashboard-session"
@@ -50,14 +49,6 @@ export async function POST(req: Request) {
 
   const user = await sessionStore.getOrCreateUser(email)
   const token = await createSessionToken(user.email)
-  const expiresAt = new Date(Date.now() + MAX_AGE_SECONDS * 1000).toISOString()
-  await sessionStore.saveSession({
-    sessionToken: token,
-    userId: user.id,
-    email: user.email,
-    expiresAt,
-    createdAt: new Date().toISOString(),
-  })
 
   const res = NextResponse.json({
     ok: true,

@@ -1,8 +1,10 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
 import { Button } from '@/components/ui/button'
+import { ButtonLink } from '@/components/ui/button-link'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -14,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatUSDC } from '@/lib/format'
+import { CUSTODY_LINE } from '@/lib/use-sender-balance'
 
 type LedgerEntry = {
   id: string
@@ -30,12 +33,26 @@ type DepositInstructions = {
   depositAccountHolder: string
 }
 
+type PendingOrder = {
+  orderId: string
+  status: string
+  currency: string
+  fiatAmount: number
+  usdcAmount: number
+  createdAt: string
+  credited: boolean
+}
+
 export default function FundingPage() {
+  const router = useRouter()
+  const redirected = useRef(false)
   const [amount, setAmount] = useState('100')
   const [balance, setBalance] = useState<number | null>(null)
   const [ledger, setLedger] = useState<LedgerEntry[]>([])
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [checkingId, setCheckingId] = useState<string | null>(null)
   const [orderId, setOrderId] = useState<string | null>(null)
   const [instructions, setInstructions] = useState<DepositInstructions | null>(null)
   const [orderStatus, setOrderStatus] = useState<string | null>(null)
@@ -43,10 +60,13 @@ export default function FundingPage() {
 
   const refreshBalance = useCallback(async () => {
     const res = await fetch('/api/funding/balance')
-    if (!res.ok) return
+    if (!res.ok) return 0
     const data = await res.json()
-    setBalance(Number(data.amount ?? 0))
+    const next = Number(data.amount ?? 0)
+    setBalance(next)
     setLedger(Array.isArray(data.ledger) ? data.ledger : [])
+    setPendingOrders(Array.isArray(data.pending) ? data.pending : [])
+    return next
   }, [])
 
   useEffect(() => {
@@ -54,15 +74,27 @@ export default function FundingPage() {
   }, [refreshBalance])
 
   useEffect(() => {
-    if (!orderId || orderStatus === 'completed' || orderStatus === 'failed') return
+    if (!orderId || orderStatus === 'failed') return
+    if (orderStatus === 'completed') {
+      if (!redirected.current) {
+        redirected.current = true
+        router.push('/dashboard/create')
+      }
+      return
+    }
     let cancelled = false
     const tick = async () => {
       const res = await fetch(`/api/funding/${encodeURIComponent(orderId)}`)
       if (!res.ok || cancelled) return
       const data = await res.json()
-      setOrderStatus(String(data.status ?? ''))
-      if (data.credited || data.status === 'completed') {
+      const status = String(data.status ?? '')
+      setOrderStatus(status)
+      if (data.credited || status === 'completed') {
         await refreshBalance()
+        if (!cancelled && !redirected.current) {
+          redirected.current = true
+          router.push('/dashboard/create')
+        }
       }
     }
     void tick()
@@ -71,7 +103,7 @@ export default function FundingPage() {
       cancelled = true
       clearInterval(id)
     }
-  }, [orderId, orderStatus, refreshBalance])
+  }, [orderId, orderStatus, refreshBalance, router])
 
   async function onDeposit(e: FormEvent) {
     e.preventDefault()
@@ -80,6 +112,7 @@ export default function FundingPage() {
     setInstructions(null)
     setOrderId(null)
     setOrderStatus(null)
+    redirected.current = false
     try {
       const res = await fetch('/api/funding/deposit', {
         method: 'POST',
@@ -95,6 +128,7 @@ export default function FundingPage() {
       setOrderStatus('created')
       setQuotedUsdc(Number(data.usdcAmount))
       setInstructions(data.instructions)
+      await refreshBalance()
     } catch {
       setError('Could not reach the funding service.')
     } finally {
@@ -102,23 +136,59 @@ export default function FundingPage() {
     }
   }
 
+  async function checkStatus(id: string) {
+    setCheckingId(id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/funding/${encodeURIComponent(id)}`)
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Could not check order status')
+        return
+      }
+      const next = await refreshBalance()
+      if (data.credited || data.status === 'completed') {
+        setOrderStatus('completed')
+        if (!redirected.current && next > 0) {
+          redirected.current = true
+          router.push('/dashboard/create')
+        }
+      }
+    } catch {
+      setError('Could not reach the funding service.')
+    } finally {
+      setCheckingId(null)
+    }
+  }
+
   return (
     <>
       <DashboardTopbar title="Funding" />
       <main className="flex-1 space-y-6 p-4 sm:p-6">
+        <p className="text-sm text-muted-foreground">{CUSTODY_LINE}</p>
+
+        <div className="rounded-lg border border-border bg-secondary/40 px-4 py-3 text-sm">
+          <p className="font-medium">Sandbox funding</p>
+          <p className="mt-1 text-muted-foreground">
+            Only <strong className="text-foreground">MXN</strong> on-ramp works here, up to{' '}
+            <strong className="text-foreground">500 MXN</strong> per order. BRL on-ramp is not
+            yet available in the Etherfuse sandbox — do not try BRL deposits.
+          </p>
+        </div>
+
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle>Demo balance</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Internal ledger for this sender. On-chain USDC still sits in the shared
-                sponsor wallet — this is not custody segregation.
-              </p>
+              <p className="text-sm text-muted-foreground">{CUSTODY_LINE}</p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <p className="text-3xl font-semibold tabular-nums">
                 {balance == null ? '—' : formatUSDC(balance)}
               </p>
+              {(balance ?? 0) > 0 ? (
+                <ButtonLink href="/dashboard/create">Create a claim</ButtonLink>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -126,7 +196,8 @@ export default function FundingPage() {
             <CardHeader>
               <CardTitle>Deposit MXN → USDC</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Etherfuse sandbox on-ramp. Max 500 MXN. BRL is not available in sandbox yet.
+                Creates a live Etherfuse on-ramp order. After it completes, you go straight to
+                Create.
               </p>
             </CardHeader>
             <CardContent>
@@ -145,10 +216,11 @@ export default function FundingPage() {
                     onChange={(e) => setAmount(e.target.value)}
                     required
                   />
+                  <p className="text-xs text-muted-foreground">1–500 MXN · currency fixed to MXN</p>
                 </div>
                 {error ? <p className="text-sm text-destructive">{error}</p> : null}
                 <Button type="submit" disabled={pending}>
-                  {pending ? 'Creating order…' : 'Create deposit order'}
+                  {pending ? 'Creating order…' : 'Create MXN deposit'}
                 </Button>
               </form>
 
@@ -179,14 +251,69 @@ export default function FundingPage() {
                     </p>
                   ) : null}
                   <p className="text-xs text-muted-foreground">
-                    Sandbox: simulate fiat with Etherfuse{"'"}s fiat_received endpoint, then
-                    wait for status completed.
+                    Sandbox: simulate fiat with Etherfuse{"'"}s fiat_received endpoint. You can
+                    leave this page — the deposit stays pending until you return or tap Check
+                    status.
                   </p>
                 </div>
               ) : null}
             </CardContent>
           </Card>
         </div>
+
+        {pendingOrders.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending deposits</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Orders waiting on Etherfuse. Status is refreshed on every page load; use Check
+                status after simulating fiat in the sandbox.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Fiat</TableHead>
+                    <TableHead>USDC</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingOrders.map((row) => (
+                    <TableRow key={row.orderId}>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {new Date(row.createdAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="max-w-[10rem] truncate font-mono text-xs">
+                        {row.orderId}
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {row.fiatAmount} {row.currency}
+                      </TableCell>
+                      <TableCell className="tabular-nums">{formatUSDC(row.usdcAmount)}</TableCell>
+                      <TableCell>{row.status}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={checkingId === row.orderId}
+                          onClick={() => void checkStatus(row.orderId)}
+                        >
+                          {checkingId === row.orderId ? 'Checking…' : 'Check status'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card>
           <CardHeader>
