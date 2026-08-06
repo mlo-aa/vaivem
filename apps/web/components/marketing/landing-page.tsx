@@ -366,7 +366,7 @@ function Proof() {
     { rail: t('corridorBrlOn'), status: t('corridorLive') },
     { rail: t('corridorMxnOn'), status: t('corridorLive') },
     { rail: t('corridorBrlOff'), status: t('corridorDown') },
-    { rail: t('corridorMxnOff'), status: t('corridorSoon') },
+    { rail: t('corridorMxnOff'), status: t('corridorLive') },
   ]
 
   return (

@@ -106,6 +106,7 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
 
   function payoutLabel() {
     if (claim.payoutMethod === 'pix') return t('payoutPix')
+    if (claim.payoutMethod === 'spei') return t('payoutSpei')
     if (claim.payoutMethod === 'stellar') return t('payoutStellar')
     return t('payoutNotChosen')
   }

@@ -68,7 +68,8 @@ export async function createClaimForOwner(
 > {
   try {
     const amount = Number(body.amount)
-    const country = String(body.country ?? "BR")
+    const countryRaw = String(body.country ?? "BR").toUpperCase()
+    const country = countryRaw === "MX" ? "MX" : "BR"
     const senderName = owner.name?.trim() || owner.email || "Vaivém sender"
     const recipientName = String(body.recipientName ?? "")
     const recipientEmail =

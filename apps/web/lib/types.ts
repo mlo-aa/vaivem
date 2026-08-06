@@ -12,7 +12,7 @@ export type ClaimStatus =
 
 export type ProtectionType = 'public' | 'email' | 'code'
 
-export type PayoutMethod = 'stellar' | 'pix' | null
+export type PayoutMethod = 'stellar' | 'pix' | 'spei' | null
 
 export type DisplayCurrency = 'BRL' | 'USD'
 

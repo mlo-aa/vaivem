@@ -72,6 +72,7 @@ export function CreateWizard() {
 
   const [amount, setAmount] = useState('500')
   const [currency, setCurrency] = useState<DisplayCurrency>('BRL')
+  const [recipientCountry, setRecipientCountry] = useState<'BR' | 'MX'>('BR')
   const [purpose, setPurpose] = useState('Hackathon prize')
   const [reference, setReference] = useState('')
   const [recipientName, setRecipientName] = useState('')
@@ -176,7 +177,7 @@ export function CreateWizard() {
       amount: numericAmount,
       displayCurrency: currency,
       fundingUsdc: fundingUsdc ?? undefined,
-      recipientCountry: 'BR',
+      recipientCountry,
       purpose,
       reference: reference || undefined,
       message: message || undefined,
@@ -277,6 +278,23 @@ export function CreateWizard() {
             <CardContent className="py-2">
               <FieldGroup>
                 <Field>
+                  <FieldLabel>{t('countryLabel')}</FieldLabel>
+                  <ToggleGroup
+                    value={[recipientCountry]}
+                    onValueChange={(v) => {
+                      if (v[0] === 'BR' || v[0] === 'MX') {
+                        setRecipientCountry(v[0])
+                        if (v[0] === 'MX') setCurrency('USD')
+                      }
+                    }}
+                  >
+                    <ToggleGroupItem value="BR">{t('countryBr')}</ToggleGroupItem>
+                    <ToggleGroupItem value="MX">{t('countryMx')}</ToggleGroupItem>
+                  </ToggleGroup>
+                  <FieldDescription>{t('countryHint')}</FieldDescription>
+                </Field>
+
+                <Field>
                   <FieldLabel htmlFor="amount">{t('amountLabel')}</FieldLabel>
                   <div className="flex gap-2">
                     <Input
@@ -291,8 +309,11 @@ export function CreateWizard() {
                       onValueChange={(v) => {
                         if (v[0]) setCurrency(v[0] as DisplayCurrency)
                       }}
+                      disabled={recipientCountry === 'MX'}
                     >
-                      <ToggleGroupItem value="BRL">BRL</ToggleGroupItem>
+                      <ToggleGroupItem value="BRL" disabled={recipientCountry === 'MX'}>
+                        BRL
+                      </ToggleGroupItem>
                       <ToggleGroupItem value="USD">USD</ToggleGroupItem>
                     </ToggleGroup>
                   </div>
@@ -338,8 +359,16 @@ export function CreateWizard() {
                       onChange={setAllowStellar}
                     />
                     <MethodToggle
-                      title={t('methodPixTitle')}
-                      description={t('methodPixDesc')}
+                      title={
+                        recipientCountry === 'MX'
+                          ? t('methodSpeiTitle')
+                          : t('methodPixTitle')
+                      }
+                      description={
+                        recipientCountry === 'MX'
+                          ? t('methodSpeiDesc')
+                          : t('methodPixDesc')
+                      }
                       checked={allowPix}
                       onChange={setAllowPix}
                     />
@@ -487,7 +516,10 @@ export function CreateWizard() {
                 label={t('reviewMethods')}
                 value={[
                   allowStellar && t('reviewMethodStellar'),
-                  allowPix && t('reviewMethodPix'),
+                  allowPix &&
+                    (recipientCountry === 'MX'
+                      ? t('reviewMethodSpei')
+                      : t('reviewMethodPix')),
                 ]
                   .filter(Boolean)
                   .join(' · ')}

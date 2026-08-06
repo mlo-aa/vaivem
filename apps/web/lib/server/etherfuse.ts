@@ -7,6 +7,8 @@
 
 import "server-only"
 
+import { MIN_AMOUNT_USDC } from "@/lib/limits"
+
 const BASE_URL = process.env.ETHERFUSE_BASE_URL ?? "https://api.sand.etherfuse.com"
 const API_KEY = process.env.ETHERFUSE_API_KEY
 const ORG_ID = process.env.ETHERFUSE_ORG_ID
@@ -344,19 +346,36 @@ export function describeUpstreamError(
   if (status === 401 || status === 403) {
     return "The payment provider rejected our credentials. Check the Etherfuse API key."
   }
+  const lower = providerMessage.toLowerCase()
+  const failedQuote =
+    status === 424 ||
+    lower.includes("failedtogetquote") ||
+    lower.includes("failed to get quote")
+  if (failedQuote) {
+    // Above the known minimum, 424 is a corridor/provider outage — not a bad amount.
+    if (amountUsdc == null || amountUsdc >= MIN_AMOUNT_USDC) {
+      return "This cash-out corridor is temporarily unavailable from the payment provider. Try again later or choose another corridor."
+    }
+    return `The payment provider couldn't quote ${amountUsdc.toFixed(2)} USDC. Try a different amount — the supported minimum is ${MIN_AMOUNT_USDC.toFixed(2)} USDC.`
+  }
   const bare = !providerMessage.trim() || /^Etherfuse \d+$/.test(providerMessage.trim())
   if (!bare) return providerMessage
-  if (status === 424) {
-    const amount = amountUsdc != null ? `${amountUsdc.toFixed(2)} USDC` : "this amount"
-    return `The payment provider couldn't quote ${amount}. Try a different amount — the supported minimum is 1.00 USDC.`
-  }
   return `The payment provider rejected this request (${status}).`
+}
+
+/** Resolve the Etherfuse bank account for a fiat cash-out corridor. */
+export async function requireBankAccountIdForCurrency(
+  currency: "BRL" | "MXN",
+): Promise<string> {
+  if (currency === "MXN") return resolveMxnBankAccountId()
+  return resolveBrlBankAccountId()
 }
 
 export function getUsdcAssetId(): string {
   return process.env.ETHERFUSE_USDC_ASSET ?? SANDBOX_ASSETS.USDC
 }
 
+/** @deprecated Prefer requireBankAccountIdForCurrency — BRL-only. */
 export function requireBankAccountId(): string {
   const id = process.env.ETHERFUSE_BRL_BANK_ACCOUNT_ID
   if (!id) {

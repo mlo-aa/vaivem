@@ -59,7 +59,15 @@ export async function fetchQuote(
   if (!res.ok) {
     const message =
       data?.message ?? data?.error ?? `The quote provider returned an error (${res.status}).`
-    const kind: QuoteErrorKind = res.status >= 400 && res.status < 500 ? "invalid" : "provider"
+    // 424 FailedToGetQuote above the minimum is a corridor outage — keep retrying.
+    const kind: QuoteErrorKind =
+      data?.error === "amount_below_minimum" || res.status === 422
+        ? "invalid"
+        : res.status === 424 || data?.error === "provider_rejected"
+          ? "provider"
+          : res.status >= 400 && res.status < 500
+            ? "invalid"
+            : "provider"
     throw new QuoteError(kind, res.status, message)
   }
 

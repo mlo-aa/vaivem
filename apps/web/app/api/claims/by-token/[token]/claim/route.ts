@@ -32,7 +32,7 @@ import {
   EtherfuseError,
   getOrder,
   getUsdcAssetId,
-  requireBankAccountId,
+  requireBankAccountIdForCurrency,
 } from "@/lib/server/etherfuse"
 
 export const dynamic = "force-dynamic"
@@ -44,13 +44,15 @@ function classifyError(message: string): { code: string; message: string } {
   const m = message.toLowerCase()
   if (
     m.includes("failedtogetquote") ||
+    m.includes("failed to get quote") ||
+    m.includes("temporarily unavailable") ||
     m.includes("etherfuse 424") ||
     m.includes("provider_rejected")
   ) {
     return {
       code: "provider_rejected",
       message:
-        "The payment provider could not quote this payout right now. Try again later or keep the USDC on Stellar.",
+        "This cash-out corridor is temporarily unavailable from the payment provider. Try again later or keep the USDC on Stellar.",
     }
   }
   if (m.includes("op_does_not_exist") || m.includes("not found")) {
@@ -234,15 +236,19 @@ export async function POST(
       })
     }
 
-    // PIX: provider quote + order BEFORE touching the claimable balance.
-    const bankAccountId = requireBankAccountId()
+    // Local bank cash-out: corridor from claim.country (BR→PIX/BRL, MX→SPEI/MXN).
+    // Quote + order BEFORE touching the claimable balance.
+    const corridorCountry = claim.country === "MX" ? "MX" : "BR"
+    const targetAsset = corridorCountry === "MX" ? "MXN" : "BRL"
+    const payoutMethod = corridorCountry === "MX" ? "spei" : "pix"
+    const bankAccountId = await requireBankAccountIdForCurrency(targetAsset)
     const sourceAsset = getUsdcAssetId()
     const publicKey = getSponsorPublicKey()
     const quoteId = crypto.randomUUID()
     const quote = await createQuote({
       type: "offramp",
       sourceAsset,
-      targetAsset: "BRL",
+      targetAsset,
       sourceAmount: claim.amount.toFixed(2),
       quoteId,
     })
@@ -269,7 +275,7 @@ export async function POST(
       // Anchor payment submitted; do not pretend the link is still claimable.
       await updateStoredClaim(token, {
         status: "cashing_out",
-        payoutMethod: "pix",
+        payoutMethod,
         payoutOrderId: orderId,
         txHash: hash,
       })
@@ -289,7 +295,7 @@ export async function POST(
       // Sponsor already paid the anchor — leave residue accounting; mark unavailable.
       await updateStoredClaim(token, {
         status: "cashing_out",
-        payoutMethod: "pix",
+        payoutMethod,
         payoutOrderId: orderId,
         txHash: hash,
       })
@@ -307,7 +313,7 @@ export async function POST(
     await recipientSecretsByBalanceId.delete(claim.balanceId)
     const updated = await updateStoredClaim(token, {
       status: "completed",
-      payoutMethod: "pix",
+      payoutMethod,
       payoutOrderId: orderId,
       claimedAt: new Date().toISOString(),
       txHash: hash,
@@ -315,7 +321,7 @@ export async function POST(
 
     return NextResponse.json({
       status: "completed",
-      payoutMethod: "pix",
+      payoutMethod,
       orderId,
       txHash: hash,
       claim: updated,

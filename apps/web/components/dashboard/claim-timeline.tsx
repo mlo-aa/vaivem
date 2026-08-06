@@ -54,7 +54,10 @@ function deriveEvents(claim: Claim): { event: ClaimEventType; timestamp: string 
   if (['claimed', 'cashing_out', 'completed'].includes(claim.status) && claim.claimedAt) {
     list.push({ event: 'claimed', timestamp: claim.claimedAt })
   }
-  if (claim.payoutMethod === 'pix' && ['cashing_out', 'completed'].includes(claim.status)) {
+  if (
+    (claim.payoutMethod === 'pix' || claim.payoutMethod === 'spei') &&
+    ['cashing_out', 'completed'].includes(claim.status)
+  ) {
     list.push({ event: 'pix_initiated', timestamp: claim.claimedAt ?? created })
     if (claim.status === 'completed') {
       list.push({ event: 'pix_completed', timestamp: claim.claimedAt ?? created })

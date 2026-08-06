@@ -15,13 +15,13 @@ import {
   useKitMessages,
   useKitMessagesOptional,
 } from "./i18n"
-import { isBelowMinimum, minAmountInFiat, MIN_AMOUNT_USDC } from "./limits"
+import { isBelowMinimum, minAmountInFiat, MIN_AMOUNT_USDC, formatFiat } from "./limits"
 import type { DeepPartial, KitLocale, KitMessages } from "./messages"
 import { resolveMessages } from "./messages"
 import { ProcessSteps } from "./process-steps"
 import type { KycStatus, PixKeyType } from "./types"
 import { useQuote } from "./use-quote"
-import { digitsOnly, formatBRL, formatUSDC } from "./utils"
+import { digitsOnly, formatUSDC } from "./utils"
 import "./styles.css"
 
 export type RampWithdrawProps = {
@@ -68,6 +68,13 @@ function validatePixKey(type: PixKeyType, key: string, m: KitMessages): string |
     default:
       return null
   }
+}
+
+function validateClabe(clabe: string, m: KitMessages): string | null {
+  const digits = digitsOnly(clabe)
+  if (!digits) return t(m, "spei.validation.empty")
+  if (digits.length !== 18) return t(m, "spei.validation.length")
+  return null
 }
 
 type Stage = "kyc" | "cashout" | "processing" | "done" | "failed"
@@ -120,10 +127,13 @@ function RampWithdrawInner({
 
   const [pixKeyType, setPixKeyType] = useState<PixKeyType>("cpf")
   const [pixKey, setPixKey] = useState("")
+  const [clabe, setClabe] = useState("")
   const [processStep, setProcessStep] = useState(0)
   const [reference, setReference] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
   const showTechnicalFailure = locale !== "pt-BR"
+  const isMexico = country === "MX"
+  const fiatCode = isMexico ? "MXN" : "BRL"
 
   // Checked before any request goes out — the provider rejects sub-minimum amounts.
   const belowMinimum = isBelowMinimum(amount)
@@ -138,19 +148,21 @@ function RampWithdrawInner({
     },
   )
 
-  const brlAmount = quote ? Number(quote.destinationAmount) : null
-  const localizedMinimumMessage = t(m, "pix.minAmount", {
+  const fiatAmount = quote ? Number(quote.destinationAmount) : null
+  const localizedMinimumMessage = t(m, isMexico ? "spei.minAmount" : "pix.minAmount", {
     usdc: formatUSDC(MIN_AMOUNT_USDC),
     fiat: minAmountInFiat(country, quote ? Number(quote.etherfuseMidMarketRate) : null),
   })
   const canPay = !belowMinimum && !quoteError && !loading && Boolean(quote)
   const displayedQuoteError = quoteError
     ? errorKind === "network"
-      ? t(m, "pix.quoteNetworkError")
+      ? t(m, isMexico ? "spei.quoteNetworkError" : "pix.quoteNetworkError")
       : errorKind === "provider"
-        ? t(m, "pix.quoteProviderError")
+        ? quoteError ||
+          t(m, isMexico ? "spei.quoteProviderError" : "pix.quoteProviderError")
         : quoteError
-    : quoteError
+    : null
+  const formatLocal = (value: number) => formatFiat(value, country)
 
   async function handleSubmitKyc() {
     setError(null)
@@ -201,14 +213,16 @@ function RampWithdrawInner({
       setError(localizedMinimumMessage)
       return
     }
-    const keyError = validatePixKey(pixKeyType, pixKey, m)
+    const keyError = isMexico
+      ? validateClabe(clabe, m)
+      : validatePixKey(pixKeyType, pixKey, m)
     if (keyError) {
       setError(keyError)
       return
     }
     if (!quote || secondsLeft <= 0) {
       void refresh({ force: true })
-      setError(t(m, "pix.quoteExpired"))
+      setError(t(m, isMexico ? "spei.quoteExpired" : "pix.quoteExpired"))
       return
     }
     setStage("processing")
@@ -255,7 +269,7 @@ function RampWithdrawInner({
       if (err instanceof PayoutError) {
         fail(err.code, err.message, err.meta)
       } else {
-        fail("network", err instanceof Error ? err.message : t(m, "pix.payoutFailed"))
+        fail("network", err instanceof Error ? err.message : t(m, isMexico ? "spei.payoutFailed" : "pix.payoutFailed"))
       }
     }
   }
@@ -343,48 +357,71 @@ function RampWithdrawInner({
       {stage === "cashout" ? (
         <div className="vv-card">
           <div>
-            <h2 className="vv-title">{t(m, "pix.title")}</h2>
+            <h2 className="vv-title">{isMexico ? m.spei.title : m.pix.title}</h2>
             <p className="vv-desc">
-              {t(m, "pix.description", { amount: formatUSDC(amount) })}
+              {t(m, isMexico ? "spei.description" : "pix.description", {
+                amount: formatUSDC(amount),
+              })}
             </p>
           </div>
           <div>
-            <div className="vv-field">
-              <label className="vv-label" htmlFor="vv-pix-type">
-                {t(m, "pix.keyTypeLabel")}
-              </label>
-              <select
-                id="vv-pix-type"
-                className="vv-select"
-                value={pixKeyType}
-                onChange={(e) => setPixKeyType(e.target.value as PixKeyType)}
-              >
-                <option value="cpf">{m.pix.keyTypes.cpf}</option>
-                <option value="cnpj">{m.pix.keyTypes.cnpj}</option>
-                <option value="email">{m.pix.keyTypes.email}</option>
-                <option value="phone">{m.pix.keyTypes.phone}</option>
-                <option value="random">{m.pix.keyTypes.random}</option>
-              </select>
-            </div>
-            <div className="vv-field">
-              <label className="vv-label" htmlFor="vv-pix-key">
-                {t(m, "pix.keyLabel")}
-              </label>
-              <input
-                id="vv-pix-key"
-                className="vv-input"
-                value={pixKey}
-                onChange={(e) => setPixKey(e.target.value)}
-                placeholder={
-                  pixKeyType === "email"
-                    ? "you@email.com"
-                    : pixKeyType === "phone"
-                      ? "+55 11 90000-0000"
-                      : t(m, "pix.keyPlaceholder", { type: keyTypeLabel })
-                }
-              />
-              <span className="vv-hint">{t(m, "pix.hint")}</span>
-            </div>
+            {isMexico ? (
+              <div className="vv-field">
+                <label className="vv-label" htmlFor="vv-clabe">
+                  {m.spei.clabeLabel}
+                </label>
+                <input
+                  id="vv-clabe"
+                  className="vv-input"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={18}
+                  value={clabe}
+                  onChange={(e) => setClabe(digitsOnly(e.target.value).slice(0, 18))}
+                  placeholder={m.spei.clabePlaceholder}
+                />
+                <span className="vv-hint">{m.spei.hint}</span>
+              </div>
+            ) : (
+              <>
+                <div className="vv-field">
+                  <label className="vv-label" htmlFor="vv-pix-type">
+                    {t(m, "pix.keyTypeLabel")}
+                  </label>
+                  <select
+                    id="vv-pix-type"
+                    className="vv-select"
+                    value={pixKeyType}
+                    onChange={(e) => setPixKeyType(e.target.value as PixKeyType)}
+                  >
+                    <option value="cpf">{m.pix.keyTypes.cpf}</option>
+                    <option value="cnpj">{m.pix.keyTypes.cnpj}</option>
+                    <option value="email">{m.pix.keyTypes.email}</option>
+                    <option value="phone">{m.pix.keyTypes.phone}</option>
+                    <option value="random">{m.pix.keyTypes.random}</option>
+                  </select>
+                </div>
+                <div className="vv-field">
+                  <label className="vv-label" htmlFor="vv-pix-key">
+                    {t(m, "pix.keyLabel")}
+                  </label>
+                  <input
+                    id="vv-pix-key"
+                    className="vv-input"
+                    value={pixKey}
+                    onChange={(e) => setPixKey(e.target.value)}
+                    placeholder={
+                      pixKeyType === "email"
+                        ? "you@email.com"
+                        : pixKeyType === "phone"
+                          ? "+55 11 90000-0000"
+                          : t(m, "pix.keyPlaceholder", { type: keyTypeLabel })
+                    }
+                  />
+                  <span className="vv-hint">{t(m, "pix.hint")}</span>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="vv-divider" />
@@ -392,7 +429,6 @@ function RampWithdrawInner({
           {belowMinimum ? (
             <p className="vv-error">{localizedMinimumMessage}</p>
           ) : displayedQuoteError ? (
-            /* The real reason, inline with the amount — not an outage banner. */
             <p className="vv-error">{displayedQuoteError}</p>
           ) : loading || !quote ? (
             <div className="vv-stack">
@@ -403,8 +439,8 @@ function RampWithdrawInner({
             <>
               <div className="vv-stack">
                 <div className="vv-row">
-                  <span className="vv-muted">{t(m, "pix.youReceive")}</span>
-                  <span className="vv-strong">{formatBRL(brlAmount ?? 0)}</span>
+                  <span className="vv-muted">{isMexico ? m.spei.youReceive : m.pix.youReceive}</span>
+                  <span className="vv-strong">{formatLocal(fiatAmount ?? 0)}</span>
                 </div>
                 <div className="vv-countdown">
                   <span
@@ -412,7 +448,7 @@ function RampWithdrawInner({
                     style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
                   >
                     <RefreshCw className="vv-icon-sm" />
-                    {t(m, "pix.quoteRefreshes")}
+                    {isMexico ? m.spei.quoteRefreshes : m.pix.quoteRefreshes}
                   </span>
                   <span className="vv-mono vv-strong">
                     {String(Math.floor(secondsLeft / 60)).padStart(1, "0")}:
@@ -422,24 +458,24 @@ function RampWithdrawInner({
                 <details className="vv-disclosure vv-disclosure--rates">
                   <summary>
                     <ChevronDown className="vv-icon-sm" />
-                    {t(m, "pix.details")}
+                    {isMexico ? m.spei.details : m.pix.details}
                   </summary>
                   <div className="vv-stack">
                     <div className="vv-row">
-                      <span className="vv-muted">{t(m, "pix.etherfuseRate")}</span>
+                      <span className="vv-muted">{isMexico ? m.spei.etherfuseRate : m.pix.etherfuseRate}</span>
                       <span className="vv-mono">
-                        1 USDC = {Number(quote.exchangeRate).toFixed(4)} BRL
+                        1 USDC = {Number(quote.exchangeRate).toFixed(4)} {fiatCode}
                       </span>
                     </div>
                     <div className="vv-row">
-                      <span className="vv-muted">{t(m, "pix.midMarket")}</span>
+                      <span className="vv-muted">{isMexico ? m.spei.midMarket : m.pix.midMarket}</span>
                       <span className="vv-mono">
-                        1 USDC = {Number(quote.etherfuseMidMarketRate).toFixed(4)} BRL
+                        1 USDC = {Number(quote.etherfuseMidMarketRate).toFixed(4)} {fiatCode}
                       </span>
                     </div>
                     <div className="vv-row">
                       <span className="vv-muted">
-                        {t(m, "pix.providerFee")} ({(Number(quote.feeBps) / 100).toFixed(2)}%)
+                        {isMexico ? m.spei.providerFee : m.pix.providerFee} ({(Number(quote.feeBps) / 100).toFixed(2)}%)
                       </span>
                       <span className="vv-mono">{formatUSDC(Number(quote.feeAmount))}</span>
                     </div>
@@ -448,7 +484,13 @@ function RampWithdrawInner({
               </div>
               <div className="vv-heading-row" style={{ marginTop: 8 }}>
                 <p className={quote.source === "mock" ? "vv-note vv-note--amber" : "vv-note"}>
-                  {quote.source === "mock" ? t(m, "pix.mockQuote") : t(m, "pix.liveQuote")}
+                  {quote.source === "mock"
+                    ? isMexico
+                      ? m.spei.mockQuote
+                      : m.pix.mockQuote
+                    : isMexico
+                      ? m.spei.liveQuote
+                      : m.pix.liveQuote}
                 </p>
                 {quote.source === "mock" ? <span className="vv-demo-badge">DEMO</span> : null}
               </div>
@@ -456,9 +498,11 @@ function RampWithdrawInner({
           )}
 
           {error ? <p className="vv-error">{error}</p> : null}
-          {brlAmount !== null ? (
+          {fiatAmount !== null ? (
             <p className="vv-expectation">
-              {t(m, "pix.expectation", { amount: formatBRL(brlAmount) })}
+              {t(m, isMexico ? "spei.expectation" : "pix.expectation", {
+                amount: formatLocal(fiatAmount),
+              })}
             </p>
           ) : null}
 
@@ -468,8 +512,8 @@ function RampWithdrawInner({
             onClick={handlePay}
             disabled={!canPay}
           >
-            {t(m, "pix.claimButton")}{" "}
-            {brlAmount !== null ? formatBRL(brlAmount) : formatUSDC(amount)}
+            {isMexico ? m.spei.claimButton : m.pix.claimButton}{" "}
+            {fiatAmount !== null ? formatLocal(fiatAmount) : formatUSDC(amount)}
           </button>
         </div>
       ) : null}
@@ -477,16 +521,16 @@ function RampWithdrawInner({
       {stage === "processing" ? (
         <div className="vv-card">
           <div>
-            <h2 className="vv-title">{t(m, "pix.processingTitle")}</h2>
-            <p className="vv-desc">{t(m, "pix.processingDesc")}</p>
+            <h2 className="vv-title">{isMexico ? m.spei.processingTitle : m.pix.processingTitle}</h2>
+            <p className="vv-desc">{isMexico ? m.spei.processingDesc : m.pix.processingDesc}</p>
           </div>
           <ProcessSteps
             current={processStep}
-            steps={[
-              t(m, "pix.steps.confirming"),
-              t(m, "pix.steps.sending"),
-              t(m, "pix.steps.deposit"),
-            ]}
+            steps={
+              isMexico
+                ? [m.spei.steps.confirming, m.spei.steps.sending, m.spei.steps.deposit]
+                : [m.pix.steps.confirming, m.pix.steps.sending, m.pix.steps.deposit]
+            }
           />
         </div>
       ) : null}
@@ -494,16 +538,16 @@ function RampWithdrawInner({
       {stage === "done" ? (
         <div className="vv-card">
           <div>
-            <h2 className="vv-title">{t(m, "pix.doneTitle")}</h2>
+            <h2 className="vv-title">{isMexico ? m.spei.doneTitle : m.pix.doneTitle}</h2>
             <p className="vv-desc">
-              {t(m, "pix.doneDesc", {
-                amount: brlAmount !== null ? formatBRL(brlAmount) : formatUSDC(amount),
+              {t(m, isMexico ? "spei.doneDesc" : "pix.doneDesc", {
+                amount: fiatAmount !== null ? formatLocal(fiatAmount) : formatUSDC(amount),
               })}
             </p>
           </div>
           {reference ? (
             <div className="vv-row">
-              <span className="vv-muted">{t(m, "pix.orderLabel")}</span>
+              <span className="vv-muted">{isMexico ? m.spei.orderLabel : m.pix.orderLabel}</span>
               <span className="vv-mono" style={{ fontSize: 12, wordBreak: "break-all", textAlign: "right" }}>
                 {reference}
               </span>
@@ -511,7 +555,7 @@ function RampWithdrawInner({
           ) : null}
           {txHash ? (
             <div className="vv-row">
-              <span className="vv-muted">{t(m, "pix.txLabel")}</span>
+              <span className="vv-muted">{isMexico ? m.spei.txLabel : m.pix.txLabel}</span>
               <a
                 className="vv-mono vv-receipt-link"
                 href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}

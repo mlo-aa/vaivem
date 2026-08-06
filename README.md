@@ -70,7 +70,7 @@ Provider availability shifts without notice — observations in [SPIKE.md](SPIKE
 | Etherfuse | BRL / PIX on-ramp (funding) | live in sandbox (≤500 BRL) — was `FailedToGetQuote` on 2026-08-05, returned 200 on 2026-08-06 |
 | Etherfuse | MXN / SPEI on-ramp (funding) | live in sandbox (≤500 MXN) |
 | Etherfuse | USDC → BRL / PIX off-ramp | **down** as of 2026-08-06 (`FailedToGetQuote` at every amount) |
-| Etherfuse | USDC → MXN / SPEI off-ramp | quotes can succeed; product claim path is BRL/PIX only — SPEI cash-out not wired |
+| Etherfuse | USDC → MXN / SPEI off-ramp | live in sandbox — claim path uses claim.country `MX` |
 | Mock | any | outage fallback / local testing |
 | Manteca | BRL / PIX | interface only — not implemented |
 

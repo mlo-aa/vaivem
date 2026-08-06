@@ -266,13 +266,15 @@ function ClaimLinkInner({
               </span>
               <span>
                 <span style={{ display: "block", fontSize: "0.875rem", fontWeight: 500 }}>
-                  {t(m, "choose.pixTitle")}
+                  {country === "MX" ? t(m, "choose.speiTitle") : t(m, "choose.pixTitle")}
                 </span>
                 <span className="vv-muted" style={{ fontSize: "0.75rem" }}>
-                  {t(m, "choose.pixDesc")}
+                  {country === "MX" ? t(m, "choose.speiDesc") : t(m, "choose.pixDesc")}
                 </span>
               </span>
-              <span className="vv-rail-eta">{t(m, "choose.pixEta")}</span>
+              <span className="vv-rail-eta">
+                {country === "MX" ? t(m, "choose.speiEta") : t(m, "choose.pixEta")}
+              </span>
             </button>
             <details className="vv-disclosure">
               <summary>
