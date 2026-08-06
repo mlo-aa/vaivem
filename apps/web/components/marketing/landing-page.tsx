@@ -1,15 +1,8 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
-import {
-  motion,
-  useInView,
-  useMotionValueEvent,
-  useReducedMotion,
-  useScroll,
-  useTransform,
-} from 'framer-motion'
+import { useInView, useReducedMotion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 import { ButtonLink } from '@/components/ui/button-link'
 import { MarketingHeader } from '@/components/marketing/marketing-header'
@@ -21,11 +14,7 @@ import {
   StaggerItem,
   Typewriter,
 } from '@/components/marketing/landing-motion'
-import {
-  PhoneMockup,
-  phoneScreenFromProgress,
-  type PhoneScreen,
-} from '@/components/marketing/phone-mockup'
+import { PhoneMockup, type PhoneScreen } from '@/components/marketing/phone-mockup'
 import { cn } from '@/lib/utils'
 
 const KIT_CODE = `const res = await fetch("/api/v1/claims", {
@@ -45,8 +34,6 @@ const claim = await res.json()
 console.log(claim.claimUrl)`
 
 export function LandingPage() {
-  const t = useTranslations('landing')
-
   return (
     <div className="flex min-h-screen flex-col overflow-x-clip bg-background">
       <MarketingHeader />
@@ -65,7 +52,6 @@ export function LandingPage() {
 
 function Hero() {
   const t = useTranslations('landing')
-  const reduce = useReducedMotion()
 
   return (
     <section className="relative overflow-hidden">
@@ -73,7 +59,7 @@ function Hero() {
         className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,var(--surface)_0%,var(--background)_55%)]"
         aria-hidden
       />
-      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 sm:px-8 lg:grid-cols-2 lg:gap-12 lg:py-24">
+      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 sm:px-8 lg:grid-cols-2 lg:gap-14 lg:py-22">
         <FadeIn>
           <span className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1 text-xs font-medium text-muted-foreground dark:border dark:border-border">
             <span className="size-1.5 rounded-full bg-primary" />
@@ -85,33 +71,17 @@ function Hero() {
           <p className="mt-5 max-w-md text-pretty text-[15px] leading-relaxed text-muted-foreground sm:text-lg">
             {t('heroBody')}
           </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-8">
             <ButtonLink size="lg" href="/dashboard">
               {t('ctaCreate')}
               <ArrowRight data-icon="inline-end" />
-            </ButtonLink>
-            <ButtonLink size="lg" variant="secondary" href="/claim/demo-active">
-              {t('ctaDemo')}
             </ButtonLink>
           </div>
           <p className="mt-6 text-sm text-muted-foreground">{t('heroAside')}</p>
         </FadeIn>
 
-        <FadeIn delay={0.08} className="flex justify-center lg:justify-end">
-          <motion.div
-            animate={
-              reduce
-                ? undefined
-                : { y: [0, -6, 0] }
-            }
-            transition={
-              reduce
-                ? undefined
-                : { duration: 4, repeat: Infinity, ease: 'easeInOut' }
-            }
-          >
-            <PhoneMockup screen="claim" />
-          </motion.div>
+        <FadeIn delay={0.06} className="flex justify-center lg:justify-end">
+          <PhoneMockup screen="claim" />
         </FadeIn>
       </div>
     </section>
@@ -138,14 +108,14 @@ function Problem() {
 
         <Stagger className="mt-10 grid gap-4 md:grid-cols-2">
           <StaggerItem>
-            <div className="rounded-[1.25rem] bg-background p-6 dark:border dark:border-border">
+            <div className="h-full rounded-[1.25rem] bg-background p-6 dark:border dark:border-border">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {t('problemBeforeLabel')}
               </p>
               <ul className="mt-4 space-y-3 text-[15px]">
-                <li className="flex justify-between gap-4 border-b border-transparent pb-3 dark:border-border">
+                <li className="flex justify-between gap-4">
                   <span className="text-muted-foreground">{t('problemBeforeDays')}</span>
-                  <span className="font-medium tabular-nums text-destructive">2–5d</span>
+                  <span className="font-medium tabular-nums text-muted-foreground">2–5d</span>
                 </li>
                 <li className="text-muted-foreground">{t('problemBeforeFees')}</li>
                 <li className="text-muted-foreground">{t('problemBeforeForms')}</li>
@@ -153,12 +123,12 @@ function Problem() {
             </div>
           </StaggerItem>
           <StaggerItem>
-            <div className="rounded-[1.25rem] bg-primary p-6 text-primary-foreground">
+            <div className="h-full rounded-[1.25rem] bg-primary p-6 text-primary-foreground">
               <p className="text-xs font-medium uppercase tracking-wide text-primary-foreground/70">
                 {t('problemAfterLabel')}
               </p>
               <ul className="mt-4 space-y-3 text-[15px]">
-                <li className="flex justify-between gap-4 border-b border-primary-foreground/15 pb-3">
+                <li className="flex justify-between gap-4">
                   <span className="text-primary-foreground/80">{t('problemAfterDays')}</span>
                   <span className="font-semibold tabular-nums">~5 min</span>
                 </li>
@@ -173,30 +143,44 @@ function Problem() {
   )
 }
 
+function FlowProgress({
+  count,
+  active,
+}: {
+  count: number
+  active: number
+}) {
+  return (
+    <div className="flex items-center justify-center gap-2" aria-hidden>
+      {Array.from({ length: count }).map((_, i) => (
+        <span
+          key={i}
+          className={cn(
+            'h-1.5 rounded-full transition-all duration-200',
+            active === i ? 'w-6 bg-primary' : 'w-1.5 bg-border',
+          )}
+        />
+      ))}
+    </div>
+  )
+}
+
 function Flow() {
   const t = useTranslations('landing')
   const reduce = useReducedMotion()
-  const containerRef = useRef<HTMLElement>(null)
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ['start center', 'end center'],
-  })
-  const phoneY = useTransform(scrollYProgress, [0, 1], [12, -12])
-  const [screen, setScreen] = useState<PhoneScreen>('claim')
+  const [active, setActive] = useState(0)
 
-  useMotionValueEvent(scrollYProgress, 'change', (v) => {
-    if (reduce) return
-    setScreen(phoneScreenFromProgress(v))
-  })
-
-  const steps = [
-    { title: t('flowStep1Title'), body: t('flowStep1Body'), screen: 'claim' as const },
-    { title: t('flowStep2Title'), body: t('flowStep2Body'), screen: 'unlock' as const },
-    { title: t('flowStep3Title'), body: t('flowStep3Body'), screen: 'pix' as const },
+  const steps: { title: string; body: string; screen: PhoneScreen }[] = [
+    { title: t('flowStep1Title'), body: t('flowStep1Body'), screen: 'claim' },
+    { title: t('flowStep2Title'), body: t('flowStep2Body'), screen: 'unlock' },
+    { title: t('flowStep3Title'), body: t('flowStep3Body'), screen: 'pix' },
+    { title: t('phoneDoneTitle'), body: t('phoneDoneBody'), screen: 'done' },
   ]
 
+  const screen = reduce ? 'claim' : steps[active]?.screen ?? 'claim'
+
   return (
-    <section id="how-it-works" ref={containerRef} className="relative">
+    <section id="how-it-works" className="relative bg-background">
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
         <FadeIn className="max-w-2xl py-14 lg:py-16">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -210,53 +194,36 @@ function Flow() {
           </p>
         </FadeIn>
 
-        <div className="space-y-12 pb-16 lg:hidden">
-          {steps.map((step, i) => (
-            <FlowStepMobile
-              key={step.title}
-              index={i}
-              title={step.title}
-              body={step.body}
-              screen={step.screen}
-            />
-          ))}
-          <div className="flex justify-center pt-4">
-            <PhoneMockup screen="done" />
-          </div>
-        </div>
-
-        <div className="hidden lg:grid lg:grid-cols-2 lg:gap-16 lg:pb-32">
-          <div className="space-y-[30vh] pb-[20vh]">
-            {steps.map((step, i) => (
-              <div key={step.title} className="flex min-h-[50vh] items-center">
-                <FadeIn>
-                  <p className="font-mono text-sm text-muted-foreground">0{i + 1}</p>
-                  <h3 className="mt-2 text-2xl font-semibold tracking-[-0.02em]">
-                    {step.title}
-                  </h3>
-                  <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-muted-foreground">
-                    {step.body}
-                  </p>
-                </FadeIn>
-              </div>
-            ))}
-            <div className="flex min-h-[40vh] items-center">
-              <FadeIn>
-                <p className="font-mono text-sm text-muted-foreground">04</p>
-                <h3 className="mt-2 text-2xl font-semibold tracking-[-0.02em]">
-                  {t('phoneDoneTitle')}
-                </h3>
-                <p className="mt-3 max-w-sm text-[15px] text-muted-foreground">
-                  {t('phoneDoneBody')}
-                </p>
-              </FadeIn>
+        {/* Shared tall wrapper so sticky phone works on mobile + desktop */}
+        <div className="relative pb-16 lg:pb-24">
+          {/* Mobile: compact sticky phone above the steps */}
+          <div className="sticky top-16 z-20 -mx-4 mb-6 border-b border-border/60 bg-background/90 px-4 py-3 backdrop-blur-md lg:hidden">
+            <PhoneMockup screen={screen} size="sm" />
+            <div className="mt-3">
+              <FlowProgress count={steps.length} active={active} />
             </div>
           </div>
-          <div className="relative">
-            <div className="sticky top-28 flex justify-center py-8">
-              <motion.div style={reduce ? undefined : { y: phoneY }}>
-                <PhoneMockup screen={reduce ? 'claim' : screen} />
-              </motion.div>
+
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-14 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="space-y-2 sm:space-y-3">
+              {steps.map((step, i) => (
+                <FlowStep
+                  key={step.title}
+                  index={i}
+                  title={step.title}
+                  body={step.body}
+                  active={active === i}
+                  setActive={setActive}
+                />
+              ))}
+            </div>
+
+            {/* Desktop: sticky phone in the side column */}
+            <div className="relative hidden lg:block">
+              <div className="sticky top-28 flex flex-col items-center gap-4">
+                <PhoneMockup screen={screen} />
+                <FlowProgress count={steps.length} active={active} />
+              </div>
             </div>
           </div>
         </div>
@@ -265,26 +232,64 @@ function Flow() {
   )
 }
 
-function FlowStepMobile({
+function FlowStep({
   index,
   title,
   body,
-  screen,
+  active,
+  setActive,
 }: {
   index: number
   title: string
   body: string
-  screen: PhoneScreen
+  active: boolean
+  setActive: (i: number) => void
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const inView = useInView(ref, {
+    margin: '-40% 0px -40% 0px',
+    amount: 0.4,
+  })
+
+  useEffect(() => {
+    if (inView) setActive(index)
+  }, [inView, index, setActive])
+
   return (
-    <FadeIn className="space-y-6">
-      <div>
-        <p className="font-mono text-sm text-muted-foreground">0{index + 1}</p>
-        <h3 className="mt-2 text-xl font-semibold tracking-[-0.02em]">{title}</h3>
-        <p className="mt-2 text-[15px] text-muted-foreground">{body}</p>
-      </div>
-      <PhoneMockup screen={screen} />
-    </FadeIn>
+    <div
+      ref={ref}
+      className={cn(
+        'rounded-[1.25rem] px-5 py-6 transition-colors duration-200 sm:px-6 sm:py-7 lg:flex lg:min-h-[200px] lg:flex-col lg:justify-center',
+        active
+          ? 'bg-surface dark:border dark:border-border'
+          : 'bg-transparent',
+      )}
+    >
+      <p
+        className={cn(
+          'font-mono text-sm transition-colors duration-200',
+          active ? 'text-foreground' : 'text-muted-foreground',
+        )}
+      >
+        0{index + 1}
+      </p>
+      <h3
+        className={cn(
+          'mt-2 text-xl font-semibold tracking-[-0.02em] transition-colors duration-200 sm:text-2xl',
+          active ? 'text-foreground' : 'text-muted-foreground',
+        )}
+      >
+        {title}
+      </h3>
+      <p
+        className={cn(
+          'mt-2 max-w-md text-[15px] leading-relaxed transition-colors duration-200',
+          active ? 'text-muted-foreground' : 'text-muted-foreground/55',
+        )}
+      >
+        {body}
+      </p>
+    </div>
   )
 }
 
@@ -294,11 +299,7 @@ function Kit() {
   const inView = useInView(ref, { amount: 0.35, once: true })
 
   return (
-    <section
-      id="developers"
-      ref={ref}
-      className="bg-foreground text-background"
-    >
+    <section id="developers" ref={ref} className="bg-foreground text-background">
       <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:px-8 lg:grid-cols-2 lg:py-24">
         <FadeIn>
           <span className="inline-flex items-center gap-2 rounded-full bg-background/10 px-3 py-1 text-xs font-medium text-background/70">
@@ -326,7 +327,7 @@ function Kit() {
             <Typewriter
               text={KIT_CODE}
               active={inView}
-              className="overflow-x-auto rounded-[1rem] bg-background/15 p-5 font-mono text-xs leading-relaxed text-background/90 sm:text-sm"
+              className="min-h-[220px] overflow-x-auto rounded-[1rem] bg-background/15 p-5 font-mono text-xs leading-relaxed text-background/90 sm:text-sm"
             />
           </div>
         </FadeIn>
@@ -366,10 +367,10 @@ function Proof() {
   ]
 
   const corridors = [
-    { rail: t('corridorBrlOn'), status: t('corridorLive'), live: true },
-    { rail: t('corridorMxnOn'), status: t('corridorLive'), live: true },
-    { rail: t('corridorBrlOff'), status: t('corridorLive'), live: true },
-    { rail: t('corridorMxnOff'), status: t('corridorLive'), live: true },
+    { rail: t('corridorBrlOn'), status: t('corridorLive') },
+    { rail: t('corridorMxnOn'), status: t('corridorLive') },
+    { rail: t('corridorBrlOff'), status: t('corridorLive') },
+    { rail: t('corridorMxnOff'), status: t('corridorLive') },
   ]
 
   return (
@@ -393,14 +394,8 @@ function Proof() {
               <div className="rounded-[1.25rem] bg-surface p-5 dark:border dark:border-border">
                 <p className="text-xs text-muted-foreground">{s.label}</p>
                 <p className="mt-2 text-3xl font-semibold tracking-[-0.02em] tabular-nums sm:text-4xl">
-                  {s.prefix ? (
-                    <>
-                      {s.prefix}
-                      <CountUp to={s.value} />
-                    </>
-                  ) : (
-                    <CountUp to={s.value} />
-                  )}
+                  {s.prefix}
+                  <CountUp to={s.value} />
                   <span className="ml-1 text-base font-medium text-muted-foreground">
                     {s.unit}
                   </span>
@@ -415,28 +410,22 @@ function Proof() {
             {t('corridorTitle')}
           </h3>
           <div className="mt-4 overflow-hidden rounded-[1.25rem] bg-surface dark:border dark:border-border">
-            <div className="hidden grid-cols-[1fr_1.2fr_1fr] gap-2 border-b border-transparent px-5 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid dark:border-border">
+            <div className="hidden grid-cols-[1fr_1.2fr_1fr] gap-2 px-5 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid dark:border-b dark:border-border">
               <span>{t('corridorProvider')}</span>
               <span>{t('corridorRail')}</span>
               <span>{t('corridorStatus')}</span>
             </div>
-            {corridors.map((row) => (
+            {corridors.map((row, i) => (
               <div
                 key={row.rail}
                 className={cn(
-                  'grid gap-1 border-t border-transparent px-5 py-4 text-sm dark:border-border md:grid-cols-[1fr_1.2fr_1fr] md:items-center md:gap-2',
+                  'grid gap-1 px-5 py-4 text-sm md:grid-cols-[1fr_1.2fr_1fr] md:items-center md:gap-2',
+                  i > 0 && 'border-t border-transparent dark:border-border',
                 )}
               >
                 <span className="font-medium">Etherfuse</span>
                 <span className="text-muted-foreground">{row.rail}</span>
-                <span
-                  className={cn(
-                    'text-xs font-medium md:text-sm',
-                    row.live ? 'text-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  {row.status}
-                </span>
+                <span className="text-xs font-medium md:text-sm">{row.status}</span>
               </div>
             ))}
           </div>
@@ -459,24 +448,14 @@ function FinalCta() {
             <p className="max-w-md text-pretty text-primary-foreground/80">
               {t('ctaBody')}
             </p>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <ButtonLink
-                size="lg"
-                href="/dashboard"
-                className="bg-foreground text-background hover:opacity-90"
-              >
-                {t('ctaCreate')}
-                <ArrowRight data-icon="inline-end" />
-              </ButtonLink>
-              <ButtonLink
-                size="lg"
-                variant="secondary"
-                href="/dashboard"
-                className="bg-primary-foreground/15 text-primary-foreground hover:bg-primary-foreground/25"
-              >
-                {t('ctaSecondary')}
-              </ButtonLink>
-            </div>
+            <ButtonLink
+              size="lg"
+              href="/dashboard"
+              className="bg-foreground text-background hover:opacity-90"
+            >
+              {t('ctaCreate')}
+              <ArrowRight data-icon="inline-end" />
+            </ButtonLink>
           </div>
         </FadeIn>
       </div>
