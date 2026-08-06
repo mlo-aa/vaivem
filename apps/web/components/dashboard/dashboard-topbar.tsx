@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Menu, Plus, Wallet as WalletIcon } from 'lucide-react'
 import {
@@ -45,6 +45,13 @@ function initials(name: string) {
 export function DashboardTopbar({ title }: { title: string }) {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.replace('/login')
+    router.refresh()
+  }
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-border bg-background/80 px-4 backdrop-blur-lg sm:px-6">
       <div className="flex items-center gap-3">
@@ -125,6 +132,7 @@ export function DashboardTopbar({ title }: { title: string }) {
             <DropdownMenuGroup>
               <DropdownMenuItem render={<Link href="/developers" />}>Developers</DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/" />}>View public site</DropdownMenuItem>
+              <DropdownMenuItem onClick={logout}>Sign out</DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>

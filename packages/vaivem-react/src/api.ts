@@ -134,11 +134,13 @@ function classifyHttpError(status: number, body: { error?: string; message?: str
 /**
  * POST /api/payouts/pix then poll GET /api/payouts/[orderId]
  * until completed | failed | stuck_funded timeout.
+ * When `claimToken` is set, persist the terminal order status onto the claim.
  */
 export async function executePixPayout(
   amount: number,
   apiBaseUrl: string,
   onStep?: (step: number) => void,
+  claimToken?: string,
 ): Promise<PixPayoutResult> {
   onStep?.(1)
   const res = await fetch(joinUrl(apiBaseUrl, "/api/payouts/pix"), {
@@ -157,34 +159,50 @@ export async function executePixPayout(
   if (data.source === "mock") {
     onStep?.(3)
     onStep?.(4)
+    if (claimToken) await persistClaimPayout(claimToken, apiBaseUrl)
     return { orderId, txHash, status: "completed", source: "mock" }
   }
 
   onStep?.(3)
   const deadline = Date.now() + 90_000
-  let lastStatus = String(data.status ?? "submitted")
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 2000))
     const poll = await fetch(joinUrl(apiBaseUrl, `/api/payouts/${encodeURIComponent(orderId)}`))
     const body = await poll.json()
     if (!poll.ok) throw classifyHttpError(poll.status, body)
-    lastStatus = String(body.status ?? "")
+    const lastStatus = String(body.status ?? "")
     if (lastStatus === "completed") {
       onStep?.(4)
+      if (claimToken) await persistClaimPayout(claimToken, apiBaseUrl)
       return { orderId, txHash, status: "completed", source: "live" }
     }
     if (lastStatus === "failed") {
-      throw new PayoutError("anchor_rejected", "The payment provider rejected this payout.")
-    }
-    if (lastStatus === "funded" && Date.now() > deadline - 45_000) {
-      // still funded late in the window
+      if (claimToken) await persistClaimPayout(claimToken, apiBaseUrl)
+      throw new PayoutError("anchor_rejected", "The payment provider rejected this payout.", {
+        orderId,
+        txHash: txHash || undefined,
+      })
     }
   }
+  if (claimToken) await persistClaimPayout(claimToken, apiBaseUrl)
   throw new PayoutError(
     "stuck_funded",
     "The payout was submitted but is still processing. Check back shortly.",
     { orderId, txHash: txHash || undefined },
   )
+}
+
+/** Ask the server to re-read the Etherfuse order and update the claim store. */
+async function persistClaimPayout(token: string, apiBaseUrl: string): Promise<void> {
+  try {
+    await fetch(joinUrl(apiBaseUrl, `/api/claims/by-token/${encodeURIComponent(token)}`), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reconcile" }),
+    })
+  } catch {
+    // Best-effort — GET /api/claims will reconcile later.
+  }
 }
 
 /** Claim a stored claim (PIX settlement via server or Stellar forward). */
@@ -212,39 +230,62 @@ export async function claimByToken(
     claim?: { txHash?: string | null; payoutOrderId?: string | null }
   }
   onStep?.(3)
+
+  const txHash = data.txHash
+    ? String(data.txHash)
+    : data.claim?.txHash
+      ? String(data.claim.txHash)
+      : undefined
+  const orderId = data.orderId
+    ? String(data.orderId)
+    : data.claim?.payoutOrderId
+      ? String(data.claim.payoutOrderId)
+      : undefined
+
   if (!res.ok && res.status !== 202) {
     throw classifyHttpError(res.status, data)
   }
+
+  // Server timed out while the order was still open — keep polling, then persist.
   if (data.error === "stuck_funded" || data.status === "cashing_out") {
+    if (orderId) {
+      const deadline = Date.now() + 90_000
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2000))
+        const poll = await fetch(
+          joinUrl(apiBaseUrl, `/api/payouts/${encodeURIComponent(orderId)}`),
+        )
+        const body = await poll.json()
+        if (!poll.ok) continue
+        const lastStatus = String(body.status ?? "")
+        if (lastStatus === "completed") {
+          await persistClaimPayout(token, apiBaseUrl)
+          onStep?.(4)
+          return { status: "completed", txHash, orderId }
+        }
+        if (lastStatus === "failed") {
+          await persistClaimPayout(token, apiBaseUrl)
+          throw new PayoutError(
+            "anchor_rejected",
+            "The payment provider rejected this payout.",
+            { txHash, orderId },
+          )
+        }
+      }
+    }
+    await persistClaimPayout(token, apiBaseUrl)
     throw new PayoutError(
       "stuck_funded",
       data.message ?? "The payout is still processing.",
-      {
-        txHash: data.txHash
-          ? String(data.txHash)
-          : data.claim?.txHash
-            ? String(data.claim.txHash)
-            : undefined,
-        orderId: data.orderId
-          ? String(data.orderId)
-          : data.claim?.payoutOrderId
-            ? String(data.claim.payoutOrderId)
-            : undefined,
-      },
+      { txHash, orderId },
     )
   }
+
   onStep?.(4)
+  if (body.rail === "pix") await persistClaimPayout(token, apiBaseUrl)
   return {
     status: String(data.status ?? "completed"),
-    txHash: data.txHash
-      ? String(data.txHash)
-      : data.claim?.txHash
-        ? String(data.claim.txHash)
-        : undefined,
-    orderId: data.orderId
-      ? String(data.orderId)
-      : data.claim?.payoutOrderId
-        ? String(data.claim.payoutOrderId)
-        : undefined,
+    txHash,
+    orderId,
   }
 }

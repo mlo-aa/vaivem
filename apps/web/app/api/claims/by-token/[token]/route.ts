@@ -1,6 +1,6 @@
 /**
  * GET  /api/claims/by-token/[token]  — PUBLIC (no secrets).
- * PATCH /api/claims/by-token/[token] — dashboard cancel/refund/extend.
+ * PATCH /api/claims/by-token/[token] — dashboard cancel/refund/extend + reconcile.
  */
 
 import { NextResponse } from "next/server"
@@ -11,6 +11,7 @@ import {
   toPublicClaim,
   updateStoredClaim,
 } from "@/lib/server/claim-store"
+import { reconcileClaimPayout } from "@/lib/server/reconcile-claim"
 
 export const dynamic = "force-dynamic"
 
@@ -23,9 +24,13 @@ export async function GET(
     return NextResponse.json({ error: "token required" }, { status: 400 })
   }
 
-  const claim = await getStoredClaim(token)
+  let claim = await getStoredClaim(token)
   if (!claim) {
     return NextResponse.json({ error: "Claim not found" }, { status: 404 })
+  }
+
+  if (claim.status === "cashing_out" && claim.payoutOrderId) {
+    claim = await reconcileClaimPayout(claim)
   }
 
   return NextResponse.json(toPublicClaim(claim))
@@ -50,6 +55,12 @@ export async function PATCH(
 
   const action = body.action
   try {
+    // Safe for recipients: server re-reads Etherfuse; client cannot invent a status.
+    if (action === "reconcile") {
+      const updated = await reconcileClaimPayout(claim)
+      return NextResponse.json({ claim: updated })
+    }
+
     if (action === "cancel" || action === "refund") {
       try {
         const { hash } = await refundExpiredBalance(claim.balanceId)

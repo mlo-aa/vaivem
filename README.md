@@ -27,4 +27,6 @@ export default function Page() {
 
 **Architecture.** `packages/vaivem-react` is the importable UI (`RampWithdraw`, `ClaimLink`, `useQuote`). `apps/web` hosts product pages and API routes (`/api/quote`, `/api/claims/*`). `apps/demo` imports the package and sets `apiBaseUrl` to `apps/web` (`NEXT_PUBLIC_VAIVEM_API`, default `http://localhost:3000`); it has no quote backend of its own. Provider HTTP calls (Etherfuse, Stellar Horizon) run only in server modules under `apps/web/lib/server/` and in route handlers. The API key is read from env on the server and never sent to the browser.
 
-**What we did not build.** Batch payouts, embedded wallet, webhooks, multi-anchor routing, passkeys, production deployment.
+**Dashboard auth.** The sender console (`/dashboard`, `GET/POST /api/claims` except `by-token`) is a **single-tenant demo** protected by one shared password (`DASHBOARD_PASSWORD`). Login sets an httpOnly signed session cookie. If the env var is unset, access stays open and the server logs a warning — convenient for local dev, not for a shared deploy. Per-sender accounts, invites, and org roles are out of scope. Recipient routes (`/claim/[token]`, `/api/claims/by-token/*`, `/api/quote`, `/api/payouts/*`) stay public so a phone can cash out without credentials.
+
+**What we did not build.** Batch payouts, embedded wallet, webhooks, multi-anchor routing, passkeys, production deployment, multi-user auth.

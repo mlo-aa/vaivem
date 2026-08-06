@@ -299,7 +299,12 @@ export function RampWithdraw({
         return
       }
 
-      const payout = await executePixPayout(amount, apiBaseUrl, (s) => setProcessStep(s))
+      const payout = await executePixPayout(
+        amount,
+        apiBaseUrl,
+        (s) => setProcessStep(s),
+        claimToken,
+      )
       setReference(payout.orderId)
       if (payout.txHash) setTxHash(payout.txHash)
       setStage("done")
