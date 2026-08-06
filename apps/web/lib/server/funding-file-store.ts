@@ -10,7 +10,7 @@ import path from "node:path"
 
 type LedgerEntry = {
   id: string
-  type: "deposit" | "claim_funded" | "refund"
+  type: "deposit" | "deposit_usdc" | "claim_funded" | "refund"
   amount: number
   ref: string
   createdAt: string
@@ -179,7 +179,13 @@ export async function fileHasDepositRef(orderId: string): Promise<boolean> {
   const s = await loadSnapshot()
   if (s.creditedOrders[orderId]) return true
   for (const entries of Object.values(s.ledgers)) {
-    if (entries.some((e) => e.type === "deposit" && e.ref === orderId)) {
+    if (
+      entries.some(
+        (e) =>
+          (e.type === "deposit" || e.type === "deposit_usdc") &&
+          e.ref === orderId,
+      )
+    ) {
       return true
     }
   }

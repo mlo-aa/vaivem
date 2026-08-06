@@ -34,6 +34,7 @@ function serialize(c: Awaited<ReturnType<typeof listStoredClaimsByOwner>>[number
     purpose: c.purpose ?? "Payout",
     reference: c.reference ?? null,
     balanceId: c.balanceId,
+    batchId: c.batchId ?? null,
   }
 }
 

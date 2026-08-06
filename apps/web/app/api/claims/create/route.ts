@@ -51,6 +51,10 @@ export async function POST(req: Request) {
     const displayAmount = Number(body.displayAmount ?? amount)
     const purpose = String(body.purpose ?? "Payout")
     const reference = body.reference != null ? String(body.reference) : null
+    const batchId =
+      body.batchId != null && String(body.batchId).trim()
+        ? String(body.batchId).trim().slice(0, 64)
+        : null
     const allowPix = body.allowPix !== false
     const allowStellar = body.allowStellar !== false
 
@@ -158,6 +162,7 @@ export async function POST(req: Request) {
       displayAmount,
       purpose,
       reference,
+      batchId,
       expiresAt: new Date(deadline * 1000).toISOString(),
     }
     await saveStoredClaim(record)
@@ -175,6 +180,7 @@ export async function POST(req: Request) {
       amount,
       ownerId: who.ownerId,
       senderName,
+      batchId,
     })
   } catch (err) {
     const message =

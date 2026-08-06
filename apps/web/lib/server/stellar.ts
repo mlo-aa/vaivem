@@ -21,8 +21,12 @@ import {
   Memo,
 } from "@stellar/stellar-sdk"
 
-const HORIZON_URL = "https://horizon-testnet.stellar.org"
+export const HORIZON_URL = "https://horizon-testnet.stellar.org"
 const NETWORK_PASSPHRASE = Networks.TESTNET
+
+/** Etherfuse sandbox USDC issuer — the only asset credited for crypto deposits. */
+export const ETHERFUSE_USDC_ISSUER =
+  "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
 
 export class StellarError extends Error {
   constructor(
@@ -153,7 +157,7 @@ function getUsdcAsset() {
 function getEtherfuseUsdcAsset() {
   const raw =
     process.env.ETHERFUSE_USDC_ASSET ??
-    "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+    `USDC:${ETHERFUSE_USDC_ISSUER}`
   const [code, issuer] = raw.includes(":") ? raw.split(":") : ["USDC", raw]
   if (!issuer) {
     throw new StellarError("ETHERFUSE_USDC_ASSET must be CODE:ISSUER or an issuer pubkey")
@@ -161,8 +165,20 @@ function getEtherfuseUsdcAsset() {
   return new Asset(code, issuer)
 }
 
+export function getEtherfuseUsdcCodeIssuer(): { code: string; issuer: string } {
+  const asset = getEtherfuseUsdcAsset()
+  return {
+    code: asset.getCode(),
+    issuer: asset.getIssuer() || ETHERFUSE_USDC_ISSUER,
+  }
+}
+
 export function getSponsorPublicKey(): string {
   return getSponsorKeypair().publicKey()
+}
+
+export function getHorizonServer() {
+  return getServer()
 }
 
 /**

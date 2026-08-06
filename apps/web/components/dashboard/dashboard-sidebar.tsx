@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Link2, Plus, Code2, LifeBuoy, Wallet } from 'lucide-react'
+import { Link2, Plus, Code2, LifeBuoy, Wallet, Upload } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { cn } from '@/lib/utils'
 import { useSenderBalance } from '@/lib/use-sender-balance'
@@ -16,6 +16,12 @@ import {
 const NAV = [
   { label: 'Claims', href: '/dashboard', icon: Link2, needsFunds: false },
   { label: 'Create claim', href: '/dashboard/create', icon: Plus, needsFunds: true },
+  {
+    label: 'Batch CSV',
+    href: '/dashboard/create/batch',
+    icon: Upload,
+    needsFunds: true,
+  },
   { label: 'Funding', href: '/dashboard/funding', icon: Wallet, needsFunds: false },
   { label: 'Developers', href: '/developers', icon: Code2, needsFunds: false },
 ]
@@ -38,7 +44,9 @@ export function DashboardSidebar() {
             const active =
               item.href === '/dashboard'
                 ? pathname === '/dashboard'
-                : pathname.startsWith(item.href)
+                : item.href === '/dashboard/create'
+                  ? pathname === '/dashboard/create'
+                  : pathname.startsWith(item.href)
             const locked = item.needsFunds && createLocked
             const className = cn(
               'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',

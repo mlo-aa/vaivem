@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar'
 import { CreateWizard } from '@/components/dashboard/create-wizard'
@@ -31,6 +32,15 @@ export default function CreateClaimPage() {
     <>
       <DashboardTopbar title="New claim" />
       <main className="flex-1 p-4 sm:p-6">
+        <div className="mx-auto mb-4 max-w-lg text-sm text-muted-foreground">
+          Creating many payouts?{' '}
+          <Link
+            href="/dashboard/create/batch"
+            className="text-foreground underline underline-offset-2"
+          >
+            Upload a CSV batch
+          </Link>
+        </div>
         <CreateWizard />
       </main>
     </>

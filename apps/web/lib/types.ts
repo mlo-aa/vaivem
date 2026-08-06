@@ -85,6 +85,8 @@ export interface Claim {
   reference: string | null
   stellarTransactionHash: string | null
   withdrawalReference: string | null
+  /** Present when created via CSV batch upload. */
+  batchId?: string | null
 }
 
 export interface ClaimEvent {

@@ -34,7 +34,7 @@ const OWNER_PENDING_PREFIX = "funding-pending:"
 const CREDITED_ORDER_PREFIX = "deposit-credited:"
 const LEDGER_MAX = 200
 
-export type LedgerEntryType = "deposit" | "claim_funded" | "refund"
+export type LedgerEntryType = "deposit" | "deposit_usdc" | "claim_funded" | "refund"
 
 export interface LedgerEntry {
   id: string
@@ -106,7 +106,13 @@ export async function isDepositCreditedGlobally(
     if (await fileHasDepositRef(orderId)) return true
   } else {
     for (const entries of memoryLedgers.values()) {
-      if (entries.some((e) => e.type === "deposit" && e.ref === orderId)) {
+      if (
+        entries.some(
+          (e) =>
+            (e.type === "deposit" || e.type === "deposit_usdc") &&
+            e.ref === orderId,
+        )
+      ) {
         return true
       }
     }
@@ -219,6 +225,37 @@ export async function creditDeposit(
   })
   await markDepositCreditedGlobally(orderId)
   return balance
+}
+
+/**
+ * Credit USDC from a Stellar payment (crypto deposit).
+ * Ledger type `deposit_usdc`, ref = transaction hash. Idempotent on tx hash.
+ */
+export async function creditUsdcDeposit(
+  ownerId: string,
+  usdcAmount: number,
+  txHash: string,
+): Promise<{ balance: SenderBalance; newlyCredited: boolean }> {
+  if (await isDepositCreditedGlobally(txHash)) {
+    return { balance: await getBalance(ownerId), newlyCredited: false }
+  }
+  const ledger = await getLedger(ownerId)
+  if (
+    ledger.some(
+      (e) =>
+        (e.type === "deposit_usdc" || e.type === "deposit") && e.ref === txHash,
+    )
+  ) {
+    await markDepositCreditedGlobally(txHash)
+    return { balance: await getBalance(ownerId), newlyCredited: false }
+  }
+  const balance = await applyDelta(ownerId, usdcAmount, {
+    type: "deposit_usdc",
+    amount: usdcAmount,
+    ref: txHash,
+  })
+  await markDepositCreditedGlobally(txHash)
+  return { balance, newlyCredited: true }
 }
 
 /** Debit when creating a claim. Throws if short. */

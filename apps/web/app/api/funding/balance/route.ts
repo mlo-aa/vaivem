@@ -1,11 +1,12 @@
 /**
- * GET /api/funding/balance — reconcile pending on-ramps, then return demo ledger.
+ * GET /api/funding/balance — reconcile on-ramps + USDC deposits, then return demo ledger.
  */
 
 import { NextResponse } from "next/server"
 import { requireOwnerId } from "@/lib/server/auth-session"
 import { getBalance, getLedger } from "@/lib/server/balance-store"
 import { reconcilePendingDeposits } from "@/lib/server/reconcile-funding"
+import { reconcileUsdcDeposits } from "@/lib/server/reconcile-usdc-deposits"
 
 export const dynamic = "force-dynamic"
 
@@ -15,7 +16,10 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const pending = await reconcilePendingDeposits(who.ownerId)
+  const [pending, usdcCredits] = await Promise.all([
+    reconcilePendingDeposits(who.ownerId),
+    reconcileUsdcDeposits(who.ownerId),
+  ])
 
   const [balance, ledger] = await Promise.all([
     getBalance(who.ownerId),
@@ -35,6 +39,10 @@ export async function GET() {
       usdcAmount: p.usdcAmount,
       createdAt: p.createdAt,
       credited: p.credited,
+    })),
+    usdcCredits: usdcCredits.map((c) => ({
+      txHash: c.txHash,
+      amount: c.amount,
     })),
   })
 }

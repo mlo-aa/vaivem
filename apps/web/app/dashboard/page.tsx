@@ -133,7 +133,7 @@ export default function DashboardPage() {
               <EmptyDescription>
                 {funded
                   ? 'Create a claim to lock USDC and share a payout link.'
-                  : 'Your demo balance is empty. Fund with MXN first, then create a claim.'}
+                  : 'Your demo balance is empty. Fund with fiat or USDC first, then create a claim.'}
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>

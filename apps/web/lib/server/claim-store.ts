@@ -44,6 +44,8 @@ export interface StoredClaim {
   purpose?: string
   reference?: string | null
   expiresAt?: string
+  /** Present when created via CSV batch. */
+  batchId?: string | null
 }
 
 /** Public fields safe for the recipient unlock page. */

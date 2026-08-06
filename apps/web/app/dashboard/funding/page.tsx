@@ -21,11 +21,12 @@ import { CUSTODY_LINE } from '@/lib/use-sender-balance'
 
 const SANDBOX_FIAT_MAX = 500
 
+type FundingMethod = 'fiat' | 'usdc'
 type FundingCurrency = 'BRL' | 'MXN'
 
 type LedgerEntry = {
   id: string
-  type: 'deposit' | 'claim_funded' | 'refund'
+  type: 'deposit' | 'deposit_usdc' | 'claim_funded' | 'refund'
   amount: number
   ref: string
   createdAt: string
@@ -51,6 +52,16 @@ type PendingOrder = {
   credited: boolean
 }
 
+type UsdcDepositInfo = {
+  address: string
+  memo: string
+  memoType: string
+  assetCode: string
+  assetIssuer: string
+  network: string
+  note?: string
+}
+
 function hasPixCopyPaste(instructions: DepositInstructions): boolean {
   return Boolean(instructions.pixCopyPaste?.trim())
 }
@@ -58,11 +69,14 @@ function hasPixCopyPaste(instructions: DepositInstructions): boolean {
 export default function FundingPage() {
   const router = useRouter()
   const redirected = useRef(false)
+  const [method, setMethod] = useState<FundingMethod>('fiat')
   const [currency, setCurrency] = useState<FundingCurrency>('BRL')
   const [amount, setAmount] = useState('100')
   const [balance, setBalance] = useState<number | null>(null)
   const [ledger, setLedger] = useState<LedgerEntry[]>([])
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([])
+  const [usdcInfo, setUsdcInfo] = useState<UsdcDepositInfo | null>(null)
+  const [usdcCredits, setUsdcCredits] = useState<{ txHash: string; amount: number }[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [checkingId, setCheckingId] = useState<string | null>(null)
@@ -71,7 +85,7 @@ export default function FundingPage() {
   const [depositNote, setDepositNote] = useState<string | null>(null)
   const [orderStatus, setOrderStatus] = useState<string | null>(null)
   const [quotedUsdc, setQuotedUsdc] = useState<number | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
 
   const refreshBalance = useCallback(async () => {
     const res = await fetch('/api/funding/balance')
@@ -81,12 +95,40 @@ export default function FundingPage() {
     setBalance(next)
     setLedger(Array.isArray(data.ledger) ? data.ledger : [])
     setPendingOrders(Array.isArray(data.pending) ? data.pending : [])
+    if (Array.isArray(data.usdcCredits) && data.usdcCredits.length > 0) {
+      setUsdcCredits(data.usdcCredits)
+    }
     return next
+  }, [])
+
+  const loadUsdcInfo = useCallback(async () => {
+    const res = await fetch('/api/funding/usdc')
+    if (!res.ok) return
+    const data = await res.json()
+    setUsdcInfo({
+      address: String(data.address ?? ''),
+      memo: String(data.memo ?? ''),
+      memoType: String(data.memoType ?? 'hash'),
+      assetCode: String(data.assetCode ?? 'USDC'),
+      assetIssuer: String(data.assetIssuer ?? ''),
+      network: String(data.network ?? 'testnet'),
+      note: typeof data.note === 'string' ? data.note : undefined,
+    })
   }, [])
 
   useEffect(() => {
     void refreshBalance()
   }, [refreshBalance])
+
+  useEffect(() => {
+    if (method === 'usdc') void loadUsdcInfo()
+  }, [method, loadUsdcInfo])
+
+  useEffect(() => {
+    if (method !== 'usdc') return
+    const id = setInterval(() => void refreshBalance(), 8000)
+    return () => clearInterval(id)
+  }, [method, refreshBalance])
 
   useEffect(() => {
     if (!orderId || orderStatus === 'failed') return
@@ -128,7 +170,7 @@ export default function FundingPage() {
     setDepositNote(null)
     setOrderId(null)
     setOrderStatus(null)
-    setCopied(false)
+    setCopied(null)
     redirected.current = false
     try {
       const res = await fetch('/api/funding/deposit', {
@@ -154,11 +196,11 @@ export default function FundingPage() {
     }
   }
 
-  async function copyText(value: string) {
+  async function copyText(value: string, key: string) {
     try {
       await navigator.clipboard.writeText(value)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setCopied(key)
+      setTimeout(() => setCopied(null), 2000)
     } catch {
       setError('Could not copy to clipboard.')
     }
@@ -200,12 +242,31 @@ export default function FundingPage() {
         <div className="rounded-lg border border-border bg-secondary/40 px-4 py-3 text-sm">
           <p className="font-medium">Sandbox funding</p>
           <p className="mt-1 text-muted-foreground">
-            Live Etherfuse on-ramp in sandbox: <strong className="text-foreground">BRL</strong>{' '}
-            (PIX) or <strong className="text-foreground">MXN</strong> (SPEI), up to{' '}
-            <strong className="text-foreground">{SANDBOX_FIAT_MAX}</strong> per order in either
-            currency. After payment completes, reload this page or tap Check status — credits
-            reconcile automatically.
+            Two ways to fund: fiat on-ramp (
+            <strong className="text-foreground">BRL</strong> /{' '}
+            <strong className="text-foreground">MXN</strong>, max {SANDBOX_FIAT_MAX}) or send{' '}
+            <strong className="text-foreground">Etherfuse USDC</strong> on Stellar testnet with
+            your memo. Credits reconcile on every page load.
           </p>
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={method === 'fiat' ? 'default' : 'outline'}
+            onClick={() => setMethod('fiat')}
+          >
+            Fiat on-ramp
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={method === 'usdc' ? 'default' : 'outline'}
+            onClick={() => setMethod('usdc')}
+          >
+            USDC deposit
+          </Button>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -219,11 +280,107 @@ export default function FundingPage() {
                 {balance == null ? '—' : formatUSDC(balance)}
               </p>
               {(balance ?? 0) > 0 ? (
-                <ButtonLink href="/dashboard/create">Create a claim</ButtonLink>
+                <div className="flex flex-wrap gap-2">
+                  <ButtonLink href="/dashboard/create">Create a claim</ButtonLink>
+                  <ButtonLink href="/dashboard/create/batch" variant="outline">
+                    Batch from CSV
+                  </ButtonLink>
+                </div>
               ) : null}
             </CardContent>
           </Card>
 
+          {method === 'usdc' ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Deposit USDC (Stellar)</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  For DAOs and treasuries that already hold USDC. Send to the sponsor address
+                  with your unique memo — credits appear after Horizon sees the payment.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                {!usdcInfo ? (
+                  <p className="text-muted-foreground">Loading deposit details…</p>
+                ) : (
+                  <>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Required asset</p>
+                      <p className="font-mono text-xs break-all">
+                        {usdcInfo.assetCode}:
+                        <span className="text-foreground">{usdcInfo.assetIssuer}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Payments in any other USDC (different issuer) are ignored and will not
+                        be credited.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Destination (sponsor)
+                      </p>
+                      <p className="break-all font-mono text-xs">{usdcInfo.address}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void copyText(usdcInfo.address, 'address')}
+                      >
+                        {copied === 'address' ? 'Copied' : 'Copy address'}
+                      </Button>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Memo (type: Hash) — required for attribution
+                      </p>
+                      <p className="break-all font-mono text-xs">{usdcInfo.memo}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void copyText(usdcInfo.memo, 'memo')}
+                      >
+                        {copied === 'memo' ? 'Copied' : 'Copy memo hex'}
+                      </Button>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-2 rounded-lg border border-border p-3">
+                      <QRCodeSVG value={usdcInfo.address} size={160} bgColor="transparent" />
+                      <p className="text-center text-xs text-muted-foreground">
+                        QR encodes the Stellar address — set memo type Hash and paste the hex
+                        in your wallet before sending.
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void refreshBalance()}
+                    >
+                      Check for deposits
+                    </Button>
+
+                    {usdcCredits.length > 0 ? (
+                      <div className="rounded-md border border-border bg-secondary/40 p-3">
+                        <p className="font-medium">Newly credited</p>
+                        <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+                          {usdcCredits.map((c) => (
+                            <li key={c.txHash}>
+                              {formatUSDC(c.amount)} ·{' '}
+                              <span className="font-mono">{c.txHash.slice(0, 12)}…</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
           <Card>
             <CardHeader>
               <CardTitle>Deposit fiat → USDC</CardTitle>
@@ -306,9 +463,9 @@ export default function FundingPage() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => void copyText(instructions.pixCopyPaste!)}
+                            onClick={() => void copyText(instructions.pixCopyPaste!, 'pix')}
                           >
-                            {copied ? 'Copied' : 'Copy Pix code'}
+                            {copied === 'pix' ? 'Copied' : 'Copy Pix code'}
                           </Button>
                           <div className="flex flex-col items-center gap-1 pt-2">
                             <QRCodeSVG
@@ -358,9 +515,9 @@ export default function FundingPage() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => void copyText(instructions.statusPage!)}
+                            onClick={() => void copyText(instructions.statusPage!, 'status')}
                           >
-                            {copied ? 'Copied link' : 'Copy order page link'}
+                            {copied === 'status' ? 'Copied link' : 'Copy order page link'}
                           </Button>
                         </div>
                       ) : null}
@@ -400,6 +557,7 @@ export default function FundingPage() {
               ) : null}
             </CardContent>
           </Card>
+          )}
         </div>
 
         {pendingOrders.length > 0 ? (

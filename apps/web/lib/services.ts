@@ -42,6 +42,7 @@ export interface CreateClaimInput {
   expirationDays: number
   allowStellar: boolean
   allowPix: boolean
+  batchId?: string
 }
 
 /** API list/detail row → Claim UI model */
@@ -77,6 +78,7 @@ export function mapApiClaim(row: Record<string, unknown>): Claim {
     reference: row.reference != null ? String(row.reference) : null,
     stellarTransactionHash: row.txHash != null ? String(row.txHash) : null,
     withdrawalReference: row.payoutOrderId != null ? String(row.payoutOrderId) : null,
+    batchId: row.batchId != null ? String(row.batchId) : null,
   }
 }
 
@@ -123,6 +125,7 @@ export async function createClaim(
       reference: input.reference ?? null,
       allowPix: input.allowPix,
       allowStellar: input.allowStellar,
+      batchId: input.batchId ?? null,
     }),
   })
   const data = await res.json()
@@ -156,6 +159,7 @@ export async function createClaim(
     reference: input.reference ?? null,
     stellarTransactionHash: data.hash ? String(data.hash) : null,
     withdrawalReference: null,
+    batchId: input.batchId ?? null,
   }
 }
 
