@@ -35,42 +35,6 @@ export function fade(scene: Scene, { from = 0.5, floor = 0.08 }: { from?: number
   }
 }
 
-type Slab = { cx: number; cy: number; w: number; h: number; angle: number; seed: number }
-
-/** A tilted slab: solid hairline edge, interior as a density gradient of dots. */
-function slab(ctx: CanvasRenderingContext2D, cols: number, rows: number, o: Slab) {
-  const rand = mulberry32(o.seed)
-  const cos = Math.cos(-o.angle)
-  const sin = Math.sin(-o.angle)
-  const x0 = Math.max(0, Math.floor(o.cx - o.w))
-  const x1 = Math.min(cols, Math.ceil(o.cx + o.w))
-  const y0 = Math.max(0, Math.floor(o.cy - o.w))
-  const y1 = Math.min(rows, Math.ceil(o.cy + o.w))
-  for (let y = y0; y < y1; y++) {
-    for (let x = x0; x < x1; x++) {
-      const dx = x + 0.5 - o.cx
-      const dy = y + 0.5 - o.cy
-      const u = dx * cos - dy * sin
-      const v = dx * sin + dy * cos
-      if (Math.abs(u) > o.w / 2 || Math.abs(v) > o.h / 2) continue
-      const edge = Math.min(o.w / 2 - Math.abs(u), o.h / 2 - Math.abs(v))
-      const t = u / o.w + 0.5
-      const p = edge < 1.1 ? 1 : 0.24 + 0.7 * smooth(1.2 - t * 1.2)
-      if (rand() < p) ctx.fillRect(x, y, 1, 1)
-    }
-  }
-}
-
-/** Hero: two stacked payout slabs. */
-export const slabsScene: Scene = (ctx, cols, rows) => {
-  const s = Math.min(cols, rows * 1.25)
-  const w = s * 0.74
-  const h = s * 0.26
-  const angle = -0.42
-  slab(ctx, cols, rows, { cx: cols * 0.46, cy: rows * 0.34, w, h, angle, seed: 11 })
-  slab(ctx, cols, rows, { cx: cols * 0.56, cy: rows * 0.66, w, h, angle, seed: 23 })
-}
-
 /**
  * Large word rendered as dots, fitted to the field width.
  * With `zone` (an element id) it also stays inside that element's vertical band.

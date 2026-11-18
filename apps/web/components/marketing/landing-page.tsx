@@ -14,13 +14,13 @@ import { cn } from '@/lib/utils'
 import { Logo } from '@/components/logo'
 import { LandingNav } from '@/components/marketing/landing-nav'
 import { PixelField } from '@/components/marketing/pixel-field'
+import { TerrainField } from '@/components/marketing/terrain-field'
 import { AsciiReceipt, useTyped } from '@/components/marketing/ascii'
 import {
   coinScene,
   fade,
   linkScene,
   pixScene,
-  slabsScene,
   wordScene,
 } from '@/components/marketing/pixel-scenes'
 
@@ -28,7 +28,6 @@ const LIME = '#d4ff3f'
 const LIME_DIM = '#78941f'
 const LINE = 'border-[var(--lp-line)]'
 
-const HERO_SCENES = [slabsScene]
 const FLOW_SCENES = [coinScene, linkScene, pixScene]
 const CTA_SCENES = [fade(wordScene('vaivem', { zone: 'cta-word', fill: 0.97, weight: 800 }), { from: 0.55, floor: 0.22 })]
 
@@ -131,62 +130,116 @@ function Stat({ label, value, unit }: { label: string; value: string; unit: stri
   )
 }
 
+/** A claim that walks through the three steps on its own. */
+function HeroClaim() {
+  const t = useTranslations('landing')
+  const reduce = useReducedMotion()
+  const [step, setStep] = useState(2)
+  useEffect(() => {
+    if (reduce) return
+    setStep(0)
+    const id = window.setInterval(() => setStep((s) => (s + 1) % 3), 2600)
+    return () => window.clearInterval(id)
+  }, [reduce])
+
+  const titles = [t('flowStep1Title'), t('flowStep2Title'), t('flowStep3Title')]
+  return (
+    <div className="w-full max-w-[400px] border border-[var(--lp-line-strong)] bg-black/60 backdrop-blur-md">
+      <div className={cn('flex items-center justify-between border-b px-4 py-2.5', LINE)}>
+        <span className="lp-label">CLAIM 7KQ2-X9</span>
+        <span className="lp-tag">{t('statusTag')}</span>
+      </div>
+      <div className="px-4 py-5">
+        <p className="lp-label">{t('simSend')}</p>
+        <p className="mt-1 text-4xl font-medium tracking-[-0.04em] tabular-nums sm:text-[2.6rem]">
+          100.00<span className="lp-mono ml-2 text-sm font-normal text-[var(--lp-muted)]">USDC</span>
+        </p>
+        <div className="my-4 flex items-center gap-3" aria-hidden>
+          <span className="h-px flex-1 bg-[var(--lp-line-strong)]" />
+          <span className="lp-mono text-xs text-[var(--lp-lime)]">PIX</span>
+          <span className="h-px flex-1 bg-[var(--lp-line-strong)]" />
+        </div>
+        <p className="lp-label">{t('simReceive')}</p>
+        <p className="mt-1 text-2xl font-medium tracking-[-0.03em] tabular-nums text-[var(--lp-lime)]">R$ 511.97</p>
+      </div>
+      <div className={cn('border-t px-4 py-3', LINE)}>
+        <div className="flex gap-1.5" aria-hidden>
+          {titles.map((_, i) => (
+            <span
+              key={i}
+              className={cn(
+                'h-1 flex-1 transition-colors duration-500',
+                i <= step ? 'bg-[var(--lp-lime)]' : 'bg-white/15',
+              )}
+            />
+          ))}
+        </div>
+        <p className="lp-mono mt-2.5 text-xs text-[var(--lp-text)]" aria-live="polite">
+          {String(step + 1).padStart(2, '0')} · {titles[step]}
+          <span className="lp-caret text-[var(--lp-lime)]">_</span>
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function Hero() {
   const t = useTranslations('landing')
-  const cell = useCell(5, 4)
+  const ref = useRef<HTMLElement>(null)
+  const cell = useCell(7, 6)
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] })
 
   return (
-    <section className="pt-14">
-      <Rail>
-        <Cross className="-left-[5px] top-0" />
-        <Cross className="-right-[5px] top-0" />
+    <section ref={ref} className="relative isolate flex min-h-[max(100svh,800px)] flex-col overflow-hidden pt-14">
+      <div className="absolute inset-0 -z-10">
+        <TerrainField progress={scrollYProgress} cell={cell} />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(10,10,11,0.88)_0%,rgba(10,10,11,0.55)_30%,rgba(10,10,11,0.1)_60%,transparent_78%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_55%_45%_at_18%_82%,rgba(10,10,11,0.78),transparent)] max-sm:bg-[rgba(10,10,11,0.38)]" />
+        <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[var(--lp-bg)] to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[var(--lp-bg)] to-transparent" />
+      </div>
 
-        <div className="grid lg:grid-cols-2">
-          <div className={cn('lp-hatch flex flex-col justify-center px-5 py-16 sm:px-10 lg:min-h-[640px] lg:border-r', LINE)}>
-            <span className="lp-tag w-fit">
-              {t('heroChip')}
-              <span aria-hidden className="lp-caret">
-                _
-              </span>
-            </span>
-            <h1 className="lp-h mt-7 max-w-[15ch] text-[clamp(2.5rem,5.2vw,4.6rem)]">{t('heroTitle')}</h1>
-            <p className="mt-6 max-w-[46ch] text-[15px] leading-relaxed text-[var(--lp-muted)] sm:text-base">
-              {t('heroBody')}
-            </p>
-            <div className="mt-9 flex flex-wrap gap-3">
-              <Button href="/dashboard">{t('ctaCreate')}</Button>
-              <Button href="/developers" variant="line">
-                {t('ctaDevelopers')}
-              </Button>
-            </div>
-            <p className="mt-6 text-xs text-[var(--lp-muted)]">{t('heroAside')}</p>
-          </div>
+      {/* measuring ticks along the left edge */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute bottom-0 left-0 top-14 hidden w-3 opacity-70 sm:block"
+        style={{
+          backgroundImage:
+            'repeating-linear-gradient(to bottom, rgba(255,255,255,0.28) 0 1px, transparent 1px 10px), repeating-linear-gradient(to bottom, rgba(212,255,63,0.7) 0 1px, transparent 1px 50px)',
+          backgroundSize: '7px 100%, 13px 100%',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
 
-          <div className={cn('relative min-h-[360px] border-t lg:min-h-[640px] lg:border-t-0', LINE)}>
-            <PixelField
-              scenes={HERO_SCENES}
-              cell={cell}
-              dot={0.62}
-              color={LIME}
-              accent={LIME_DIM}
-              accentEvery={4}
-              idle="wave"
-              wave={0.5}
-              radius={7}
-              maxParticles={7500}
-              label={t('heroChip')}
-            />
-            <span className="lp-tag absolute left-4 top-4">{t('statusTag')}</span>
-            <span aria-hidden className="lp-mono absolute right-4 top-4 text-[11px] tracking-[0.2em] text-[var(--lp-muted)]">
-              ||||||||||||
+      <div className="relative mx-auto flex w-full max-w-[1240px] flex-1 flex-col justify-center gap-12 px-5 py-14 sm:px-10 lg:grid lg:grid-cols-[1.55fr_1fr] lg:items-end lg:gap-10 lg:py-16">
+        <div>
+          <span className="lp-tag w-fit">
+            {t('heroChip')}
+            <span aria-hidden className="lp-caret">
+              _
             </span>
-            <p className="lp-label absolute bottom-4 left-4 hidden normal-case tracking-normal lg:block">
-              {t('heroHint')}
-            </p>
+          </span>
+          <h1 className="lp-h mt-7 max-w-[13ch] text-[clamp(2.9rem,7.4vw,7rem)] leading-[0.93] tracking-[-0.045em]">
+            {t('heroTitle')}
+          </h1>
+          <p className="mt-7 max-w-[46ch] text-[15px] leading-relaxed text-[#b4b7bd] [text-shadow:0_0_14px_#0a0a0b,0_0_4px_#0a0a0b] sm:text-base">
+            {t('heroBody')}
+          </p>
+          <div className="mt-9 flex flex-wrap gap-3">
+            <Button href="/dashboard">{t('ctaCreate')}</Button>
+            <Button href="/developers" variant="line">
+              {t('ctaDevelopers')}
+            </Button>
           </div>
         </div>
 
-        <div className={cn('grid border-t lg:grid-cols-2', LINE)}>
+        <div className="flex lg:justify-end">
+          <HeroClaim />
+        </div>
+      </div>
+
+      <div className={cn('relative border-t bg-[var(--lp-bg)]/70 backdrop-blur-md', LINE)}>
+        <div className="mx-auto grid max-w-[1240px] lg:grid-cols-2">
           <div className={cn('flex flex-col justify-center gap-3 px-5 py-5 sm:px-10 lg:border-r', LINE)}>
             <p className="lp-label">{t('logos')}</p>
             <p className="flex flex-wrap items-center gap-x-8 gap-y-2 text-[15px] font-medium tracking-[-0.01em] text-[var(--lp-muted)]">
@@ -203,7 +256,7 @@ function Hero() {
             <Stat label={t('proofQuoteLabel')} value={t('proofQuoteValue')} unit={t('proofQuoteUnit')} />
           </div>
         </div>
-      </Rail>
+      </div>
     </section>
   )
 }
