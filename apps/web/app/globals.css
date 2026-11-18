@@ -174,3 +174,100 @@
     @apply bg-background text-foreground text-[15px] antialiased;
   }
 }
+
+/* ───────────────────────── Landing (pixel / ascii world) ───────────────────────── */
+.lp {
+  --lp-ink: #050505;
+  --lp-lime: #d4ff3f;
+  --lp-cobalt: #1537ff;
+  --lp-bone: #e8e9ee;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  background: var(--lp-ink);
+  color: var(--lp-bone);
+}
+.lp-pixel {
+  font-family: var(--font-pixel), var(--font-geist-mono), ui-monospace, monospace;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+/* The pixel face makes 5 read as 8 — money figures use mono. */
+.lp-num {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.lp-marquee {
+  overflow: hidden;
+}
+.lp-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: lp-marquee 52s linear infinite;
+}
+.lp-marquee:hover .lp-marquee-track {
+  animation-play-state: paused;
+}
+@keyframes lp-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes lp-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.lp-caret {
+  animation: lp-blink 1s steps(1) infinite;
+}
+@keyframes lp-print {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.lp-print {
+  animation: lp-print 0.3s steps(7) both;
+}
+.lp-range {
+  appearance: none;
+  height: 12px;
+  width: 100%;
+  background:
+    repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 8px) center / 100% 2px no-repeat;
+  cursor: ew-resize;
+}
+.lp-range::-webkit-slider-thumb {
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  background: var(--lp-ink);
+  border: 2px solid currentColor;
+  box-shadow: 3px 3px 0 currentColor;
+}
+.lp-range::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border-radius: 0;
+  background: var(--lp-ink);
+  border: 2px solid currentColor;
+  box-shadow: 3px 3px 0 currentColor;
+}
+.lp-range:focus-visible {
+  outline: 2px dashed currentColor;
+  outline-offset: 6px;
+}
+.lp a:focus-visible,
+.lp button:focus-visible {
+  outline: 2px dashed currentColor;
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-marquee-track,
+  .lp-caret,
+  .lp-print {
+    animation: none;
+  }
+}

@@ -154,7 +154,17 @@
     "corridorNote": "La disponibilidad del proveedor cambia sin aviso. El on-ramp BRL devolvió 424 FailedToGetQuote el 2026-08-05 y 200 el 2026-08-06 (SPIKE.md). Las cotizaciones de off-ramp BRL fallan en todos los montos al 2026-08-06; MXN/SPEI funciona. Trata el estado del corredor como dato en runtime, no como promesa fija.",
     "ctaTitle": "Envía tu primer pago hoy",
     "ctaBody": "Crea un enlace protegido en menos de un minuto. El destinatario lo abre como cualquier mensaje de WhatsApp.",
-    "ctaSecondary": "Explorar el panel"
+    "ctaSecondary": "Explorar el panel",
+    "heroHint": "Mueve el cursor. Los píxeles te siguen.",
+    "scrollHint": "Desliza",
+    "problemHint": "Sigue bajando. El tiempo pasa.",
+    "simTitle": "Prueba un envío",
+    "simAmount": "Monto en USDC",
+    "simSend": "envías",
+    "simFee": "comisión",
+    "simRate": "tasa",
+    "simReceive": "recibe",
+    "simNote": "Tasas ilustrativas, no es una cotización real."
   },
   "dashboard": {
     "title": "Reclamos",

@@ -154,7 +154,17 @@
     "corridorNote": "Provider availability shifts without notice. BRL on-ramp was 424 FailedToGetQuote on 2026-08-05 and returned 200 on 2026-08-06 (SPIKE.md). BRL off-ramp quotes fail at every amount as of 2026-08-06; MXN/SPEI off-ramp quotes succeed. Treat corridor status as runtime data, not a permanent product claim.",
     "ctaTitle": "Send your first payout today",
     "ctaBody": "Create a protected claim link in under a minute. Your recipient opens it like any other WhatsApp message.",
-    "ctaSecondary": "Explore the dashboard"
+    "ctaSecondary": "Explore the dashboard",
+    "heroHint": "Move your cursor. The pixels move with you.",
+    "scrollHint": "Scroll",
+    "problemHint": "Keep scrolling. Time passes.",
+    "simTitle": "Try a payout",
+    "simAmount": "Amount in USDC",
+    "simSend": "send",
+    "simFee": "fee",
+    "simRate": "rate",
+    "simReceive": "receive",
+    "simNote": "Illustrative rates, not a live quote."
   },
   "dashboard": {
     "title": "Claims",
