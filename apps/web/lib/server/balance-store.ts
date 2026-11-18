@@ -93,6 +93,65 @@ function roundUsdc(n: number): number {
   return Math.round(n * 100) / 100
 }
 
+
+// ---------------------------------------------------------------------------
+// Per-owner lock. Balance + ledger updates are read-modify-write, so every
+// mutation runs inside this lock. KV: SET NX (shared across serverless
+// instances) with a TTL so a crashed holder cannot wedge the owner. An
+// in-process chain also serializes callers within one instance (and covers the
+// file/memory stores used locally).
+// ---------------------------------------------------------------------------
+
+const LOCK_PREFIX = "balance-lock:"
+const LOCK_TTL_SECONDS = 15
+const LOCK_MAX_ATTEMPTS = 120
+const processLocks = new Map<string, Promise<unknown>>()
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+async function acquireKvLock(key: string): Promise<string> {
+  const holder = crypto.randomUUID()
+  for (let i = 0; i < LOCK_MAX_ATTEMPTS; i++) {
+    const ok = await kv.set(key, holder, { nx: true, ex: LOCK_TTL_SECONDS })
+    if (ok) return holder
+    await sleep(40 + Math.random() * 60)
+  }
+  throw new Error("balance_lock_timeout")
+}
+
+async function releaseKvLock(key: string, holder: string): Promise<void> {
+  try {
+    if ((await kv.get<string>(key)) === holder) await kv.del(key)
+  } catch {
+    /* TTL will free it */
+  }
+}
+
+async function withOwnerLock<T>(
+  ownerId: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const prev = processLocks.get(ownerId) ?? Promise.resolve()
+  const run = prev.catch(() => undefined).then(async () => {
+    if (!kvConfigured()) return fn()
+    const key = `${LOCK_PREFIX}${ownerId}`
+    const holder = await acquireKvLock(key)
+    try {
+      return await fn()
+    } finally {
+      await releaseKvLock(key, holder)
+    }
+  })
+  processLocks.set(ownerId, run)
+  try {
+    return await run
+  } finally {
+    if (processLocks.get(ownerId) === run) processLocks.delete(ownerId)
+  }
+}
+
 function creditedOrderKey(orderId: string) {
   return `${CREDITED_ORDER_PREFIX}${orderId}`
 }
@@ -210,6 +269,16 @@ export async function creditDeposit(
   usdcAmount: number,
   orderId: string,
 ): Promise<SenderBalance> {
+  return withOwnerLock(ownerId, () =>
+    creditDepositLocked(ownerId, usdcAmount, orderId),
+  )
+}
+
+async function creditDepositLocked(
+  ownerId: string,
+  usdcAmount: number,
+  orderId: string,
+): Promise<SenderBalance> {
   if (await isDepositCreditedGlobally(orderId)) {
     return getBalance(ownerId)
   }
@@ -232,6 +301,16 @@ export async function creditDeposit(
  * Ledger type `deposit_usdc`, ref = transaction hash. Idempotent on tx hash.
  */
 export async function creditUsdcDeposit(
+  ownerId: string,
+  usdcAmount: number,
+  txHash: string,
+): Promise<{ balance: SenderBalance; newlyCredited: boolean }> {
+  return withOwnerLock(ownerId, () =>
+    creditUsdcDepositLocked(ownerId, usdcAmount, txHash),
+  )
+}
+
+async function creditUsdcDepositLocked(
   ownerId: string,
   usdcAmount: number,
   txHash: string,
@@ -264,6 +343,16 @@ export async function debitForClaim(
   usdcAmount: number,
   claimToken: string,
 ): Promise<SenderBalance> {
+  return withOwnerLock(ownerId, () =>
+    debitForClaimLocked(ownerId, usdcAmount, claimToken),
+  )
+}
+
+async function debitForClaimLocked(
+  ownerId: string,
+  usdcAmount: number,
+  claimToken: string,
+): Promise<SenderBalance> {
   const current = await getBalance(ownerId)
   if (current.amount + 1e-9 < usdcAmount) {
     const err = new Error("insufficient_balance")
@@ -284,10 +373,17 @@ export async function creditRefund(
   usdcAmount: number,
   claimToken: string,
 ): Promise<SenderBalance> {
-  return applyDelta(ownerId, usdcAmount, {
-    type: "refund",
-    amount: usdcAmount,
-    ref: claimToken,
+  return withOwnerLock(ownerId, async () => {
+    // Idempotent per claim: a retried cancel/rollback must not credit twice.
+    const ledger = await getLedger(ownerId)
+    if (ledger.some((e) => e.type === "refund" && e.ref === claimToken)) {
+      return getBalance(ownerId)
+    }
+    return applyDelta(ownerId, usdcAmount, {
+      type: "refund",
+      amount: usdcAmount,
+      ref: claimToken,
+    })
   })
 }
 

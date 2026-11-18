@@ -14,7 +14,7 @@ import {
 } from "@/lib/server/claim-store"
 import type { ProtectionType } from "@/lib/types"
 import { isBelowMinimum, minAmountMessage, MIN_AMOUNT_USDC } from "@/lib/limits"
-import { debitForClaim, getBalance } from "@/lib/server/balance-store"
+import { creditRefund, debitForClaim } from "@/lib/server/balance-store"
 
 export type CreateClaimInput = {
   amount: number
@@ -154,47 +154,62 @@ export async function createClaimForOwner(
       }
     }
 
-    const balance = await getBalance(owner.ownerId)
-    if (balance.amount + 1e-9 < amount) {
-      return {
-        ok: false,
-        failure: {
-          error: "insufficient_balance",
-          message: `Insufficient balance. You have ${balance.amount.toFixed(2)} USDC and need ${amount.toFixed(2)} USDC.`,
-          status: 402,
-          available: balance.amount,
-          required: amount,
-        },
-      }
-    }
-
+    let recipientPublicKey = ""
     const expiresInSeconds = Math.floor(expirationDays * 86400)
     const amountStr = amount.toFixed(2)
-
-    const recipient = generateRecipientKeypair()
-    await createSponsoredAccount(recipient.publicKey, recipient.secret)
-
-    const { balanceId, hash, deadline } = await createClaimableBalance(
-      recipient.publicKey,
-      amountStr,
-      expiresInSeconds,
-    )
-
-    await recipientSecretsByBalanceId.set(balanceId, recipient.secret, deadline)
-
     const token = generateClaimToken()
+
+    // Debit FIRST, atomically (per-owner lock inside balance-store). Funding the
+    // on-chain escrow before debiting let concurrent requests all pass a
+    // balance check and leave sponsor-paid orphan escrows behind.
     try {
       await debitForClaim(owner.ownerId, amount, token)
     } catch (err) {
       if (err instanceof Error && err.message === "insufficient_balance") {
+        const available = (err as Error & { available?: number }).available
         return {
           ok: false,
           failure: {
             error: "insufficient_balance",
-            message: "Insufficient balance.",
+            message:
+              available != null
+                ? `Insufficient balance. You have ${available.toFixed(2)} USDC and need ${amount.toFixed(2)} USDC.`
+                : "Insufficient balance.",
             status: 402,
+            available,
+            required: amount,
           },
         }
+      }
+      throw err
+    }
+
+    let balanceId: string
+    let hash: string
+    let deadline: number
+    try {
+      const recipient = generateRecipientKeypair()
+      await createSponsoredAccount(recipient.publicKey, recipient.secret)
+      const created = await createClaimableBalance(
+        recipient.publicKey,
+        amountStr,
+        expiresInSeconds,
+      )
+      balanceId = created.balanceId
+      hash = created.hash
+      deadline = created.deadline
+      await recipientSecretsByBalanceId.set(balanceId, recipient.secret, deadline)
+      recipientPublicKey = recipient.publicKey
+    } catch (err) {
+      // Nothing escrowed (or escrow unreachable): give the balance back.
+      try {
+        await creditRefund(owner.ownerId, amount, token)
+      } catch (refundErr) {
+        console.error(
+          "[createClaimForOwner] rollback refund failed for",
+          token,
+          refundErr instanceof Error ? refundErr.message : refundErr,
+        )
       }
       throw err
     }
@@ -204,7 +219,7 @@ export async function createClaimForOwner(
       token,
       ownerId: owner.ownerId,
       balanceId,
-      recipientPublicKey: recipient.publicKey,
+      recipientPublicKey,
       amount,
       country,
       senderName,
