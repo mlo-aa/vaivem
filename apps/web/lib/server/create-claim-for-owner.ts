@@ -156,6 +156,67 @@ export async function createClaimForOwner(
       }
     }
 
+    const maxAmount = Number(process.env.MAX_CLAIM_USDC ?? 1000)
+    if (Number.isFinite(maxAmount) && amount > maxAmount) {
+      return {
+        ok: false,
+        failure: {
+          error: "amount_above_maximum",
+          message: `amount exceeds the maximum of ${maxAmount} USDC per claim`,
+          status: 422,
+        },
+      }
+    }
+    const tooLong =
+      recipientName.length > 100 ||
+      (message?.length ?? 0) > 500 ||
+      purpose.length > 100 ||
+      (reference?.length ?? 0) > 200 ||
+      (accessCode?.length ?? 0) > 64
+    if (tooLong) {
+      return {
+        ok: false,
+        failure: {
+          error: "field_too_long",
+          message: "recipientName/purpose ≤ 100, message ≤ 500, reference ≤ 200, accessCode ≤ 64 characters",
+          status: 400,
+        },
+      }
+    }
+    if (expirationDays > 90) {
+      return {
+        ok: false,
+        failure: {
+          error: "expirationDays_invalid",
+          message: "expirationDays must be 90 or less",
+          status: 400,
+        },
+      }
+    }
+    if (!["public", "email", "code"].includes(protectionType)) {
+      return {
+        ok: false,
+        failure: {
+          error: "protection_invalid",
+          message: "protectionType must be public, email or code",
+          status: 400,
+        },
+      }
+    }
+    if (
+      protectionType === "email" &&
+      !(recipientEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))
+    ) {
+      return {
+        ok: false,
+        failure: {
+          error: "recipientEmail_required",
+          message: "a valid recipientEmail is required for email protection",
+          status: 400,
+        },
+      }
+    }
+
     let recipientPublicKey = ""
     const expiresInSeconds = Math.floor(expirationDays * 86400)
     const amountStr = amount.toFixed(2)
@@ -244,7 +305,16 @@ export async function createClaimForOwner(
       batchId,
       expiresAt: new Date(deadline * 1000).toISOString(),
     }
-    await saveStoredClaim(record)
+    try {
+      await saveStoredClaim(record)
+    } catch (err) {
+      // Escrow exists but we cannot track it: return the balance. The sponsor can
+      // reclaim the escrow after the deadline (predicateNot claimant).
+      await creditRefund(owner.ownerId, amount, token).catch((e) =>
+        console.error("[createClaimForOwner] refund after save failure:", e),
+      )
+      throw err
+    }
 
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL ??

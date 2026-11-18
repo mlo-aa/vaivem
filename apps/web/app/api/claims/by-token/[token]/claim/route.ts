@@ -38,6 +38,8 @@ import {
 } from "@/lib/server/etherfuse"
 
 export const dynamic = "force-dynamic"
+/** Settlement polls the provider for up to ~90s; the default limit would kill it mid-payout. */
+export const maxDuration = 120
 
 const POLL_MS = 2000
 const POLL_TIMEOUT_MS = 90_000
@@ -297,6 +299,10 @@ export async function POST(
     })
     const { orderId, withdrawAnchorAccount, withdrawMemo } = order.offramp
 
+    // Persist the order id BEFORE moving funds: if this function is killed
+    // mid-payout, reconcileClaimPayout can still finish the claim from Etherfuse.
+    await updateStoredClaim(token, { payoutMethod, payoutOrderId: orderId })
+
     // Anchor destination is ready — now claim the escrow.
     await claimBalance(claim.balanceId, secret)
     escrowClaimed = true
@@ -394,7 +400,11 @@ export async function POST(
         )
       }
     } else {
-      await updateStoredClaim(token, { status: "shared" })
+      await updateStoredClaim(token, {
+        status: "shared",
+        payoutMethod: null,
+        payoutOrderId: null,
+      })
     }
 
     return NextResponse.json(
