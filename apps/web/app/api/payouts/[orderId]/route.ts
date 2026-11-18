@@ -32,7 +32,6 @@ export async function GET(
       orderId: order.orderId ?? orderId,
       status: order.status,
       source: "live" as const,
-      raw: order,
     })
   } catch (err) {
     const message =

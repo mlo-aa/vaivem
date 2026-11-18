@@ -5,6 +5,8 @@
 
 import { NextResponse } from "next/server"
 import { getStoredClaim } from "@/lib/server/claim-store"
+import { verifyAccessCode } from "@/lib/server/access-code"
+import { clientIp, hit } from "@/lib/server/rate-limit"
 
 export const dynamic = "force-dynamic"
 
@@ -29,7 +31,19 @@ export async function POST(
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
-  if (!body.accessCode || body.accessCode !== claim.accessCode) {
+  // Brute-force guard: per claim and per client IP.
+  const [perClaim, perIp] = await Promise.all([
+    hit(`unlock:${claim.token}`, 10, 900),
+    hit(`unlock-ip:${clientIp(req)}:${claim.token}`, 8, 900),
+  ])
+  if (!perClaim.ok || !perIp.ok) {
+    return NextResponse.json(
+      { error: "too_many_attempts", message: "Too many attempts. Try again later." },
+      { status: 429 },
+    )
+  }
+
+  if (!verifyAccessCode(claim.accessCode, body.accessCode)) {
     return NextResponse.json(
       { error: "invalid_code", message: "That code doesn't match." },
       { status: 401 },

@@ -26,6 +26,7 @@
  */
 
 import { NextResponse } from "next/server"
+import { requireOwnerId } from "@/lib/server/auth-session"
 import {
   createOrder,
   createQuote,
@@ -64,6 +65,13 @@ function mockPayout(amount: number): PixPayoutResponse {
 }
 
 export async function POST(req: Request) {
+  // Spends the sponsor wallet's USDC: authenticated senders only. Recipients
+  // settle through /api/claims/by-token/[token]/claim, which is escrow-backed.
+  const who = await requireOwnerId()
+  if (!who.ok) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   let amount: number
 
   try {

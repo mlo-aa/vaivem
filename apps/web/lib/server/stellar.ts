@@ -189,30 +189,69 @@ export async function payAnchor(
   memoBase64: string,
   amount: string,
 ): Promise<{ hash: string }> {
-  const sponsor = getSponsorKeypair()
-  const asset = getEtherfuseUsdcAsset()
-  const server = getServer()
-  const memo = Memo.hash(Buffer.from(memoBase64, "base64"))
+  return withSponsorSequence(async () => {
+    const sponsor = getSponsorKeypair()
+    const asset = getEtherfuseUsdcAsset()
+    const server = getServer()
+    const memo = Memo.hash(Buffer.from(memoBase64, "base64"))
 
-  const acc = await server.loadAccount(sponsor.publicKey())
-  const tx = new TransactionBuilder(acc, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
+    const acc = await server.loadAccount(sponsor.publicKey())
+    const tx = new TransactionBuilder(acc, {
+      fee: BASE_FEE,
+      networkPassphrase: NETWORK_PASSPHRASE,
+    })
+      .addOperation(
+        Operation.payment({
+          destination,
+          asset,
+          amount: String(amount),
+        }),
+      )
+      .addMemo(memo)
+      .setTimeout(120)
+      .build()
+
+    tx.sign(sponsor)
+    const res = await submitTransaction(tx, "payAnchor")
+    return { hash: res.hash }
   })
-    .addOperation(
-      Operation.payment({
-        destination,
-        asset,
-        amount: String(amount),
-      }),
-    )
-    .addMemo(memo)
-    .setTimeout(120)
-    .build()
+}
 
-  tx.sign(sponsor)
-  const res = await submitTransaction(tx, "payAnchor")
-  return { hash: res.hash }
+
+/**
+ * Every tx whose SOURCE is the sponsor account consumes the sponsor's sequence
+ * number. Concurrent requests (batch CSV, parallel API calls) would collide with
+ * tx_bad_seq, so they run one at a time per process and retry on a stale
+ * sequence (covers other serverless instances). Fee-bumps don't consume it.
+ */
+let sponsorChain: Promise<unknown> = Promise.resolve()
+
+function isBadSeq(err: unknown): boolean {
+  if (!(err instanceof StellarError)) return false
+  return (
+    err.resultCodes?.transaction === "tx_bad_seq" ||
+    err.message.includes("tx_bad_seq")
+  )
+}
+
+async function withSponsorSequence<T>(fn: () => Promise<T>): Promise<T> {
+  const run = sponsorChain
+    .catch(() => undefined)
+    .then(async () => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await fn()
+        } catch (err) {
+          if (attempt < 4 && isBadSeq(err)) {
+            await new Promise((r) => setTimeout(r, 250 * (attempt + 1)))
+            continue
+          }
+          throw err
+        }
+      }
+    })
+  sponsorChain = run
+  return run
 }
 
 function extractResultCodes(err: unknown): StellarError["resultCodes"] | undefined {
@@ -267,47 +306,49 @@ export async function createSponsoredAccount(
   recipientPublicKey: string,
   recipientSecret: string,
 ): Promise<{ hash: string }> {
-  const sponsor = getSponsorKeypair()
-  const recipient = Keypair.fromSecret(recipientSecret)
-  if (recipient.publicKey() !== recipientPublicKey) {
-    throw new StellarError("recipientPublicKey does not match recipientSecret")
-  }
-  const USDC = getUsdcAsset()
-  const server = getServer()
+  return withSponsorSequence(async () => {
+    const sponsor = getSponsorKeypair()
+    const recipient = Keypair.fromSecret(recipientSecret)
+    if (recipient.publicKey() !== recipientPublicKey) {
+      throw new StellarError("recipientPublicKey does not match recipientSecret")
+    }
+    const USDC = getUsdcAsset()
+    const server = getServer()
 
-  const acc = await server.loadAccount(sponsor.publicKey())
-  const tx = new TransactionBuilder(acc, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
+    const acc = await server.loadAccount(sponsor.publicKey())
+    const tx = new TransactionBuilder(acc, {
+      fee: BASE_FEE,
+      networkPassphrase: NETWORK_PASSPHRASE,
+    })
+      .addOperation(
+        Operation.beginSponsoringFutureReserves({
+          sponsoredId: recipientPublicKey,
+        }),
+      )
+      .addOperation(
+        Operation.createAccount({
+          destination: recipientPublicKey,
+          startingBalance: "0",
+        }),
+      )
+      .addOperation(
+        Operation.changeTrust({
+          asset: USDC,
+          source: recipientPublicKey,
+        }),
+      )
+      .addOperation(
+        Operation.endSponsoringFutureReserves({
+          source: recipientPublicKey,
+        }),
+      )
+      .setTimeout(60)
+      .build()
+
+    tx.sign(sponsor, recipient)
+    const res = await submitTransaction(tx, "createSponsoredAccount")
+    return { hash: res.hash }
   })
-    .addOperation(
-      Operation.beginSponsoringFutureReserves({
-        sponsoredId: recipientPublicKey,
-      }),
-    )
-    .addOperation(
-      Operation.createAccount({
-        destination: recipientPublicKey,
-        startingBalance: "0",
-      }),
-    )
-    .addOperation(
-      Operation.changeTrust({
-        asset: USDC,
-        source: recipientPublicKey,
-      }),
-    )
-    .addOperation(
-      Operation.endSponsoringFutureReserves({
-        source: recipientPublicKey,
-      }),
-    )
-    .setTimeout(60)
-    .build()
-
-  tx.sign(sponsor, recipient)
-  const res = await submitTransaction(tx, "createSponsoredAccount")
-  return { hash: res.hash }
 }
 
 /**
@@ -320,38 +361,40 @@ export async function createClaimableBalance(
   amount: string,
   expiresInSeconds: number,
 ): Promise<{ balanceId: string; hash: string; deadline: number }> {
-  const sponsor = getSponsorKeypair()
-  const USDC = getUsdcAsset()
-  const server = getServer()
+  return withSponsorSequence(async () => {
+    const sponsor = getSponsorKeypair()
+    const USDC = getUsdcAsset()
+    const server = getServer()
 
-  const deadline = Math.floor(Date.now() / 1000) + expiresInSeconds
-  const before = Claimant.predicateBeforeAbsoluteTime(String(deadline))
+    const deadline = Math.floor(Date.now() / 1000) + expiresInSeconds
+    const before = Claimant.predicateBeforeAbsoluteTime(String(deadline))
 
-  const claimants = [
-    new Claimant(recipientPublicKey, before),
-    new Claimant(sponsor.publicKey(), Claimant.predicateNot(before)),
-  ]
+    const claimants = [
+      new Claimant(recipientPublicKey, before),
+      new Claimant(sponsor.publicKey(), Claimant.predicateNot(before)),
+    ]
 
-  const acc = await server.loadAccount(sponsor.publicKey())
-  const tx = new TransactionBuilder(acc, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
+    const acc = await server.loadAccount(sponsor.publicKey())
+    const tx = new TransactionBuilder(acc, {
+      fee: BASE_FEE,
+      networkPassphrase: NETWORK_PASSPHRASE,
+    })
+      .addOperation(
+        Operation.createClaimableBalance({
+          asset: USDC,
+          amount: String(amount),
+          claimants,
+        }),
+      )
+      .setTimeout(60)
+      .build()
+
+    tx.sign(sponsor)
+    const res = await submitTransaction(tx, "createClaimableBalance")
+    const balanceId = tx.getClaimableBalanceId(0)
+
+    return { balanceId, hash: res.hash, deadline }
   })
-    .addOperation(
-      Operation.createClaimableBalance({
-        asset: USDC,
-        amount: String(amount),
-        claimants,
-      }),
-    )
-    .setTimeout(60)
-    .build()
-
-  tx.sign(sponsor)
-  const res = await submitTransaction(tx, "createClaimableBalance")
-  const balanceId = tx.getClaimableBalanceId(0)
-
-  return { balanceId, hash: res.hash, deadline }
 }
 
 /**
@@ -482,34 +525,36 @@ export async function claimAndForward(
  * Before the deadline Horizon returns op_cannot_claim — expected; surfaced as StellarError.
  */
 export async function refundExpiredBalance(balanceId: string): Promise<{ hash: string }> {
-  const sponsor = getSponsorKeypair()
-  const server = getServer()
+  return withSponsorSequence(async () => {
+    const sponsor = getSponsorKeypair()
+    const server = getServer()
 
-  const acc = await server.loadAccount(sponsor.publicKey())
-  const tx = new TransactionBuilder(acc, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(Operation.claimClaimableBalance({ balanceId }))
-    .setTimeout(60)
-    .build()
-  tx.sign(sponsor)
+    const acc = await server.loadAccount(sponsor.publicKey())
+    const tx = new TransactionBuilder(acc, {
+      fee: BASE_FEE,
+      networkPassphrase: NETWORK_PASSPHRASE,
+    })
+      .addOperation(Operation.claimClaimableBalance({ balanceId }))
+      .setTimeout(60)
+      .build()
+    tx.sign(sponsor)
 
-  try {
-    const res = await submitTransaction(tx, "refundExpiredBalance")
-    return { hash: res.hash }
-  } catch (err) {
-    if (err instanceof StellarError) {
-      const ops = err.resultCodes?.operations ?? []
-      if (ops.includes("op_cannot_claim")) {
-        throw new StellarError(
-          "Claimable balance cannot be claimed yet (op_cannot_claim) — deadline has not passed",
-          err.resultCodes,
-        )
+    try {
+      const res = await submitTransaction(tx, "refundExpiredBalance")
+      return { hash: res.hash }
+    } catch (err) {
+      if (err instanceof StellarError) {
+        const ops = err.resultCodes?.operations ?? []
+        if (ops.includes("op_cannot_claim")) {
+          throw new StellarError(
+            "Claimable balance cannot be claimed yet (op_cannot_claim) — deadline has not passed",
+            err.resultCodes,
+          )
+        }
       }
+      throw err
     }
-    throw err
-  }
+  })
 }
 
 /** Balances plus subentry_count, num_sponsoring, num_sponsored. */

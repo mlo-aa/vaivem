@@ -14,7 +14,8 @@ import {
 } from "@/lib/server/claim-store"
 import type { ProtectionType } from "@/lib/types"
 import { isBelowMinimum, minAmountMessage, MIN_AMOUNT_USDC } from "@/lib/limits"
-import { debitForClaim, getBalance } from "@/lib/server/balance-store"
+import { hashAccessCode } from "@/lib/server/access-code"
+import { creditRefund, debitForClaim } from "@/lib/server/balance-store"
 
 export type CreateClaimInput = {
   amount: number
@@ -80,6 +81,7 @@ export async function createClaimForOwner(
       protectionType === "code" && body.accessCode
         ? String(body.accessCode)
         : null
+    const accessCodeStored = accessCode ? hashAccessCode(accessCode) : null
     const expirationDays = Number(body.expirationDays ?? 7)
     const displayCurrency = body.displayCurrency === "USD" ? "USD" : "BRL"
     const displayAmount = Number(body.displayAmount ?? amount)
@@ -154,47 +156,123 @@ export async function createClaimForOwner(
       }
     }
 
-    const balance = await getBalance(owner.ownerId)
-    if (balance.amount + 1e-9 < amount) {
+    const maxAmount = Number(process.env.MAX_CLAIM_USDC ?? 1000)
+    if (Number.isFinite(maxAmount) && amount > maxAmount) {
       return {
         ok: false,
         failure: {
-          error: "insufficient_balance",
-          message: `Insufficient balance. You have ${balance.amount.toFixed(2)} USDC and need ${amount.toFixed(2)} USDC.`,
-          status: 402,
-          available: balance.amount,
-          required: amount,
+          error: "amount_above_maximum",
+          message: `amount exceeds the maximum of ${maxAmount} USDC per claim`,
+          status: 422,
+        },
+      }
+    }
+    const tooLong =
+      recipientName.length > 100 ||
+      (message?.length ?? 0) > 500 ||
+      purpose.length > 100 ||
+      (reference?.length ?? 0) > 200 ||
+      (accessCode?.length ?? 0) > 64
+    if (tooLong) {
+      return {
+        ok: false,
+        failure: {
+          error: "field_too_long",
+          message: "recipientName/purpose ≤ 100, message ≤ 500, reference ≤ 200, accessCode ≤ 64 characters",
+          status: 400,
+        },
+      }
+    }
+    if (expirationDays > 90) {
+      return {
+        ok: false,
+        failure: {
+          error: "expirationDays_invalid",
+          message: "expirationDays must be 90 or less",
+          status: 400,
+        },
+      }
+    }
+    if (!["public", "email", "code"].includes(protectionType)) {
+      return {
+        ok: false,
+        failure: {
+          error: "protection_invalid",
+          message: "protectionType must be public, email or code",
+          status: 400,
+        },
+      }
+    }
+    if (
+      protectionType === "email" &&
+      !(recipientEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))
+    ) {
+      return {
+        ok: false,
+        failure: {
+          error: "recipientEmail_required",
+          message: "a valid recipientEmail is required for email protection",
+          status: 400,
         },
       }
     }
 
+    let recipientPublicKey = ""
     const expiresInSeconds = Math.floor(expirationDays * 86400)
     const amountStr = amount.toFixed(2)
-
-    const recipient = generateRecipientKeypair()
-    await createSponsoredAccount(recipient.publicKey, recipient.secret)
-
-    const { balanceId, hash, deadline } = await createClaimableBalance(
-      recipient.publicKey,
-      amountStr,
-      expiresInSeconds,
-    )
-
-    await recipientSecretsByBalanceId.set(balanceId, recipient.secret, deadline)
-
     const token = generateClaimToken()
+
+    // Debit FIRST, atomically (per-owner lock inside balance-store). Funding the
+    // on-chain escrow before debiting let concurrent requests all pass a
+    // balance check and leave sponsor-paid orphan escrows behind.
     try {
       await debitForClaim(owner.ownerId, amount, token)
     } catch (err) {
       if (err instanceof Error && err.message === "insufficient_balance") {
+        const available = (err as Error & { available?: number }).available
         return {
           ok: false,
           failure: {
             error: "insufficient_balance",
-            message: "Insufficient balance.",
+            message:
+              available != null
+                ? `Insufficient balance. You have ${available.toFixed(2)} USDC and need ${amount.toFixed(2)} USDC.`
+                : "Insufficient balance.",
             status: 402,
+            available,
+            required: amount,
           },
         }
+      }
+      throw err
+    }
+
+    let balanceId: string
+    let hash: string
+    let deadline: number
+    try {
+      const recipient = generateRecipientKeypair()
+      await createSponsoredAccount(recipient.publicKey, recipient.secret)
+      const created = await createClaimableBalance(
+        recipient.publicKey,
+        amountStr,
+        expiresInSeconds,
+      )
+      balanceId = created.balanceId
+      hash = created.hash
+      deadline = created.deadline
+      await recipientSecretsByBalanceId.set(balanceId, recipient.secret, deadline)
+      recipientPublicKey = recipient.publicKey
+    } catch (err) {
+      // Nothing escrowed (or escrow unreachable): give the balance back.
+      try {
+        await creditRefund(owner.ownerId, amount, token)
+      } catch (refundErr) {
+        console.error(
+          "[createClaimForOwner] rollback refund failed for",
+          token,
+          refundErr instanceof Error ? refundErr.message : refundErr,
+        )
       }
       throw err
     }
@@ -204,7 +282,7 @@ export async function createClaimForOwner(
       token,
       ownerId: owner.ownerId,
       balanceId,
-      recipientPublicKey: recipient.publicKey,
+      recipientPublicKey,
       amount,
       country,
       senderName,
@@ -212,7 +290,7 @@ export async function createClaimForOwner(
       recipientEmail,
       message,
       protectionType,
-      accessCode,
+      accessCode: accessCodeStored,
       status: "shared",
       deadline,
       createdAt: now,
@@ -227,7 +305,16 @@ export async function createClaimForOwner(
       batchId,
       expiresAt: new Date(deadline * 1000).toISOString(),
     }
-    await saveStoredClaim(record)
+    try {
+      await saveStoredClaim(record)
+    } catch (err) {
+      // Escrow exists but we cannot track it: return the balance. The sponsor can
+      // reclaim the escrow after the deadline (predicateNot claimant).
+      await creditRefund(owner.ownerId, amount, token).catch((e) =>
+        console.error("[createClaimForOwner] refund after save failure:", e),
+      )
+      throw err
+    }
 
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL ??

@@ -20,6 +20,8 @@ import {
   returnSponsoredUsdcToSponsor,
   StellarError,
 } from "@/lib/server/stellar"
+import { verifyAccessCode } from "@/lib/server/access-code"
+import { hit, tryLock } from "@/lib/server/rate-limit"
 import { recipientSecretsByBalanceId } from "@/lib/server/claim-secrets"
 import {
   getStoredClaim,
@@ -36,6 +38,8 @@ import {
 } from "@/lib/server/etherfuse"
 
 export const dynamic = "force-dynamic"
+/** Settlement polls the provider for up to ~90s; the default limit would kill it mid-payout. */
+export const maxDuration = 120
 
 const POLL_MS = 2000
 const POLL_TIMEOUT_MS = 90_000
@@ -180,7 +184,14 @@ export async function POST(
   }
 
   if (claim.protectionType === "code") {
-    if (!body.accessCode || body.accessCode !== claim.accessCode) {
+    const attempts = await hit(`unlock:${claim.token}`, 10, 900)
+    if (!attempts.ok) {
+      return NextResponse.json(
+        { error: "too_many_attempts", message: "Too many attempts. Try again later." },
+        { status: 429 },
+      )
+    }
+    if (!verifyAccessCode(claim.accessCode, body.accessCode)) {
       return NextResponse.json(
         { error: "invalid_code", message: "That code doesn't match." },
         { status: 401 },
@@ -199,6 +210,34 @@ export async function POST(
     )
   }
 
+  // One settlement per claim at a time: a concurrent duplicate must not create
+  // a second off-ramp order or reset the status the first request is driving.
+  const release = await tryLock(`claim:${claim.token}`, 180)
+  if (!release) {
+    return NextResponse.json(
+      { error: "in_progress", message: "This payout is already being processed." },
+      { status: 409 },
+    )
+  }
+  try {
+    return await settleClaim(claim, secret, rail, body.walletAddress)
+  } finally {
+    await release()
+  }
+
+  async function settleClaim(
+    claim: StoredClaim,
+    secret: string,
+    rail: "pix" | "stellar",
+    walletAddress: string | undefined,
+  ): Promise<Response> {
+  const fresh = await getStoredClaim(token)
+  if (!fresh || fresh.status !== "shared") {
+    return NextResponse.json(
+      { error: "already_claimed", message: "This payout was already claimed." },
+      { status: 409 },
+    )
+  }
   await updateStoredClaim(token, { status: "cashing_out" })
 
   /** True only after claimBalance succeeds — triggers escrow restore on failure. */
@@ -206,7 +245,7 @@ export async function POST(
 
   try {
     if (rail === "stellar") {
-      const wallet = String(body.walletAddress ?? "").trim()
+      const wallet = String(walletAddress ?? "").trim()
       if (wallet.length < 8) {
         await updateStoredClaim(token, { status: "shared" })
         return NextResponse.json(
@@ -259,6 +298,10 @@ export async function POST(
       useAnchor: true,
     })
     const { orderId, withdrawAnchorAccount, withdrawMemo } = order.offramp
+
+    // Persist the order id BEFORE moving funds: if this function is killed
+    // mid-payout, reconcileClaimPayout can still finish the claim from Etherfuse.
+    await updateStoredClaim(token, { payoutMethod, payoutOrderId: orderId })
 
     // Anchor destination is ready — now claim the escrow.
     await claimBalance(claim.balanceId, secret)
@@ -357,7 +400,11 @@ export async function POST(
         )
       }
     } else {
-      await updateStoredClaim(token, { status: "shared" })
+      await updateStoredClaim(token, {
+        status: "shared",
+        payoutMethod: null,
+        payoutOrderId: null,
+      })
     }
 
     return NextResponse.json(
@@ -365,4 +412,5 @@ export async function POST(
       { status: 502 },
     )
   }
+}
 }
