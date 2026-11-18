@@ -13,24 +13,23 @@ import { Link } from '@/i18n/navigation'
 import { cn } from '@/lib/utils'
 import { LandingNav } from '@/components/marketing/landing-nav'
 import { PixelField } from '@/components/marketing/pixel-field'
-import { DitherDivider } from '@/components/marketing/dither-divider'
-import { AsciiReceipt, AsciiTicker, useTyped } from '@/components/marketing/ascii'
+import { AsciiReceipt, useTyped } from '@/components/marketing/ascii'
 import {
   coinScene,
-  dustScene,
+  fade,
   linkScene,
   pixScene,
+  slabsScene,
   wordScene,
 } from '@/components/marketing/pixel-scenes'
 
-const INK = '#050505'
 const LIME = '#d4ff3f'
-const COBALT = '#1537ff'
-const BONE = '#e8e9ee'
+const LIME_DIM = '#78941f'
+const LINE = 'border-[var(--lp-line)]'
 
-const HERO_SCENES = [wordScene('VAIVÉM', { zone: 'hero-word' }), dustScene]
+const HERO_SCENES = [slabsScene]
 const FLOW_SCENES = [coinScene, linkScene, pixScene]
-const CTA_SCENES = [wordScene('VAI E VEM', { anchor: 'center', fill: 0.92 })]
+const CTA_SCENES = [fade(wordScene('Vaivém', { zone: 'cta-word', fill: 0.97, weight: 800 }), { from: 0.55, floor: 0.22 })]
 
 const KIT_CODE = `const res = await fetch("/api/v1/claims", {
   method: "POST",
@@ -50,7 +49,7 @@ console.log(claim.claimUrl)`
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
-/** Smaller cells on phones so the shapes keep their detail. */
+/** Smaller cells on phones so shapes keep their detail. */
 function useCell(desktop: number, mobile: number) {
   const [cell, setCell] = useState(desktop)
   useEffect(() => {
@@ -62,33 +61,37 @@ function useCell(desktop: number, mobile: number) {
   return cell
 }
 
-function PixelButton({
+/** Page column framed by hairlines, like a spec sheet. */
+function Rail({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn('relative mx-auto w-full max-w-[1240px] border-x', LINE, className)}>{children}</div>
+  )
+}
+
+function Cross({ className }: { className?: string }) {
+  return <span aria-hidden className={cn('lp-cross z-10', className)} />
+}
+
+function Button({
   href,
   children,
   variant = 'solid',
-  tone = 'lime',
 }: {
   href: string
   children: ReactNode
   variant?: 'solid' | 'line'
-  tone?: 'lime' | 'ink' | 'bone'
 }) {
-  const solid = {
-    lime: 'bg-[var(--lp-lime)] text-black shadow-[5px_5px_0_var(--lp-bone)]',
-    ink: 'bg-[var(--lp-ink)] text-[var(--lp-lime)] shadow-[5px_5px_0_var(--lp-lime)]',
-    bone: 'bg-[var(--lp-bone)] text-black shadow-[5px_5px_0_var(--lp-lime)]',
-  }[tone]
   return (
     <Link
       href={href}
       className={cn(
-        'inline-flex items-center gap-2 border-2 border-current px-5 py-3 text-sm font-bold transition-[transform,box-shadow] duration-100',
-        'hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-none active:translate-y-[4px]',
-        variant === 'solid' ? solid : 'shadow-[5px_5px_0_currentColor]',
+        'inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium transition-[background-color,filter]',
+        variant === 'solid'
+          ? 'bg-[var(--lp-lime)] text-black hover:brightness-95'
+          : 'border border-[var(--lp-line-strong)] hover:bg-white/5',
       )}
     >
       {children}
-      <span aria-hidden>&gt;</span>
     </Link>
   )
 }
@@ -99,15 +102,10 @@ export function LandingPage() {
       <LandingNav />
       <main>
         <Hero />
-        <DitherDivider from={INK} to={COBALT} rows={18} />
         <Problem />
-        <DitherDivider from={COBALT} to={LIME} rows={18} />
         <Flow />
-        <DitherDivider from={LIME} to={INK} rows={18} />
         <Kit />
-        <DitherDivider from={INK} to={BONE} rows={18} />
         <Proof />
-        <DitherDivider from={BONE} to={COBALT} rows={18} />
         <FinalCta />
       </main>
       <LandingFooter />
@@ -115,70 +113,103 @@ export function LandingPage() {
   )
 }
 
-/* ─────────────────────────────── Act I · hero ─────────────────────────────── */
+/* ─────────────────────────────────── hero ─────────────────────────────────── */
+
+function Stat({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <div className="px-5 py-4 sm:px-6">
+      <p className="lp-label">{label}</p>
+      <p className="lp-mono mt-1.5 text-xl tabular-nums sm:text-2xl">
+        {value}
+        <span className="ml-1 text-sm text-[var(--lp-muted)]">{unit}</span>
+        <span aria-hidden className="lp-caret text-[var(--lp-lime)]">
+          _
+        </span>
+      </p>
+    </div>
+  )
+}
 
 function Hero() {
   const t = useTranslations('landing')
-  const ref = useRef<HTMLElement>(null)
-  const cell = useCell(7, 5)
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] })
-  const progress = useTransform(scrollYProgress, [0, 0.75], [0, 1])
+  const cell = useCell(5, 4)
 
   return (
-    <section ref={ref} className="relative flex min-h-[100svh] flex-col overflow-hidden">
-      <div className="pointer-events-none absolute inset-x-0 bottom-9 top-0">
-        <PixelField
-          scenes={HERO_SCENES}
-          progress={progress}
-          cell={cell}
-          color={LIME}
-          accent={BONE}
-          idle="wave"
-          radius={11}
-          label="VAIVÉM"
-        />
-      </div>
+    <section className="pt-14">
+      <Rail>
+        <Cross className="-left-[5px] top-0" />
+        <Cross className="-right-[5px] top-0" />
 
-      <div className="relative z-10 mx-auto w-full max-w-[1400px] flex-none px-4 pt-24 sm:px-8 sm:pt-28">
-        <p className="text-xs text-[var(--lp-lime)] sm:text-sm">
-          <span aria-hidden>&gt; </span>vaivem send 500 --to ana<span className="lp-caret">_</span>
-        </p>
-        <h1 className="lp-pixel mt-4 max-w-[17ch] text-balance text-[clamp(2.4rem,6.4vw,5.4rem)] leading-[0.96]">
-          {t('heroTitle')}
-        </h1>
-        <p className="mt-5 max-w-[52ch] text-sm leading-relaxed text-[var(--lp-bone)]/75 sm:text-[15px]">
-          {t('heroBody')}
-        </p>
-        <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-5">
-          <PixelButton href="/dashboard">{t('ctaCreate')}</PixelButton>
-          <PixelButton href="/developers" variant="line">
-            {t('ctaDevelopers')}
-          </PixelButton>
-          <p className="text-xs text-[var(--lp-bone)]/55 lg:ml-auto lg:text-right">
-            <span className="block">{t('heroAside')}</span>
-            <span className="mt-1 hidden lg:block">{t('heroHint')}</span>
-          </p>
+        <div className="grid lg:grid-cols-2">
+          <div className={cn('lp-hatch flex flex-col justify-center px-5 py-16 sm:px-10 lg:min-h-[640px] lg:border-r', LINE)}>
+            <span className="lp-tag w-fit">
+              {t('heroChip')}
+              <span aria-hidden className="lp-caret">
+                _
+              </span>
+            </span>
+            <h1 className="lp-h mt-7 max-w-[15ch] text-[clamp(2.5rem,5.2vw,4.6rem)]">{t('heroTitle')}</h1>
+            <p className="mt-6 max-w-[46ch] text-[15px] leading-relaxed text-[var(--lp-muted)] sm:text-base">
+              {t('heroBody')}
+            </p>
+            <div className="mt-9 flex flex-wrap gap-3">
+              <Button href="/dashboard">{t('ctaCreate')}</Button>
+              <Button href="/developers" variant="line">
+                {t('ctaDevelopers')}
+              </Button>
+            </div>
+            <p className="mt-6 text-xs text-[var(--lp-muted)]">{t('heroAside')}</p>
+          </div>
+
+          <div className={cn('relative min-h-[360px] border-t lg:min-h-[640px] lg:border-t-0', LINE)}>
+            <PixelField
+              scenes={HERO_SCENES}
+              cell={cell}
+              dot={0.62}
+              color={LIME}
+              accent={LIME_DIM}
+              accentEvery={4}
+              idle="wave"
+              wave={0.5}
+              radius={7}
+              maxParticles={7500}
+              label={t('heroChip')}
+            />
+            <span className="lp-tag absolute left-4 top-4">{t('statusTag')}</span>
+            <span aria-hidden className="lp-mono absolute right-4 top-4 text-[11px] tracking-[0.2em] text-[var(--lp-muted)]">
+              ||||||||||||
+            </span>
+            <p className="lp-label absolute bottom-4 left-4 hidden normal-case tracking-normal lg:block">
+              {t('heroHint')}
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div id="hero-word" className="relative z-0 mb-0 mt-6 min-h-[clamp(150px,26svh,300px)] flex-1" aria-hidden />
-
-      <AsciiTicker
-        className="relative z-10 h-9 bg-[var(--lp-lime)] py-2 text-xs text-black"
-        items={[
-          '$ 500.00 USDC ──> ://vaivem/c/7KQ2 ──> R$ 2,565.97 PIX',
-          '[ link ]──[ claim ]──[ cash out ]',
-          '$ 100.00 USDC ──> ://vaivem/c/M4X9 ──> $ 1,838.16 SPEI',
-          '< vai e vem >',
-        ]}
-      />
+        <div className={cn('grid border-t lg:grid-cols-2', LINE)}>
+          <div className={cn('flex flex-col justify-center gap-3 px-5 py-5 sm:px-10 lg:border-r', LINE)}>
+            <p className="lp-label">{t('logos')}</p>
+            <p className="flex flex-wrap items-center gap-x-8 gap-y-2 text-[15px] font-medium tracking-[-0.01em] text-[var(--lp-muted)]">
+              <span>Stellar</span>
+              <span>USDC</span>
+              <span>Etherfuse</span>
+              <span>PIX</span>
+              <span>SPEI</span>
+            </p>
+          </div>
+          <div className={cn('grid grid-cols-3 divide-x border-t lg:border-t-0', LINE, 'divide-[var(--lp-line)]')}>
+            <Stat label={t('proofSettlementLabel')} value={t('proofSettlementValue')} unit={t('proofSettlementUnit')} />
+            <Stat label={t('proofFeeLabel')} value={t('proofFeeValue')} unit={t('proofFeeUnit')} />
+            <Stat label={t('proofQuoteLabel')} value={t('proofQuoteValue')} unit={t('proofQuoteUnit')} />
+          </div>
+        </div>
+      </Rail>
     </section>
   )
 }
 
-/* ───────────────────────────── Act II · the problem ───────────────────────────── */
+/* ───────────────────────────────── the problem ───────────────────────────────── */
 
-const BAR = 24
+const BAR = 28
 
 function Lane({
   label,
@@ -194,19 +225,34 @@ function Lane({
   tone: 'old' | 'new'
 }) {
   return (
-    <div className={cn('border-2 border-white p-4 sm:p-5', tone === 'new' && 'bg-[var(--lp-lime)] text-black border-black')}>
-      <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="font-bold">{label}</span>
-        <span className="lp-num text-xl tabular-nums">{time}</span>
+    <div className={cn('border bg-[var(--lp-panel)] p-5', tone === 'new' ? 'border-[rgba(212,255,63,0.4)]' : LINE)}>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="lp-label">{label}</span>
+        <span className={cn('lp-mono text-lg tabular-nums', tone === 'new' && 'text-[var(--lp-lime)]')}>{time}</span>
       </div>
-      <p className="mt-3 whitespace-pre text-[15px] leading-none tracking-tighter sm:text-lg" aria-hidden>
-        [{'█'.repeat(filled)}
-        {'░'.repeat(BAR - filled)}]
+      <p
+        aria-hidden
+        className={cn(
+          'lp-mono mt-4 whitespace-pre text-[13px] leading-none tracking-[-0.05em] sm:text-sm',
+          tone === 'new' ? 'text-[var(--lp-lime)]' : 'text-[var(--lp-muted)]',
+        )}
+      >
+        {'█'.repeat(filled)}
+        <span className="opacity-30">{'░'.repeat(BAR - filled)}</span>
       </p>
-      <ul className="mt-4 flex min-h-[3.6rem] flex-col gap-1 text-[13px]">
+      <ul className="mt-5 flex min-h-[3.4rem] flex-col gap-1.5 text-[13px]">
         {rows.map((r) => (
-          <li key={r.text} className={cn('transition-opacity duration-200', r.shown ? 'opacity-100' : 'opacity-0')}>
-            <span aria-hidden>{r.ok ? '[+] ' : '[x] '}</span>
+          <li
+            key={r.text}
+            className={cn(
+              'flex gap-2 transition-opacity duration-200',
+              r.shown ? 'opacity-100' : 'opacity-0',
+              r.ok ? 'text-[var(--lp-text)]' : 'text-[var(--lp-muted)]',
+            )}
+          >
+            <span aria-hidden className={cn('lp-mono', r.ok && 'text-[var(--lp-lime)]')}>
+              {r.ok ? '+' : '×'}
+            </span>
             {r.text}
           </li>
         ))}
@@ -220,56 +266,54 @@ function Problem() {
   const ref = useRef<HTMLElement>(null)
   const [step, setStep] = useState(0)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end end'] })
-  useMotionValueEvent(scrollYProgress, 'change', (v) =>
-    setStep(Math.round(clamp01((v - 0.1) / 0.78) * BAR)),
-  )
+  useMotionValueEvent(scrollYProgress, 'change', (v) => setStep(Math.round(clamp01((v - 0.1) / 0.78) * BAR)))
 
   const days = Math.floor((step / BAR) * 5)
   return (
-    <section id="problem" ref={ref} className="relative h-[260vh] bg-[var(--lp-cobalt)] text-white">
-      <div className="sticky top-0 flex h-[100svh] items-center">
-        <div className="mx-auto grid w-full max-w-[1400px] items-center gap-8 px-4 sm:px-8 lg:grid-cols-[1fr_minmax(0,560px)] lg:gap-16">
-          <div>
-            <p className="text-xs opacity-80 sm:text-sm">{t('problemEyebrow')}</p>
-            <h2 className="lp-pixel mt-4 max-w-[20ch] text-balance text-[clamp(1.9rem,4.6vw,3.9rem)] leading-[1.02]">
-              {t('problemTitle')}
-            </h2>
-            <p className="mt-5 max-w-[48ch] text-sm leading-relaxed opacity-85 sm:text-[15px]">{t('problemBody')}</p>
-            <p className="mt-8 hidden text-xs opacity-70 lg:block">
-              {t('problemHint')}
-              <span className="lp-caret">_</span>
-            </p>
-          </div>
+    <section id="problem" ref={ref} className={cn('relative h-[240vh] border-t', LINE)}>
+      <div className="sticky top-0 flex h-[100svh] items-center pt-14">
+        <Rail className="w-full">
+          <div className="grid items-center gap-10 px-5 py-10 sm:px-10 lg:grid-cols-[1fr_minmax(0,540px)] lg:gap-16">
+            <div>
+              <p className="lp-label">{t('problemEyebrow')}</p>
+              <h2 className="lp-h mt-4 max-w-[19ch] text-[clamp(2rem,4.2vw,3.5rem)]">{t('problemTitle')}</h2>
+              <p className="mt-5 max-w-[46ch] text-[15px] leading-relaxed text-[var(--lp-muted)]">{t('problemBody')}</p>
+              <p className="lp-label mt-8 hidden normal-case tracking-normal lg:block">
+                {t('problemHint')}
+                <span className="lp-caret text-[var(--lp-lime)]">_</span>
+              </p>
+            </div>
 
-          <div className="flex flex-col gap-4">
-            <Lane
-              tone="old"
-              label={t('problemBeforeLabel')}
-              time={step >= BAR ? t('problemBeforeDays') : `D+${days}`}
-              filled={step}
-              rows={[
-                { text: t('problemBeforeFees'), shown: step >= 8, ok: false },
-                { text: t('problemBeforeForms'), shown: step >= 16, ok: false },
-              ]}
-            />
-            <Lane
-              tone="new"
-              label={t('problemAfterLabel')}
-              time={step >= 3 ? t('problemAfterDays') : '…'}
-              filled={Math.min(BAR, step * 8)}
-              rows={[
-                { text: t('problemAfterFees'), shown: step >= 3, ok: true },
-                { text: t('problemAfterForms'), shown: step >= 4, ok: true },
-              ]}
-            />
+            <div className="flex flex-col gap-3">
+              <Lane
+                tone="old"
+                label={t('problemBeforeLabel')}
+                time={step >= BAR ? t('problemBeforeDays') : `D+${days}`}
+                filled={step}
+                rows={[
+                  { text: t('problemBeforeFees'), shown: step >= 9, ok: false },
+                  { text: t('problemBeforeForms'), shown: step >= 18, ok: false },
+                ]}
+              />
+              <Lane
+                tone="new"
+                label={t('problemAfterLabel')}
+                time={step >= 3 ? t('problemAfterDays') : '…'}
+                filled={Math.min(BAR, step * 9)}
+                rows={[
+                  { text: t('problemAfterFees'), shown: step >= 3, ok: true },
+                  { text: t('problemAfterForms'), shown: step >= 4, ok: true },
+                ]}
+              />
+            </div>
           </div>
-        </div>
+        </Rail>
       </div>
     </section>
   )
 }
 
-/* ───────────────────────────── Act III · how it works ───────────────────────────── */
+/* ───────────────────────────────── how it works ───────────────────────────────── */
 
 const FLOW_CMDS = [
   '$ vaivem send 500 --to ana',
@@ -281,7 +325,7 @@ function Flow() {
   const t = useTranslations('landing')
   const reduce = useReducedMotion()
   const ref = useRef<HTMLElement>(null)
-  const cell = useCell(8, 6)
+  const cell = useCell(5, 4)
   const [active, setActive] = useState(0)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end end'] })
   const stage = useTransform(scrollYProgress, [0.06, 0.94], [0, 2])
@@ -302,69 +346,120 @@ function Flow() {
   }
 
   return (
-    <section id="how-it-works" ref={ref} className="relative h-[340vh] bg-[var(--lp-lime)] text-black">
-      <div className="sticky top-0 flex h-[100svh] items-center">
-        <div className="mx-auto grid w-full max-w-[1400px] items-center gap-6 px-4 pt-16 sm:px-8 lg:grid-cols-[1fr_minmax(0,560px)] lg:gap-16 lg:pt-0">
-          <div className="order-2 lg:order-1">
-            <p className="text-xs opacity-70 sm:text-sm">{t('flowEyebrow')}</p>
-            <h2 className="lp-pixel mt-3 text-[clamp(2rem,5vw,4.2rem)] leading-[1]">{t('flowTitle')}</h2>
-            <ol className="mt-6 flex flex-col gap-3 sm:mt-8 sm:gap-4">
-              {steps.map((s, i) => (
-                <li key={s.title}>
-                  <button
-                    type="button"
-                    onClick={() => goTo(i)}
-                    aria-current={active === i ? 'step' : undefined}
-                    className={cn(
-                      'w-full text-left transition-opacity duration-200',
-                      active === i ? 'opacity-100' : 'opacity-35 hover:opacity-70',
-                    )}
-                  >
-                    <span className="lp-pixel flex items-baseline gap-3 text-xl sm:text-2xl">
-                      <span aria-hidden className="text-base">
-                        {active === i ? '[■]' : '[ ]'}
-                      </span>
-                      {s.title}
-                    </span>
-                    <span
+    <section id="how-it-works" ref={ref} className={cn('relative h-[320vh] border-t', LINE)}>
+      <div className="sticky top-0 flex h-[100svh] items-center pt-14">
+        <Rail className="w-full">
+          <div className="grid items-center gap-8 px-5 py-8 sm:px-10 lg:grid-cols-[1fr_minmax(0,540px)] lg:gap-16">
+            <div className="order-2 lg:order-1">
+              <p className="lp-label">{t('flowEyebrow')}</p>
+              <h2 className="lp-h mt-4 text-[clamp(2rem,4.2vw,3.5rem)]">{t('flowTitle')}</h2>
+              <ol className={cn('mt-8 border-t', LINE)}>
+                {steps.map((s, i) => (
+                  <li key={s.title} className={cn('border-b', LINE)}>
+                    <button
+                      type="button"
+                      onClick={() => goTo(i)}
+                      aria-current={active === i ? 'step' : undefined}
                       className={cn(
-                        'ml-9 mt-1 block max-w-[44ch] text-[13px] leading-relaxed transition-[max-height,opacity] duration-300 sm:text-sm',
-                        active === i ? 'max-h-24 opacity-100' : 'max-h-0 overflow-hidden opacity-0',
+                        'relative flex w-full gap-5 py-4 text-left transition-opacity duration-200',
+                        active === i ? 'opacity-100' : 'opacity-45 hover:opacity-75',
                       )}
                     >
-                      {s.body}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          <div className="order-1 flex flex-col gap-3 lg:order-2">
-            <div className="relative mx-auto aspect-square w-full max-w-[min(560px,46svh)] lg:max-w-[560px]">
-              <PixelField
-                scenes={FLOW_SCENES}
-                progress={stage}
-                cell={cell}
-                color={INK}
-                accent={COBALT}
-                radius={8}
-                scatter={9}
-                label={steps[active]?.title ?? ''}
-              />
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'absolute left-0 top-0 h-full w-px transition-colors',
+                          active === i ? 'bg-[var(--lp-lime)]' : 'bg-transparent',
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          'lp-mono w-6 pl-3 text-xs',
+                          active === i ? 'text-[var(--lp-lime)]' : 'text-[var(--lp-muted)]',
+                        )}
+                      >
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span className="flex-1">
+                        <span className="block text-lg font-medium tracking-[-0.02em]">{s.title}</span>
+                        <span
+                          className={cn(
+                            'block max-w-[44ch] overflow-hidden text-sm leading-relaxed text-[var(--lp-muted)] transition-[max-height,opacity,margin] duration-300',
+                            active === i ? 'mt-1.5 max-h-24 opacity-100' : 'max-h-0 opacity-0',
+                          )}
+                        >
+                          {s.body}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
             </div>
-            <p className="mx-auto min-h-5 w-full max-w-[560px] bg-black px-3 py-2 text-xs text-[var(--lp-lime)] sm:text-[13px]">
-              {FLOW_CMDS[active]}
-              <span className="lp-caret">_</span>
-            </p>
+
+            <div className={cn('lp-hatch relative order-1 border lg:order-2', LINE)}>
+              <Cross className="-left-[6px] -top-[6px]" />
+              <Cross className="-right-[6px] -top-[6px]" />
+              <Cross className="-bottom-[6px] -left-[6px]" />
+              <Cross className="-bottom-[6px] -right-[6px]" />
+              <div className="relative mx-auto aspect-square w-full max-w-[min(540px,44svh)] lg:max-w-none">
+                <PixelField
+                  scenes={FLOW_SCENES}
+                  progress={stage}
+                  cell={cell}
+                  color={LIME}
+                  accent={LIME_DIM}
+                  accentEvery={4}
+                  radius={7}
+                  scatter={8}
+                  maxParticles={5000}
+                  label={steps[active]?.title ?? ''}
+                />
+                <span className="lp-tag absolute left-3 top-3">
+                  {t('stepOf')} {String(active + 1).padStart(2, '0')} / 03
+                </span>
+              </div>
+              <p className={cn('lp-mono border-t bg-[var(--lp-panel)] px-4 py-2.5 text-xs text-[var(--lp-muted)]', LINE)}>
+                {FLOW_CMDS[active]}
+                <span className="lp-caret text-[var(--lp-lime)]">_</span>
+              </p>
+            </div>
           </div>
-        </div>
+        </Rail>
       </div>
     </section>
   )
 }
 
-/* ─────────────────────────────── Act IV · developers ─────────────────────────────── */
+/* ───────────────────────────────── developers ───────────────────────────────── */
+
+/** Light syntax tint: strings in lime, keywords in full white, the rest muted. */
+function CodeLine({ line }: { line: string }) {
+  const parts = line.split(/("[^"]*"|`[^`]*`)/g)
+  return (
+    <>
+      {parts.map((p, i) =>
+        /^["`]/.test(p) ? (
+          <span key={i} className="text-[var(--lp-lime)]">
+            {p}
+          </span>
+        ) : (
+          <span key={i}>
+            {p.split(/\b(const|await|fetch|JSON)\b/g).map((q, j) =>
+              /^(const|await|fetch|JSON)$/.test(q) ? (
+                <span key={j} className="text-white">
+                  {q}
+                </span>
+              ) : (
+                q
+              ),
+            )}
+          </span>
+        ),
+      )}
+    </>
+  )
+}
 
 function Kit() {
   const t = useTranslations('landing')
@@ -375,47 +470,47 @@ function Kit() {
   const lines = typed.split('\n')
 
   return (
-    <section id="developers" className="bg-[var(--lp-ink)] text-[var(--lp-bone)]">
-      <div className="mx-auto grid max-w-[1400px] items-center gap-10 px-4 py-20 sm:px-8 lg:grid-cols-[1fr_1.15fr] lg:gap-16 lg:py-28">
-        <div>
-          <p className="text-xs text-[var(--lp-lime)] sm:text-sm">{`// ${t('kitEyebrow')}`}</p>
-          <h2 className="lp-pixel mt-4 max-w-[16ch] text-balance text-[clamp(2rem,4.6vw,3.9rem)] leading-[1.02]">
-            {t('kitTitle')}
-          </h2>
-          <p className="mt-5 max-w-[46ch] text-sm leading-relaxed opacity-75 sm:text-[15px]">{t('kitBody')}</p>
-          <div className="mt-8">
-            <PixelButton href="/developers">{t('kitCta')}</PixelButton>
+    <section id="developers" className={cn('border-t', LINE)}>
+      <Rail>
+        <div className="grid items-center gap-10 px-5 py-20 sm:px-10 lg:grid-cols-[1fr_1.15fr] lg:gap-16 lg:py-28">
+          <div>
+            <p className="lp-label">{t('kitEyebrow')}</p>
+            <h2 className="lp-h mt-4 max-w-[15ch] text-[clamp(2rem,4.2vw,3.5rem)]">{t('kitTitle')}</h2>
+            <p className="mt-5 max-w-[44ch] text-[15px] leading-relaxed text-[var(--lp-muted)]">{t('kitBody')}</p>
+            <div className="mt-8">
+              <Button href="/developers">{t('kitCta')}</Button>
+            </div>
+            <p className="mt-8 max-w-[44ch] text-xs leading-relaxed text-[var(--lp-muted)]">{t('kitNote')}</p>
           </div>
-          <p className="mt-8 max-w-[46ch] text-xs leading-relaxed opacity-55">{t('kitNote')}</p>
-        </div>
 
-        <div ref={ref} className="border-2 border-[var(--lp-lime)] shadow-[8px_8px_0_var(--lp-cobalt)]">
-          <div className="flex items-center justify-between border-b-2 border-[var(--lp-lime)] px-4 py-2 text-xs text-[var(--lp-lime)]">
-            <span>POST /api/v1/claims</span>
-            <span className="tabular-nums">
-              {Math.min(lines.length, total)}/{total}
-            </span>
-          </div>
-          <pre className="min-h-[19rem] overflow-x-auto p-4 text-[12px] leading-[1.7] sm:text-[13px]">
-            <code>
-              {lines.map((l, i) => (
-                <span key={i} className="block">
-                  <span aria-hidden className="mr-4 inline-block w-5 select-none text-right opacity-35">
-                    {i + 1}
+          <div ref={ref} className={cn('border bg-[var(--lp-panel)]', LINE)}>
+            <div className={cn('flex items-center justify-between border-b px-4 py-2.5', LINE)}>
+              <span className="lp-label">POST /api/v1/claims</span>
+              <span className="lp-label tabular-nums">
+                {Math.min(lines.length, total)}/{total}
+              </span>
+            </div>
+            <pre className="lp-mono min-h-[19rem] overflow-x-auto p-4 text-[12px] leading-[1.75] text-[var(--lp-muted)] sm:text-[13px]">
+              <code>
+                {lines.map((l, i) => (
+                  <span key={i} className="block">
+                    <span aria-hidden className="mr-4 inline-block w-5 select-none text-right opacity-40">
+                      {i + 1}
+                    </span>
+                    <CodeLine line={l} />
+                    {i === lines.length - 1 && <span className="lp-caret text-[var(--lp-lime)]">█</span>}
                   </span>
-                  {l}
-                  {i === lines.length - 1 && <span className="lp-caret text-[var(--lp-lime)]">█</span>}
-                </span>
-              ))}
-            </code>
-          </pre>
+                ))}
+              </code>
+            </pre>
+          </div>
         </div>
-      </div>
+      </Rail>
     </section>
   )
 }
 
-/* ──────────────────────────────── Act V · proof ──────────────────────────────── */
+/* ──────────────────────────────────── proof ──────────────────────────────────── */
 
 function Proof() {
   const t = useTranslations('landing')
@@ -434,23 +529,21 @@ function Proof() {
   ]
 
   return (
-    <section id="proof" className="bg-[var(--lp-bone)] text-[var(--lp-cobalt)]">
-      <div className="mx-auto max-w-[1400px] px-4 py-20 sm:px-8 lg:py-28">
-        <div className="grid gap-12 lg:grid-cols-[1fr_1fr] lg:gap-16">
+    <section id="proof" className={cn('border-t', LINE)}>
+      <Rail>
+        <div className="grid gap-12 px-5 py-20 sm:px-10 lg:grid-cols-2 lg:gap-16 lg:py-28">
           <div>
-            <p className="text-xs opacity-75 sm:text-sm">{`// ${t('proofEyebrow')}`}</p>
-            <h2 className="lp-pixel mt-4 max-w-[16ch] text-balance text-[clamp(2rem,4.6vw,3.9rem)] leading-[1.02]">
-              {t('proofTitle')}
-            </h2>
-            <p className="mt-5 max-w-[46ch] text-sm leading-relaxed opacity-80 sm:text-[15px]">{t('proofBody')}</p>
-            <dl className="mt-8 grid grid-cols-2 gap-3">
+            <p className="lp-label">{t('proofEyebrow')}</p>
+            <h2 className="lp-h mt-4 max-w-[15ch] text-[clamp(2rem,4.2vw,3.5rem)]">{t('proofTitle')}</h2>
+            <p className="mt-5 max-w-[44ch] text-[15px] leading-relaxed text-[var(--lp-muted)]">{t('proofBody')}</p>
+            <dl className={cn('mt-9 grid grid-cols-2 border-l border-t', LINE)}>
               {stats.map((s) => (
-                <div key={s.label} className="border-2 border-current p-4">
-                  <dt className="text-xs opacity-75">{s.label}</dt>
-                  <dd className="lp-num mt-2 flex items-baseline gap-1.5 text-4xl tabular-nums sm:text-5xl">
+                <div key={s.label} className={cn('border-b border-r p-4 sm:p-5', LINE)}>
+                  <dt className="lp-label">{s.label}</dt>
+                  <dd className="lp-mono mt-2 text-3xl tabular-nums sm:text-4xl">
                     {s.value}
-                    <span className="text-base">{s.unit}</span>
-                    <span aria-hidden className="lp-caret text-2xl">
+                    <span className="ml-1.5 text-sm text-[var(--lp-muted)]">{s.unit}</span>
+                    <span aria-hidden className="lp-caret text-[var(--lp-lime)]">
                       _
                     </span>
                   </dd>
@@ -459,15 +552,15 @@ function Proof() {
             </dl>
           </div>
 
-          <div className="h-fit border-2 border-current p-5 shadow-[8px_8px_0_var(--lp-cobalt)] sm:p-6">
+          <div className={cn('h-fit border bg-[var(--lp-panel)] p-5 sm:p-6', LINE)}>
             <AsciiReceipt />
           </div>
         </div>
 
-        <div className="mt-16 sm:mt-20">
-          <h3 className="lp-pixel text-2xl sm:text-3xl">{t('corridorTitle')}</h3>
-          <div className="mt-5 border-2 border-current text-sm">
-            <div className="hidden grid-cols-[1fr_1.4fr_1.2fr] gap-3 border-b-2 border-current px-4 py-2 text-xs opacity-75 md:grid">
+        <div className={cn('border-t px-5 py-14 sm:px-10', LINE)}>
+          <h3 className="text-xl font-medium tracking-[-0.02em]">{t('corridorTitle')}</h3>
+          <div className={cn('mt-6 border text-sm', LINE)}>
+            <div className={cn('lp-label hidden grid-cols-[1fr_1.4fr_1.2fr] gap-3 border-b px-4 py-2.5 md:grid', LINE)}>
               <span>{t('corridorProvider')}</span>
               <span>{t('corridorRail')}</span>
               <span>{t('corridorStatus')}</span>
@@ -476,56 +569,64 @@ function Proof() {
               <div
                 key={row.rail}
                 className={cn(
-                  'grid gap-1 px-4 py-3 md:grid-cols-[1fr_1.4fr_1.2fr] md:items-center md:gap-3',
-                  i > 0 && 'border-t border-current/30',
+                  'grid gap-1 px-4 py-3.5 md:grid-cols-[1fr_1.4fr_1.2fr] md:items-center md:gap-3',
+                  i > 0 && cn('border-t', LINE),
                 )}
               >
-                <span className="font-bold">Etherfuse</span>
-                <span>{row.rail}</span>
-                <span className={cn(!row.ok && 'line-through decoration-2')}>
-                  <span aria-hidden>{row.ok ? '[■] ' : '[ ] '}</span>
+                <span className="font-medium">Etherfuse</span>
+                <span className="text-[var(--lp-muted)]">{row.rail}</span>
+                <span className="flex items-center gap-2">
+                  <span
+                    aria-hidden
+                    className={cn('size-1.5 rounded-full', row.ok ? 'bg-[var(--lp-lime)]' : 'bg-[#ff6b5e]')}
+                  />
                   {row.status}
                 </span>
               </div>
             ))}
           </div>
-          <p className="mt-4 max-w-[80ch] text-xs leading-relaxed opacity-75">{t('corridorNote')}</p>
+          <p className="mt-5 max-w-[80ch] text-xs leading-relaxed text-[var(--lp-muted)]">{t('corridorNote')}</p>
         </div>
-      </div>
+      </Rail>
     </section>
   )
 }
 
-/* ─────────────────────────────── Finale · cta + footer ─────────────────────────────── */
+/* ──────────────────────────────── closing + footer ──────────────────────────────── */
 
 function FinalCta() {
   const t = useTranslations('landing')
-  const cell = useCell(8, 5)
+  const cell = useCell(5, 3)
   return (
-    <section className="relative flex min-h-[88svh] flex-col overflow-hidden bg-[var(--lp-cobalt)] text-white">
-      <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 pt-6 sm:px-8">
-        <h2 className="lp-pixel max-w-[18ch] text-balance text-[clamp(2rem,5vw,4.4rem)] leading-[1]">{t('ctaTitle')}</h2>
-        <p className="mt-5 max-w-[46ch] text-sm leading-relaxed opacity-85 sm:text-[15px]">{t('ctaBody')}</p>
-        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-5">
-          <PixelButton href="/dashboard" tone="bone">
-            {t('ctaCreate')}
-          </PixelButton>
-          <PixelButton href="/dashboard" variant="line">
-            {t('ctaSecondary')}
-          </PixelButton>
-        </div>
-      </div>
-      <div className="pointer-events-none relative mt-6 w-full flex-1">
+    <section className={cn('relative overflow-hidden border-t', LINE)}>
+      <div className="pointer-events-none absolute inset-0">
         <PixelField
           scenes={CTA_SCENES}
           cell={cell}
-          color={BONE}
-          accent={LIME}
+          dot={0.62}
+          color={LIME}
+          accent={LIME_DIM}
+          accentEvery={4}
           idle="wave"
-          radius={12}
-          label="VAI E VEM"
+          wave={0.4}
+          radius={8}
+          maxParticles={7500}
+          label="Vaivém"
         />
       </div>
+      <Rail className="flex min-h-[640px] flex-col border-transparent">
+        <div className="relative z-10 px-5 pt-20 sm:px-10 lg:pt-28">
+          <h2 className="lp-h max-w-[16ch] text-[clamp(2.2rem,5vw,4.4rem)]">{t('ctaTitle')}</h2>
+          <p className="mt-5 max-w-[44ch] text-[15px] leading-relaxed text-[var(--lp-muted)]">{t('ctaBody')}</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button href="/dashboard">{t('ctaCreate')}</Button>
+            <Button href="/dashboard" variant="line">
+              {t('ctaSecondary')}
+            </Button>
+          </div>
+        </div>
+        <div id="cta-word" aria-hidden className="mt-12 min-h-[220px] flex-1" />
+      </Rail>
     </section>
   )
 }
@@ -552,25 +653,28 @@ function LandingFooter() {
     },
   ]
   return (
-    <footer className="bg-[var(--lp-ink)] text-[var(--lp-bone)]">
-      <div className="mx-auto max-w-[1400px] px-4 py-14 sm:px-8">
-        <div className="grid gap-10 md:grid-cols-[1.6fr_1fr_1fr]">
+    <footer className={cn('border-t', LINE)}>
+      <Rail>
+        <div className="grid gap-10 px-5 py-14 sm:px-10 md:grid-cols-[1.6fr_1fr_1fr]">
           <div className="max-w-xs">
-            <p className="lp-pixel text-3xl text-[var(--lp-lime)]">VAIVÉM</p>
-            <p className="mt-4 text-sm leading-relaxed opacity-70">{t('footerBlurb')}</p>
+            <p className="text-lg font-medium tracking-[-0.02em]">Vaivém</p>
+            <p className="mt-3 text-sm leading-relaxed text-[var(--lp-muted)]">{t('footerBlurb')}</p>
           </div>
           {columns.map((col) => (
             <div key={col.title}>
-              <h3 className="text-sm font-bold text-[var(--lp-lime)]">{col.title}</h3>
+              <h3 className="lp-label">{col.title}</h3>
               <ul className="mt-4 flex flex-col gap-3 text-sm">
                 {col.links.map((l) => (
                   <li key={l.label}>
                     {'hash' in l ? (
-                      <a href={l.href} className="opacity-75 hover:underline hover:opacity-100">
+                      <a href={l.href} className="text-[var(--lp-muted)] transition-colors hover:text-[var(--lp-text)]">
                         {l.label}
                       </a>
                     ) : (
-                      <Link href={l.href as '/dashboard'} className="opacity-75 hover:underline hover:opacity-100">
+                      <Link
+                        href={l.href as '/dashboard'}
+                        className="text-[var(--lp-muted)] transition-colors hover:text-[var(--lp-text)]"
+                      >
                         {l.label}
                       </Link>
                     )}
@@ -580,11 +684,16 @@ function LandingFooter() {
             </div>
           ))}
         </div>
-        <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-white/20 pt-6 text-xs opacity-60 sm:flex-row sm:items-center">
+        <div
+          className={cn(
+            'flex flex-col items-start justify-between gap-3 border-t px-5 py-5 text-xs text-[var(--lp-muted)] sm:flex-row sm:items-center sm:px-10',
+            LINE,
+          )}
+        >
           <p>{t('footerLegal', { year })}</p>
           <p>{t('footerPowered')}</p>
         </div>
-      </div>
+      </Rail>
     </footer>
   )
 }

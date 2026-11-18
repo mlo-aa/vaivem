@@ -164,7 +164,11 @@
     "simFee": "taxa",
     "simRate": "câmbio",
     "simReceive": "recebe",
-    "simNote": "Taxas ilustrativas, não é uma cotação real."
+    "simNote": "Taxas ilustrativas, não é uma cotação real.",
+    "heroChip": "Pagamentos sem carteira na Stellar",
+    "statusTag": "Sandbox · Testnet",
+    "stepOf": "Passo",
+    "logos": "Construído sobre"
   },
   "dashboard": {
     "title": "Resgates",

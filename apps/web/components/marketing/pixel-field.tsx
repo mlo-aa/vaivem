@@ -15,11 +15,15 @@ type Props = {
   color: string
   accent?: string
   accentEvery?: number
-  /** 'wave' makes the field drift left and right (vai e vem). */
+  /** 'wave' makes the field drift left and right. */
   idle?: 'wave' | 'none'
   radius?: number
   scatter?: number
   maxParticles?: number
+  /** Dot size as a fraction of the cell (halftone look). */
+  dot?: number
+  /** Amplitude (in cells) of the 'wave' idle drift. */
+  wave?: number
   className?: string
   label: string
 }
@@ -39,6 +43,8 @@ export function PixelField({
   radius = 9,
   scatter = 7,
   maxParticles = 4200,
+  dot = 0.62,
+  wave: waveAmp = 1.6,
   className,
   label,
 }: Props) {
@@ -84,14 +90,14 @@ export function PixelField({
       const b = targets[Math.min(S - 1, k + 1)]!
       const amp = scatter * Math.sin(Math.PI * e)
       const r2 = radius * radius
-      const wave = idle === 'wave' && animate && !reduce
+      const drift = idle === 'wave' && animate && !reduce
 
       for (let i = 0; i < n; i++) {
         const ax = a[i * 2]!
         const ay = a[i * 2 + 1]!
         let x = ax + (b[i * 2]! - ax) * e + rx[i]! * amp
         const y = ay + (b[i * 2 + 1]! - ay) * e + ry[i]! * amp
-        if (wave) x += Math.sin(time * 1.3 + y * 0.16) * 1.6 * (1 - e)
+        if (drift) x += Math.sin(time * 1.1 + y * 0.16) * waveAmp * (1 - e)
         if (animate) {
           const dx = x + ox[i]! - ptr.x
           const dy = y + oy[i]! - ptr.y
@@ -113,15 +119,16 @@ export function PixelField({
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr)
-      const size = cell > 5 ? cell - 1 : cell
+      const size = Math.max(1, cell * dot)
+      const inset = (cell - size) / 2
       ctx.fillStyle = color
       for (let i = 0; i < n; i++) {
         if (accent && i % accentEvery === 0) continue
-        ctx.fillRect(px[i]!, py[i]!, size, size)
+        ctx.fillRect(px[i]! + inset, py[i]! + inset, size, size)
       }
       if (accent) {
         ctx.fillStyle = accent
-        for (let i = 0; i < n; i += accentEvery) ctx.fillRect(px[i]!, py[i]!, size, size)
+        for (let i = 0; i < n; i += accentEvery) ctx.fillRect(px[i]! + inset, py[i]! + inset, size, size)
       }
     }
 
@@ -242,7 +249,7 @@ export function PixelField({
     }
     // scenes/progress are stable module-level or memoised by the caller
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cell, color, accent, accentEvery, idle, radius, scatter, maxParticles, reduce])
+  }, [cell, color, accent, accentEvery, idle, radius, scatter, maxParticles, dot, waveAmp, reduce])
 
   return (
     <canvas

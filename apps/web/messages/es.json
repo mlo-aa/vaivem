@@ -164,7 +164,11 @@
     "simFee": "comisión",
     "simRate": "tasa",
     "simReceive": "recibe",
-    "simNote": "Tasas ilustrativas, no es una cotización real."
+    "simNote": "Tasas ilustrativas, no es una cotización real.",
+    "heroChip": "Pagos sin billetera en Stellar",
+    "statusTag": "Sandbox · Testnet",
+    "stepOf": "Paso",
+    "logos": "Construido sobre"
   },
   "dashboard": {
     "title": "Reclamos",

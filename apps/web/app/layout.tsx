@@ -1,6 +1,6 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono, Pixelify_Sans } from 'next/font/google'
+import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
@@ -13,12 +13,6 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   subsets: ['latin'],
   variable: '--font-geist-mono',
-})
-
-const pixelSans = Pixelify_Sans({
-  subsets: ['latin', 'latin-ext'],
-  weight: ['500', '700'],
-  variable: '--font-pixel',
 })
 
 export const metadata: Metadata = {
@@ -46,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${pixelSans.variable}`}>
+    <html suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="font-sans antialiased">
         <ThemeProvider>
           {children}

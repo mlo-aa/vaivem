@@ -164,7 +164,11 @@
     "simFee": "fee",
     "simRate": "rate",
     "simReceive": "receive",
-    "simNote": "Illustrative rates, not a live quote."
+    "simNote": "Illustrative rates, not a live quote.",
+    "heroChip": "Walletless payouts on Stellar",
+    "statusTag": "Sandbox · Testnet",
+    "stepOf": "Step",
+    "logos": "Built on"
   },
   "dashboard": {
     "title": "Claims",

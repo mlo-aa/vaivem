@@ -5,27 +5,6 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
-/** Endless tape of ascii; pauses on hover. */
-export function AsciiTicker({ items, className }: { items: string[]; className?: string }) {
-  const row = (key: string) => (
-    <div key={key} className="flex shrink-0 gap-10 pr-10" aria-hidden={key === 'b'}>
-      {items.map((s, i) => (
-        <span key={i} className="whitespace-pre">
-          {s}
-        </span>
-      ))}
-    </div>
-  )
-  return (
-    <div className={cn('lp-marquee', className)}>
-      <div className="lp-marquee-track">
-        {row('a')}
-        {row('b')}
-      </div>
-    </div>
-  )
-}
-
 /** Reveals `text` once `start` is true. Instant under reduced motion. */
 export function useTyped(text: string, start: boolean) {
   const reduce = useReducedMotion()
@@ -63,7 +42,7 @@ export function AsciiReceipt({ className }: { className?: string }) {
   const [printKey, setPrintKey] = useState(0)
 
   const r = RATES[country]
-  const text = useMemo(() => {
+  const lines = useMemo(() => {
     const nf = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const receive = amount * r.rate * (1 - FEE_BPS / 10000)
     const labels = [t('simSend'), t('simFee'), t('simRate'), t('simReceive')]
@@ -74,18 +53,23 @@ export function AsciiReceipt({ className }: { className?: string }) {
       [labels[2]!, `1 USDC = ${r.rate.toFixed(2)} ${r.code}`],
       [labels[3]!, `${r.cur} ${nf.format(receive)} · ${r.rail}`],
     ].map(([l, v]) => `${l!.padEnd(pad)}${v}`)
-    const inner = Math.max(30, ...rows.map((x) => x.length)) + 2
-    const line = `+${'-'.repeat(inner)}+`
-    const head = `CLAIM 7KQ2-X9`
+    const inner = Math.max(32, ...rows.map((x) => x.length)) + 2
+    const rule = `+${'-'.repeat(inner)}+`
     const fmt = (s: string) => `| ${s.padEnd(inner - 2)} |`
-    return [line, fmt(head), line, ...rows.map(fmt), line].join('\n')
+    return [
+      { text: rule, tone: 'rule' },
+      { text: fmt('CLAIM 7KQ2-X9'), tone: 'head' },
+      { text: rule, tone: 'rule' },
+      ...rows.map((x, i) => ({ text: fmt(x), tone: i === 3 ? 'hot' : 'row' })),
+      { text: rule, tone: 'rule' },
+    ]
   }, [amount, r, locale, t])
 
   return (
-    <div className={cn('flex flex-col gap-5', className)}>
+    <div className={cn('flex flex-col gap-6', className)}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="lp-pixel text-xl">{t('simTitle')}</p>
-        <div role="group" aria-label="Corridor" className="flex gap-2 text-sm">
+        <p className="lp-label">{t('simTitle')}</p>
+        <div role="group" aria-label="Corridor" className="flex border border-[var(--lp-line-strong)] text-xs">
           {(['BR', 'MX'] as const).map((c) => (
             <button
               key={c}
@@ -96,11 +80,13 @@ export function AsciiReceipt({ className }: { className?: string }) {
                 setPrintKey((k) => k + 1)
               }}
               className={cn(
-                'border-2 border-current px-3 py-1 font-bold transition-[transform,background-color] active:translate-y-px',
-                country === c ? 'bg-[var(--lp-cobalt)] text-[var(--lp-bone)]' : 'hover:bg-black/10',
+                'lp-mono px-3 py-1.5 transition-colors',
+                country === c
+                  ? 'bg-[var(--lp-lime)] text-black'
+                  : 'text-[var(--lp-muted)] hover:text-[var(--lp-text)]',
               )}
             >
-              {c === 'BR' ? 'BR · PIX' : 'MX · SPEI'}
+              {c === 'BR' ? 'BR / PIX' : 'MX / SPEI'}
             </button>
           ))}
         </div>
@@ -108,8 +94,8 @@ export function AsciiReceipt({ className }: { className?: string }) {
 
       <label className="flex flex-col gap-3 text-sm">
         <span className="flex items-baseline justify-between">
-          <span>{t('simAmount')}</span>
-          <span className="lp-num text-2xl tabular-nums">{amount}</span>
+          <span className="text-[var(--lp-muted)]">{t('simAmount')}</span>
+          <span className="lp-mono text-2xl tabular-nums">{amount}</span>
         </span>
         <input
           type="range"
@@ -121,18 +107,30 @@ export function AsciiReceipt({ className }: { className?: string }) {
             setAmount(Number(e.target.value))
             setPrintKey((k) => k + 1)
           }}
-          className="lp-range"
+          className="lp-range text-[var(--lp-lime)]"
         />
       </label>
 
       <pre
         key={printKey}
-        className="lp-print overflow-x-auto bg-[var(--lp-ink)] p-4 text-[12px] leading-[1.55] text-[var(--lp-lime)] sm:text-[13px]"
+        className="lp-print lp-mono overflow-x-auto border border-[var(--lp-line)] bg-[var(--lp-bg)] p-4 text-[12px] leading-[1.65] sm:text-[13px]"
         aria-live="polite"
       >
-        {text}
+        {lines.map((l, i) => (
+          <span
+            key={i}
+            className={cn(
+              'block',
+              l.tone === 'rule' && 'text-[var(--lp-line-strong)]',
+              l.tone === 'head' && 'text-[var(--lp-muted)]',
+              l.tone === 'hot' && 'text-[var(--lp-lime)]',
+            )}
+          >
+            {l.text}
+          </span>
+        ))}
       </pre>
-      <p className="text-xs opacity-70">{t('simNote')}</p>
+      <p className="text-xs text-[var(--lp-muted)]">{t('simNote')}</p>
     </div>
   )
 }

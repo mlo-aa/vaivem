@@ -12,24 +12,82 @@ function mulberry32(seed: number) {
   }
 }
 
+const smooth = (t: number) => {
+  const c = Math.min(1, Math.max(0, t))
+  return c * c * (3 - 2 * c)
+}
+
+/** Thins a scene toward the bottom so it dissolves like a halftone print. */
+export function fade(scene: Scene, { from = 0.5, floor = 0.08 }: { from?: number; floor?: number } = {}): Scene {
+  return (ctx, cols, rows) => {
+    scene(ctx, cols, rows)
+    const img = ctx.getImageData(0, 0, cols, rows)
+    const d = img.data
+    const rand = mulberry32(99)
+    for (let y = 0; y < rows; y++) {
+      const keep = 1 - (1 - floor) * smooth((y / rows - from) / (1 - from))
+      for (let x = 0; x < cols; x++) {
+        const i = (y * cols + x) * 4 + 3
+        if (d[i]! > 120 && rand() > keep) d[i] = 0
+      }
+    }
+    ctx.putImageData(img, 0, 0)
+  }
+}
+
+type Slab = { cx: number; cy: number; w: number; h: number; angle: number; seed: number }
+
+/** A tilted slab: solid hairline edge, interior as a density gradient of dots. */
+function slab(ctx: CanvasRenderingContext2D, cols: number, rows: number, o: Slab) {
+  const rand = mulberry32(o.seed)
+  const cos = Math.cos(-o.angle)
+  const sin = Math.sin(-o.angle)
+  const x0 = Math.max(0, Math.floor(o.cx - o.w))
+  const x1 = Math.min(cols, Math.ceil(o.cx + o.w))
+  const y0 = Math.max(0, Math.floor(o.cy - o.w))
+  const y1 = Math.min(rows, Math.ceil(o.cy + o.w))
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const dx = x + 0.5 - o.cx
+      const dy = y + 0.5 - o.cy
+      const u = dx * cos - dy * sin
+      const v = dx * sin + dy * cos
+      if (Math.abs(u) > o.w / 2 || Math.abs(v) > o.h / 2) continue
+      const edge = Math.min(o.w / 2 - Math.abs(u), o.h / 2 - Math.abs(v))
+      const t = u / o.w + 0.5
+      const p = edge < 1.1 ? 1 : 0.24 + 0.7 * smooth(1.2 - t * 1.2)
+      if (rand() < p) ctx.fillRect(x, y, 1, 1)
+    }
+  }
+}
+
+/** Hero: two stacked payout slabs. */
+export const slabsScene: Scene = (ctx, cols, rows) => {
+  const s = Math.min(cols, rows * 1.25)
+  const w = s * 0.74
+  const h = s * 0.26
+  const angle = -0.42
+  slab(ctx, cols, rows, { cx: cols * 0.46, cy: rows * 0.34, w, h, angle, seed: 11 })
+  slab(ctx, cols, rows, { cx: cols * 0.56, cy: rows * 0.66, w, h, angle, seed: 23 })
+}
+
 /**
- * Big pixel word, fitted to the width of the field. With `zone` (an element id),
- * the word is also fitted inside that element's vertical band, so layout text
- * above it is never covered.
+ * Large word rendered as dots, fitted to the field width.
+ * With `zone` (an element id) it also stays inside that element's vertical band.
  */
 export function wordScene(
   text: string,
-  { anchor = 'bottom', fill = 0.94, zone }: { anchor?: 'bottom' | 'center'; fill?: number; zone?: string } = {},
+  { fill = 0.94, zone, weight = 600 }: { fill?: number; zone?: string; weight?: number } = {},
 ): Scene {
   return (ctx, cols, rows) => {
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
-    ctx.font = pixelFont(100)
+    ctx.font = pixelFont(100, weight)
     const w100 = ctx.measureText(text).width || 1
     let maxSize = rows * 0.8
-    let baseline = anchor === 'bottom' ? rows * 0.97 : rows / 2
+    let baseline = rows * 0.92
     const el = zone && typeof document !== 'undefined' ? document.getElementById(zone) : null
-    const host = el?.parentElement?.querySelector('canvas')?.parentElement
+    const host = el?.closest('section')?.querySelector('canvas')?.parentElement
     if (el && host) {
       const zr = el.getBoundingClientRect()
       const hr = host.getBoundingClientRect()
@@ -37,24 +95,12 @@ export function wordScene(
       const top = (zr.top - hr.top) * k
       const bottom = (zr.bottom - hr.top) * k
       maxSize = Math.max(4, (bottom - top) / 0.8)
-      baseline = bottom - (bottom - top) * 0.05
+      baseline = bottom - (bottom - top) * 0.06
     }
     const size = Math.min((100 * cols * fill) / w100, maxSize)
-    ctx.font = pixelFont(size)
+    ctx.font = pixelFont(size, weight)
     const w = ctx.measureText(text).width
-    const y = anchor === 'bottom' || el ? baseline : baseline + size * 0.36
-    ctx.fillText(text, (cols - w) / 2, y)
-  }
-}
-
-/** Scattered pixels, denser toward the bottom (the wordmark dissolving). */
-export const dustScene: Scene = (ctx, cols, rows) => {
-  const rand = mulberry32(7)
-  for (let y = 0; y < rows; y++) {
-    const p = 0.01 + 0.34 * Math.pow(y / rows, 2.2)
-    for (let x = 0; x < cols; x++) {
-      if (rand() < p) ctx.fillRect(x, y, 1, 1)
-    }
+    ctx.fillText(text, (cols - w) / 2, baseline)
   }
 }
 
@@ -65,50 +111,58 @@ function pill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h:
   ctx.stroke()
 }
 
-/** Step 1 — the money: a coin. */
-export const coinScene: Scene = (ctx, cols, rows) => {
-  const s = Math.min(cols, rows)
-  const r = s * 0.38
-  ctx.lineWidth = Math.max(2, r * 0.15)
-  ctx.beginPath()
-  ctx.arc(cols / 2, rows / 2, r, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.lineWidth = Math.max(1, r * 0.05)
-  ctx.beginPath()
-  ctx.arc(cols / 2, rows / 2, r * 0.78, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.font = pixelFont(r * 1.2)
-  ctx.fillText('$', cols / 2, rows / 2 + r * 0.06)
-}
+/** Step 1 — the money. */
+export const coinScene: Scene = fade(
+  (ctx, cols, rows) => {
+    const r = Math.min(cols, rows) * 0.38
+    ctx.lineWidth = 2.3
+    ctx.beginPath()
+    ctx.arc(cols / 2, rows / 2, r, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.lineWidth = 1.2
+    ctx.beginPath()
+    ctx.arc(cols / 2, rows / 2, r * 0.8, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = pixelFont(r * 1.1, 500)
+    ctx.fillText('$', cols / 2, rows / 2 + r * 0.05)
+  },
+  { from: 0.62 },
+)
 
 /** Step 2 — the link. */
-export const linkScene: Scene = (ctx, cols, rows) => {
-  const s = Math.min(cols, rows)
-  ctx.lineWidth = Math.max(2.5, s * 0.075)
-  ctx.translate(cols / 2, rows / 2)
-  ctx.rotate(-Math.PI / 4)
-  const w = s * 0.5
-  const h = s * 0.25
-  pill(ctx, -w * 0.78, -h / 2, w, h)
-  pill(ctx, -w * 0.22, -h / 2, w, h)
-}
+export const linkScene: Scene = fade(
+  (ctx, cols, rows) => {
+    const s = Math.min(cols, rows)
+    ctx.lineWidth = 2.5
+    ctx.translate(cols / 2, rows / 2)
+    ctx.rotate(-Math.PI / 4)
+    const w = s * 0.5
+    const h = s * 0.25
+    pill(ctx, -w * 0.78, -h / 2, w, h)
+    pill(ctx, -w * 0.22, -h / 2, w, h)
+  },
+  { from: 0.62 },
+)
 
-/** Step 3 — PIX landing in a bank account: a diamond with R$. */
-export const pixScene: Scene = (ctx, cols, rows) => {
-  const s = Math.min(cols, rows)
-  const a = s * 0.27
-  ctx.save()
-  ctx.translate(cols / 2, rows / 2)
-  ctx.rotate(Math.PI / 4)
-  ctx.lineWidth = Math.max(2.5, s * 0.07)
-  ctx.strokeRect(-a, -a, a * 2, a * 2)
-  ctx.lineWidth = Math.max(1, s * 0.025)
-  ctx.strokeRect(-a * 0.72, -a * 0.72, a * 1.44, a * 1.44)
-  ctx.restore()
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.font = pixelFont(s * 0.2)
-  ctx.fillText('R$', cols / 2, rows / 2 + s * 0.01)
-}
+/** Step 3 — PIX landing in a bank account. */
+export const pixScene: Scene = fade(
+  (ctx, cols, rows) => {
+    const s = Math.min(cols, rows)
+    const a = s * 0.27
+    ctx.save()
+    ctx.translate(cols / 2, rows / 2)
+    ctx.rotate(Math.PI / 4)
+    ctx.lineWidth = 2.5
+    ctx.strokeRect(-a, -a, a * 2, a * 2)
+    ctx.lineWidth = 1.2
+    ctx.strokeRect(-a * 0.72, -a * 0.72, a * 1.44, a * 1.44)
+    ctx.restore()
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = pixelFont(s * 0.17, 500)
+    ctx.fillText('R$', cols / 2, rows / 2 + s * 0.01)
+  },
+  { from: 0.62 },
+)
