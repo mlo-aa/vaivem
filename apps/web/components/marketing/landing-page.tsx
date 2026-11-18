@@ -11,6 +11,7 @@ import {
 import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { cn } from '@/lib/utils'
+import { Logo } from '@/components/logo'
 import { LandingNav } from '@/components/marketing/landing-nav'
 import { PixelField } from '@/components/marketing/pixel-field'
 import { AsciiReceipt, useTyped } from '@/components/marketing/ascii'
@@ -29,7 +30,7 @@ const LINE = 'border-[var(--lp-line)]'
 
 const HERO_SCENES = [slabsScene]
 const FLOW_SCENES = [coinScene, linkScene, pixScene]
-const CTA_SCENES = [fade(wordScene('Vaivém', { zone: 'cta-word', fill: 0.97, weight: 800 }), { from: 0.55, floor: 0.22 })]
+const CTA_SCENES = [fade(wordScene('vaivem', { zone: 'cta-word', fill: 0.97, weight: 800 }), { from: 0.55, floor: 0.22 })]
 
 const KIT_CODE = `const res = await fetch("/api/v1/claims", {
   method: "POST",
@@ -611,7 +612,7 @@ function FinalCta() {
           wave={0.4}
           radius={8}
           maxParticles={7500}
-          label="Vaivém"
+          label="vaivem"
         />
       </div>
       <Rail className="flex min-h-[640px] flex-col border-transparent">
@@ -657,7 +658,7 @@ function LandingFooter() {
       <Rail>
         <div className="grid gap-10 px-5 py-14 sm:px-10 md:grid-cols-[1.6fr_1fr_1fr]">
           <div className="max-w-xs">
-            <p className="text-lg font-medium tracking-[-0.02em]">Vaivém</p>
+            <Logo className="h-7 invert sm:h-7" />
             <p className="mt-3 text-sm leading-relaxed text-[var(--lp-muted)]">{t('footerBlurb')}</p>
           </div>
           {columns.map((col) => (
