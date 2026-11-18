@@ -61,6 +61,15 @@ export default function Page() {
 
 See [docs/architecture.md](docs/architecture.md) for detail.
 
+## Testnet setup checklist
+
+1. Create a Stellar **testnet** sponsor account (Friendbot) with a trustline to the USDC asset and some USDC; set `STELLAR_SPONSOR_SECRET` and `STELLAR_USDC_ISSUER`.
+2. Set `AUTH_SECRET`, `NEXT_PUBLIC_APP_URL`, and Vercel KV (`KV_REST_API_URL`, `KV_REST_API_TOKEN`). **KV is required on serverless**: without it claims, secrets and balances live in memory/files and are lost between invocations.
+3. For PIX/SPEI cash-out and fiat on-ramps: `ETHERFUSE_API_KEY`, the bank-account IDs, and the sponsor wallet registered in the Etherfuse account.
+4. Crypto deposits credit only the asset in `ETHERFUSE_USDC_ASSET` (`CODE:ISSUER`, defaults to the Etherfuse sandbox USDC). Stellar-rail claims work with any USDC the sponsor holds, so the Stellar path can be exercised without Etherfuse.
+
+Security notes: claim tokens are 12-char CSPRNG values; access codes are stored as HMACs; OTP verification, access-code unlocks and settlement are rate-limited / locked per claim; `POST /api/payouts/pix` requires a session.
+
 ## Corridor status (sandbox)
 
 Provider availability shifts without notice — observations in [SPIKE.md](SPIKE.md).

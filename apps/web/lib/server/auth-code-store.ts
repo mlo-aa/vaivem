@@ -1,6 +1,8 @@
 import "server-only"
 
 import { kv } from "@vercel/kv"
+import { randomInt } from "node:crypto"
+import { hit, resetHits, safeEqual } from "@/lib/server/rate-limit"
 import { normalizeEmail } from "@/lib/dashboard-session"
 
 const CODE_PREFIX = "auth-code:"
@@ -31,7 +33,7 @@ function rateKey(email: string) {
 }
 
 function generateCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000))
+  return String(randomInt(100000, 1000000))
 }
 
 async function getRateCount(email: string): Promise<number> {
@@ -119,31 +121,18 @@ export async function verifyAuthCode(
     return { ok: false, error: "expired" }
   }
 
-  if (record.attempts >= MAX_VERIFY_ATTEMPTS) {
+  // Atomic attempt counter (INCR) — parallel guesses cannot dodge the limit.
+  const attempt = await hit(`otp-verify:${e}`, MAX_VERIFY_ATTEMPTS, CODE_TTL_SECONDS)
+  if (!attempt.ok) {
     await deleteAuthCode(e)
     return { ok: false, error: "too_many_attempts" }
   }
 
-  if (record.code !== submitted) {
-    const next: AuthCodeRecord = {
-      ...record,
-      attempts: record.attempts + 1,
-    }
-    if (next.attempts >= MAX_VERIFY_ATTEMPTS) {
-      await deleteAuthCode(e)
-      return { ok: false, error: "too_many_attempts" }
-    }
-    if (kvConfigured()) {
-      const ttl = await kv.ttl(codeKey(e))
-      await kv.set(codeKey(e), next, {
-        ex: ttl > 0 ? ttl : CODE_TTL_SECONDS,
-      })
-    } else {
-      memoryCodes.set(e, next)
-    }
+  if (!safeEqual(record.code, submitted)) {
     return { ok: false, error: "invalid" }
   }
 
+  await resetHits(`otp-verify:${e}`)
   await deleteAuthCode(e)
   return { ok: true }
 }

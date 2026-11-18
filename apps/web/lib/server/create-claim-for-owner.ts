@@ -14,6 +14,7 @@ import {
 } from "@/lib/server/claim-store"
 import type { ProtectionType } from "@/lib/types"
 import { isBelowMinimum, minAmountMessage, MIN_AMOUNT_USDC } from "@/lib/limits"
+import { hashAccessCode } from "@/lib/server/access-code"
 import { creditRefund, debitForClaim } from "@/lib/server/balance-store"
 
 export type CreateClaimInput = {
@@ -80,6 +81,7 @@ export async function createClaimForOwner(
       protectionType === "code" && body.accessCode
         ? String(body.accessCode)
         : null
+    const accessCodeStored = accessCode ? hashAccessCode(accessCode) : null
     const expirationDays = Number(body.expirationDays ?? 7)
     const displayCurrency = body.displayCurrency === "USD" ? "USD" : "BRL"
     const displayAmount = Number(body.displayAmount ?? amount)
@@ -227,7 +229,7 @@ export async function createClaimForOwner(
       recipientEmail,
       message,
       protectionType,
-      accessCode,
+      accessCode: accessCodeStored,
       status: "shared",
       deadline,
       createdAt: now,

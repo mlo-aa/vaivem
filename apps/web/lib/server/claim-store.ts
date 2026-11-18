@@ -8,6 +8,7 @@
 import "server-only"
 
 import { kv } from "@vercel/kv"
+import { randomBytes } from "node:crypto"
 import type { ClaimStatus, PayoutMethod, ProtectionType } from "@/lib/types"
 
 const KEY_PREFIX = "claim:"
@@ -15,7 +16,7 @@ const INDEX_KEY = "claims:index"
 const OWNER_INDEX_PREFIX = "claims:owner:"
 const DAY_SECONDS = 24 * 60 * 60
 
-/** 8-char uppercase base32 excluding 0/O/1/I */
+/** Uppercase base32 excluding 0/O/1/I (32 symbols) */
 const TOKEN_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 export interface StoredClaim {
@@ -99,10 +100,10 @@ function ttlFromDeadline(deadlineUnixSeconds: number): number {
   return Math.max(ttl, 60)
 }
 
+/** 12 chars × 5 bits = 60 bits from a CSPRNG (32-char alphabet → no modulo bias). */
 export function generateClaimToken(): string {
-  return Array.from({ length: 8 }, () =>
-    TOKEN_CHARS[Math.floor(Math.random() * TOKEN_CHARS.length)],
-  ).join("")
+  const bytes = randomBytes(12)
+  return Array.from(bytes, (b) => TOKEN_CHARS[b & 31]).join("")
 }
 
 export async function saveStoredClaim(claim: StoredClaim): Promise<void> {

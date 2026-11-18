@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { isValidEmail, normalizeEmail } from "@/lib/dashboard-session"
+import { clientIp, hit } from "@/lib/server/rate-limit"
 import { createAuthCode } from "@/lib/server/auth-code-store"
 import { sendLoginCode } from "@/lib/server/send-login-code"
 
@@ -16,6 +17,18 @@ export async function POST(req: Request) {
   const email = normalizeEmail(String(body.email ?? ""))
   if (!isValidEmail(email)) {
     return NextResponse.json({ error: "Valid email required" }, { status: 400 })
+  }
+
+  // Per-IP cap so one client cannot mail-bomb arbitrary addresses.
+  const ipLimit = await hit(`otp-request-ip:${clientIp(req)}`, 10, 600)
+  if (!ipLimit.ok) {
+    return NextResponse.json(
+      {
+        error: "rate_limited",
+        message: "Too many codes requested. Wait a few minutes and try again.",
+      },
+      { status: 429 },
+    )
   }
 
   const created = await createAuthCode(email)
