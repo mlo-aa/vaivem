@@ -14,6 +14,7 @@ import {
 } from "@/lib/server/claim-store"
 import type { ProtectionType } from "@/lib/types"
 import { isBelowMinimum, minAmountMessage, MIN_AMOUNT_USDC } from "@/lib/limits"
+import { sendClaimEmail } from "@/lib/server/send-claim-email"
 import { hashAccessCode } from "@/lib/server/access-code"
 import { creditRefund, debitForClaim } from "@/lib/server/balance-store"
 
@@ -322,6 +323,19 @@ export async function createClaimForOwner(
         ? `https://${process.env.VERCEL_URL}`
         : "http://localhost:3000")
     const claimUrl = `${appUrl.replace(/\/$/, "")}/claim/${token}`
+
+    // Deliver the link when we have an address (best-effort, never fails creation).
+    if (recipientEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      await sendClaimEmail({
+        to: recipientEmail,
+        senderName,
+        amount,
+        country,
+        claimUrl,
+        message,
+        requiresCode: protectionType === "code",
+      })
+    }
 
     return {
       ok: true,

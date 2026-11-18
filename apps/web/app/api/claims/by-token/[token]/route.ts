@@ -1,6 +1,6 @@
 /**
  * GET  /api/claims/by-token/[token]  — PUBLIC (no secrets).
- * PATCH /api/claims/by-token/[token] — reconcile (public) + owner cancel/refund/extend.
+ * PATCH /api/claims/by-token/[token] — reconcile (public) + owner cancel/refund.
  */
 
 import { NextResponse } from "next/server"
@@ -105,13 +105,15 @@ export async function PATCH(
     }
 
     if (action === "extend") {
-      const days = Number(body.days ?? 7)
-      const newDeadline = claim.deadline + Math.floor(days * 86400)
-      const updated = await updateStoredClaim(token, {
-        deadline: newDeadline,
-        expiresAt: new Date(newDeadline * 1000).toISOString(),
-      })
-      return NextResponse.json({ claim: updated })
+      // A claimable balance's deadline is fixed on-chain; changing only our record
+      // would make the dashboard lie about when the link stops working.
+      return NextResponse.json(
+        {
+          error: "not_supported",
+          message: "The expiry of an existing claim cannot be extended. Create a new claim instead.",
+        },
+        { status: 400 },
+      )
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 })

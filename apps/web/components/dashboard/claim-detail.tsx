@@ -6,7 +6,6 @@ import { Link, useRouter } from '@/i18n/navigation'
 import {
   ArrowLeft,
   Ban,
-  CalendarClock,
   ExternalLink,
   RotateCcw,
 } from 'lucide-react'
@@ -30,7 +29,6 @@ import { SharePanel } from '@/components/share-panel'
 import { ClaimTimeline } from '@/components/dashboard/claim-timeline'
 import {
   cancelClaim,
-  extendExpiration,
   refundClaim,
 } from '@/lib/services'
 import {
@@ -53,7 +51,7 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
   const locale = useLocale()
   const router = useRouter()
   const [claim, setClaim] = useState(initialClaim)
-  const [pending, setPending] = useState<'cancel' | 'refund' | 'extend' | null>(null)
+  const [pending, setPending] = useState<'cancel' | 'refund' | null>(null)
 
   const active = isActiveStatus(claim.status)
   const canRefund = active && claim.status !== 'claimed' && claim.status !== 'cashing_out'
@@ -80,19 +78,6 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
       toast.success(t('toastRefunded'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('toastRefundFailed'))
-    } finally {
-      setPending(null)
-    }
-  }
-
-  async function handleExtend() {
-    setPending('extend')
-    try {
-      const updated = await extendExpiration(claim, 7)
-      setClaim(updated)
-      toast.success(t('toastExtended'))
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('toastExtendFailed'))
     } finally {
       setPending(null)
     }
@@ -137,16 +122,6 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
 
         {active && (
           <div className="flex flex-wrap gap-2">
-            {claim.status !== 'claimed' && claim.status !== 'cashing_out' && (
-              <Button variant="outline" size="sm" onClick={handleExtend} disabled={pending !== null}>
-                {pending === 'extend' ? (
-                  <Spinner data-icon="inline-start" />
-                ) : (
-                  <CalendarClock data-icon="inline-start" />
-                )}
-                {t('extend7Days')}
-              </Button>
-            )}
             {canRefund && (
               <ConfirmAction
                 trigger={

@@ -14,7 +14,8 @@ import type { ClaimStatus, PayoutMethod, ProtectionType } from "@/lib/types"
 const KEY_PREFIX = "claim:"
 const INDEX_KEY = "claims:index"
 const OWNER_INDEX_PREFIX = "claims:owner:"
-const DAY_SECONDS = 24 * 60 * 60
+/** Keep records long after the deadline so the refund job can still find them. */
+const DAY_SECONDS = 30 * 24 * 60 * 60
 
 /** Uppercase base32 excluding 0/O/1/I (32 symbols) */
 const TOKEN_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -189,4 +190,18 @@ export function toPublicClaim(claim: StoredClaim): PublicClaim {
     expiresAt: claim.expiresAt,
     requiresCode: claim.protectionType === "code",
   }
+}
+
+/** Every claim token ever saved (for the maintenance job). Prunes dead index entries. */
+export async function listAllStoredClaims(): Promise<StoredClaim[]> {
+  const tokens: string[] = kvConfigured()
+    ? (((await kv.smembers(INDEX_KEY)) as string[]) ?? [])
+    : [...memoryIndex]
+  const claims: StoredClaim[] = []
+  for (const t of tokens) {
+    const c = await getStoredClaim(t)
+    if (c) claims.push(c)
+    else if (kvConfigured()) await kv.srem(INDEX_KEY, t)
+  }
+  return claims
 }

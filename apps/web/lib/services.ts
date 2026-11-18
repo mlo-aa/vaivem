@@ -210,6 +210,3 @@ export async function refundClaim(claim: Claim): Promise<Claim> {
   return patchClaim(claim.token, { action: "refund" })
 }
 
-export async function extendExpiration(claim: Claim, days: number): Promise<Claim> {
-  return patchClaim(claim.token, { action: "extend", days })
-}
