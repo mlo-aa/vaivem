@@ -116,7 +116,7 @@ export default function ApiKeysPage() {
   return (
     <>
       <DashboardTopbar title={t('title')} />
-      <main className="flex-1 space-y-6 px-4 pb-10 sm:px-8">
+      <main className="flex-1 space-y-6 px-4 pt-6 pb-10 sm:px-8">
         <p className="max-w-2xl text-[15px] text-muted-foreground">{t('subtitle')}</p>
 
         <Card>
@@ -144,7 +144,7 @@ export default function ApiKeysPage() {
             </form>
 
             {newSecret ? (
-              <div className="mt-4 space-y-2 rounded-[1.25rem] bg-primary p-4 text-primary-foreground">
+              <div className="mt-4 space-y-2 rounded-lg border border-primary bg-secondary p-4 shadow-[inset_3px_0_0_var(--primary)]">
                 <p className="text-sm font-medium">{t('secretOnce')}</p>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <code className="flex-1 break-all font-mono text-sm">{newSecret}</code>
@@ -178,7 +178,7 @@ export default function ApiKeysPage() {
               active.map((key) => (
                 <div
                   key={key.id}
-                  className="flex flex-col gap-3 rounded-[1.25rem] bg-background p-4 sm:flex-row sm:items-center sm:justify-between dark:border dark:border-border"
+                  className="flex flex-col gap-3 rounded-lg bg-background p-4 sm:flex-row sm:items-center sm:justify-between border border-border"
                 >
                   <div className="min-w-0">
                     <p className="font-medium">{key.name}</p>
@@ -211,13 +211,13 @@ export default function ApiKeysPage() {
 
             {revoked.length > 0 ? (
               <div className="pt-2">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <p className="app-label mb-2">
                   {t('revokedSection')}
                 </p>
                 {revoked.map((key) => (
                   <div
                     key={key.id}
-                    className="mb-2 rounded-[1.25rem] bg-surface px-4 py-3 opacity-60 dark:border dark:border-border"
+                    className="mb-2 rounded-lg bg-surface px-4 py-3 opacity-60 border border-border"
                   >
                     <p className="text-sm font-medium">{key.name}</p>
                     <p className="font-mono text-xs text-muted-foreground">{key.prefix}</p>
@@ -234,7 +234,7 @@ export default function ApiKeysPage() {
             <CardDescription>{t('usageBody')}</CardDescription>
           </CardHeader>
           <CardContent>
-            <pre className="overflow-x-auto rounded-[1.25rem] bg-foreground p-4 font-mono text-xs leading-relaxed text-background">
+            <pre className="overflow-x-auto rounded-lg bg-foreground p-4 font-mono text-xs leading-relaxed text-background">
 {`curl ${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/claims \\
   -H "Authorization: Bearer sk_test_…" \\
   -H "Content-Type: application/json" \\

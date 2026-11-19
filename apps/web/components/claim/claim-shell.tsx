@@ -20,11 +20,11 @@ export function ClaimShell({ children }: { children: ReactNode }) {
           <Logo />
           <div className="flex flex-wrap gap-2">
             {demoMode ? (
-              <span className="inline-flex items-center rounded-full bg-surface px-2.5 py-1 text-[11px] font-semibold text-foreground">
+              <span className="inline-flex items-center rounded-md bg-surface px-2.5 py-1 text-[11px] font-semibold text-foreground">
                 {t('demo')}
               </span>
             ) : null}
-            <span className="inline-flex items-center rounded-full bg-surface px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+            <span className="inline-flex items-center rounded-md bg-surface px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
               {t('onlyForYou')}
             </span>
           </div>

@@ -178,7 +178,7 @@ export default function BatchCreatePage() {
     return (
       <>
         <DashboardTopbar title={t('title')} />
-        <main className="flex-1 px-4 pb-10 sm:px-8">
+        <main className="flex-1 px-4 pt-6 pb-10 sm:px-8">
           <Skeleton className="mx-auto h-64 max-w-lg w-full" />
         </main>
       </>
@@ -188,7 +188,7 @@ export default function BatchCreatePage() {
   return (
     <>
       <DashboardTopbar title={t('title')} />
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 pb-10 sm:px-8">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 pt-6 pb-10 sm:px-8">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">
             {t('available', { balance: formatUSDC(balance ?? 0, locale) })}
@@ -222,7 +222,7 @@ export default function BatchCreatePage() {
               ) : null}
 
               {validation && validation.errors.length > 0 ? (
-                <div className="rounded-[1.25rem] bg-destructive/10 p-3 text-sm text-destructive dark:border dark:border-destructive/40">
+                <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive dark:border dark:border-destructive/40">
                   <p className="font-medium text-destructive">
                     {t('validationErrors')}
                   </p>
@@ -253,12 +253,12 @@ export default function BatchCreatePage() {
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="max-h-72 overflow-auto rounded-[1.25rem] bg-surface p-1 dark:border dark:border-border md:p-0">
+              <div className="max-h-72 overflow-auto rounded-lg bg-surface p-1 border border-border md:p-0">
                 <div className="flex flex-col gap-2 p-2 md:hidden">
                   {previewRows.map((row: BatchCsvRow) => (
                     <div
                       key={row.line}
-                      className="rounded-[1rem] bg-background p-3 dark:border dark:border-border"
+                      className="rounded-md bg-background p-3 border border-border"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -345,7 +345,7 @@ export default function BatchCreatePage() {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="h-2 overflow-hidden rounded-full bg-surface">
+              <div className="h-2 overflow-hidden rounded-md bg-surface">
                 <div
                   className="h-full bg-primary transition-all duration-150"
                   style={{
@@ -379,12 +379,12 @@ export default function BatchCreatePage() {
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="max-h-80 overflow-auto rounded-[1.25rem] bg-surface p-1 dark:border dark:border-border md:p-0">
+              <div className="max-h-80 overflow-auto rounded-lg bg-surface p-1 border border-border md:p-0">
                 <div className="flex flex-col gap-2 p-2 md:hidden">
                   {results.map((r) => (
                     <div
                       key={r.line}
-                      className="rounded-[1rem] bg-background p-3 dark:border dark:border-border"
+                      className="rounded-md bg-background p-3 border border-border"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">

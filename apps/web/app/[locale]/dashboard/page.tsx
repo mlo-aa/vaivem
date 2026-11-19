@@ -91,30 +91,31 @@ export default function DashboardPage() {
   return (
     <>
       <DashboardTopbar title={t('title')} />
-      <main className="flex-1 space-y-6 px-4 pb-10 sm:px-8 lg:px-8">
+      <main className="flex-1 space-y-6 px-4 pt-6 pb-10 sm:px-8 lg:px-8">
         {/* Bento: hero balance + compact stats */}
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
           <Link
             href="/dashboard/funding"
-            className="rounded-[1.25rem] bg-primary p-6 text-primary-foreground transition-opacity duration-150 hover:opacity-95 sm:p-7"
+            className="app-hatch rounded-lg border border-border bg-card p-6 transition-colors duration-150 hover:border-foreground/30 sm:p-7"
           >
-            <p className="text-sm font-medium text-primary-foreground/70">
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span aria-hidden className="size-2 shrink-0 bg-primary" />
               {tCustody('line')}
             </p>
-            <p className="mt-3 text-4xl font-semibold tracking-[-0.02em] tabular-nums sm:text-5xl">
+            <p className="mt-3 text-4xl font-medium tracking-[-0.04em] tabular-nums sm:text-5xl">
               {balance == null ? '—' : formatUSDC(balance, locale)}
             </p>
           </Link>
           <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-[1.25rem] bg-surface p-6 dark:border dark:border-border">
-              <p className="text-sm text-muted-foreground">{t('filterAll')}</p>
-              <p className="mt-2 text-3xl font-semibold tracking-[-0.02em] tabular-nums">
+            <div className="rounded-lg bg-surface p-6 border border-border">
+              <p className="app-label">{t('filterAll')}</p>
+              <p className="mt-2 text-3xl font-medium tracking-[-0.03em] tabular-nums">
                 {claims.length}
               </p>
             </div>
-            <div className="rounded-[1.25rem] bg-surface p-6 dark:border dark:border-border">
-              <p className="text-sm text-muted-foreground">{t('filterActive')}</p>
-              <p className="mt-2 text-3xl font-semibold tracking-[-0.02em] tabular-nums">
+            <div className="rounded-lg bg-surface p-6 border border-border">
+              <p className="app-label">{t('filterActive')}</p>
+              <p className="mt-2 text-3xl font-medium tracking-[-0.03em] tabular-nums">
                 {activeCount}
               </p>
             </div>
@@ -122,7 +123,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <InputGroup className="rounded-full border-transparent bg-surface sm:max-w-xs dark:border dark:border-border">
+          <InputGroup className="rounded-md border-transparent bg-surface sm:max-w-xs border border-border">
             <InputGroupAddon>
               <Search className="text-muted-foreground" />
             </InputGroupAddon>
@@ -138,29 +139,29 @@ export default function DashboardPage() {
             onValueChange={(v) => {
               if (v[0]) setFilter(v[0] as Filter)
             }}
-            className="w-fit gap-1 rounded-full bg-surface p-1 dark:border dark:border-border"
+            className="w-fit gap-1 rounded-md bg-surface p-1 border border-border"
           >
             <ToggleGroupItem
               value="all"
-              className="rounded-full px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
+              className="rounded-md px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
             >
               {t('filterAll')}
             </ToggleGroupItem>
             <ToggleGroupItem
               value="active"
-              className="rounded-full px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
+              className="rounded-md px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
             >
               {t('filterActive')}
             </ToggleGroupItem>
             <ToggleGroupItem
               value="completed"
-              className="rounded-full px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
+              className="rounded-md px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
             >
               {t('filterCompleted')}
             </ToggleGroupItem>
             <ToggleGroupItem
               value="refunded"
-              className="rounded-full px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
+              className="rounded-md px-3 data-[state=on]:bg-background data-[state=on]:text-foreground dark:data-[state=on]:bg-foreground dark:data-[state=on]:text-background"
             >
               {t('filterClosed')}
             </ToggleGroupItem>
@@ -169,14 +170,14 @@ export default function DashboardPage() {
 
         {bootstrapping ? (
           <div className="flex flex-col gap-3">
-            <Skeleton className="h-24 w-full rounded-[1.25rem]" />
-            <Skeleton className="h-24 w-full rounded-[1.25rem]" />
-            <Skeleton className="h-24 w-full rounded-[1.25rem]" />
+            <Skeleton className="h-24 w-full rounded-lg" />
+            <Skeleton className="h-24 w-full rounded-lg" />
+            <Skeleton className="h-24 w-full rounded-lg" />
           </div>
         ) : filtered.length > 0 ? (
           <ClaimsTable claims={filtered} />
         ) : claims.length === 0 ? (
-          <Empty className="rounded-[1.25rem] bg-surface p-8 dark:border dark:border-border">
+          <Empty className="rounded-lg bg-surface p-8 border border-border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 {funded ? <Search /> : <Wallet />}
@@ -195,7 +196,7 @@ export default function DashboardPage() {
             </EmptyContent>
           </Empty>
         ) : (
-          <Empty className="rounded-[1.25rem] bg-surface p-8 dark:border dark:border-border">
+          <Empty className="rounded-lg bg-surface p-8 border border-border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <Search />

@@ -13,7 +13,7 @@ export function ProcessSteps({ steps, current }: { steps: string[]; current: num
           <li key={label} className="flex items-center gap-3">
             <span
               className={cn(
-                'flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium transition-colors',
+                'flex size-7 shrink-0 items-center justify-center rounded-md text-xs font-medium transition-colors',
                   done && 'bg-primary text-primary-foreground',
                   active && 'bg-primary text-primary-foreground',
                   !done && !active && 'bg-surface text-muted-foreground',

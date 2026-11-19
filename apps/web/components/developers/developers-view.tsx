@@ -211,11 +211,11 @@ export function DevelopersView() {
               {running ? t("sending") : t("sendTest")}
             </Button>
             {response ? (
-              <pre className="max-h-64 overflow-auto rounded-[1.25rem] bg-foreground p-4 font-mono text-xs leading-relaxed text-background">
+              <pre className="max-h-64 overflow-auto rounded-lg bg-foreground p-4 font-mono text-xs leading-relaxed text-background">
                 {response}
               </pre>
             ) : (
-              <div className="rounded-[1.25rem] bg-surface p-4 text-center text-sm text-muted-foreground dark:border dark:border-dashed dark:border-border">
+              <div className="rounded-lg bg-surface p-4 text-center text-sm text-muted-foreground dark:border dark:border-dashed dark:border-border">
                 {t("responsePlaceholder")}
               </div>
             )}
@@ -248,7 +248,7 @@ function CodeBlock({
       >
         {copied ? <Check /> : <Copy />}
       </Button>
-      <pre className="max-h-80 overflow-auto rounded-[1.25rem] bg-foreground p-4 font-mono text-xs leading-relaxed text-background">
+      <pre className="max-h-80 overflow-auto rounded-lg bg-foreground p-4 font-mono text-xs leading-relaxed text-background">
         {code}
       </pre>
     </div>

@@ -94,12 +94,12 @@ export function DashboardTopbar({ title }: { title: string }) {
   }
 
   return (
-    <header className="sticky top-0 z-30 bg-background">
+    <header className="sticky top-0 z-30 border-b border-border bg-background">
       <div className="flex items-center justify-between gap-4 px-4 py-5 sm:px-8 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger
-              className="inline-flex size-10 items-center justify-center rounded-full bg-surface text-foreground transition-colors duration-150 lg:hidden dark:border dark:border-border"
+              className="inline-flex size-10 items-center justify-center rounded-md bg-surface text-foreground transition-colors duration-150 lg:hidden border border-border"
               aria-label={tc('openMenu')}
             >
               <Menu className="size-5" />
@@ -122,7 +122,7 @@ export function DashboardTopbar({ title }: { title: string }) {
                       <span
                         key={item.href}
                         title={t('addFundsFirst')}
-                        className="rounded-full px-4 py-2.5 text-sm font-medium text-muted-foreground/50"
+                        className="rounded-md px-4 py-2.5 text-sm font-medium text-muted-foreground/50"
                       >
                         {t(item.labelKey)}
                       </span>
@@ -134,9 +134,9 @@ export function DashboardTopbar({ title }: { title: string }) {
                       href={item.href}
                       onClick={() => setOpen(false)}
                       className={cn(
-                        'rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-150',
+                        'rounded-md px-4 py-2.5 text-sm font-medium transition-colors duration-150',
                         active
-                          ? 'bg-primary text-primary-foreground'
+                          ? 'bg-secondary text-foreground shadow-[inset_2px_0_0_var(--primary)]'
                           : 'text-muted-foreground hover:bg-surface hover:text-foreground',
                       )}
                     >
@@ -147,11 +147,11 @@ export function DashboardTopbar({ title }: { title: string }) {
               </nav>
             </SheetContent>
           </Sheet>
-          <h1 className="truncate text-3xl font-semibold tracking-[-0.02em] text-foreground sm:text-[2.75rem]">
+          <h1 className="truncate text-2xl font-medium tracking-[-0.035em] text-foreground sm:text-4xl">
             {title}
           </h1>
           {isDemo ? (
-            <span className="hidden shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground sm:inline">
+            <span className="hidden shrink-0 rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground sm:inline">
               {t('demoBadge')}
             </span>
           ) : null}
@@ -193,7 +193,7 @@ export function DashboardTopbar({ title }: { title: string }) {
               aria-label={tc('accountMenu')}
             >
               <Avatar className="size-10">
-                <AvatarFallback className="bg-surface text-xs font-medium text-foreground dark:border dark:border-border">
+                <AvatarFallback className="bg-surface text-xs font-medium text-foreground border border-border">
                   {initials(displayName)}
                 </AvatarFallback>
               </Avatar>

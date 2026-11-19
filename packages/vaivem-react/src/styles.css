@@ -1,21 +1,34 @@
 /* Scoped kit tokens — host apps can override via CSS variables on .vv-kit */
 .vv-kit {
-  --vv-bg: #ffffff;
-  --vv-fg: #0a0a0a;
-  --vv-muted: #525252;
-  --vv-card: #f4f4f4;
-  --vv-border: transparent;
+  --vv-bg: #f7f7f5;
+  --vv-fg: #0a0a0b;
+  --vv-muted: #5b5e66;
+  --vv-card: #ffffff;
+  --vv-surface: #f1f1ee;
+  --vv-line: rgba(10, 10, 11, 0.14);
+  --vv-border: var(--vv-line);
   --vv-brand: #d4ff3f;
-  --vv-brand-fg: #0a0a0a;
+  --vv-brand-fg: #0a0a0b;
   --vv-danger: #dc2626;
-  --vv-amber: #ca8a04;
-  --vv-radius: 1.25rem;
-  --vv-font: ui-sans-serif, system-ui, sans-serif;
-  --vv-mono: ui-monospace, monospace;
+  --vv-amber: #a16207;
+  --vv-radius: 4px;
+  --vv-font: var(--font-geist-sans, ui-sans-serif), ui-sans-serif, system-ui, sans-serif;
+  --vv-mono: var(--font-geist-mono, ui-monospace), ui-monospace, monospace;
   color: var(--vv-fg);
   font-family: var(--vv-font);
   font-size: 15px;
   box-sizing: border-box;
+}
+
+/* Dark: hosts that put .dark on an ancestor (class strategy) get it for free. */
+.dark .vv-kit {
+  --vv-bg: #0a0a0b;
+  --vv-fg: #ededee;
+  --vv-muted: #9a9da4;
+  --vv-card: #0e0f11;
+  --vv-surface: #15171a;
+  --vv-line: rgba(255, 255, 255, 0.12);
+  --vv-amber: #eab308;
 }
 
 .vv-kit *,
@@ -26,7 +39,7 @@
 
 .vv-card {
   background: var(--vv-card);
-  border: none;
+  border: 1px solid var(--vv-line);
   border-radius: var(--vv-radius);
   padding: 1.5rem;
   display: flex;
@@ -43,11 +56,13 @@
 
 .vv-demo-badge {
   flex: none;
-  border: none;
-  border-radius: 999px;
+  font-family: var(--vv-mono);
+  text-transform: uppercase;
+  border: 1px solid var(--vv-line);
+  border-radius: var(--vv-radius);
   padding: 0.15rem 0.45rem;
   color: var(--vv-fg);
-  background: #ffffff;
+  background: var(--vv-surface);
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -56,7 +71,7 @@
 .vv-title {
   margin: 0;
   font-size: 1.125rem;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
@@ -89,9 +104,9 @@
   width: 100%;
   height: 2.5rem;
   padding: 0 0.75rem;
-  border: 1px solid #e5e5e5;
-  border-radius: 999px;
-  background: #ffffff;
+  border: 1px solid var(--vv-line);
+  border-radius: var(--vv-radius);
+  background: var(--vv-surface);
   color: var(--vv-fg);
   font: inherit;
   font-size: 0.9375rem;
@@ -111,7 +126,7 @@
   width: 100%;
   height: 2.75rem;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--vv-radius);
   background: var(--vv-brand);
   color: var(--vv-brand-fg);
   font: inherit;
@@ -131,9 +146,9 @@
 }
 
 .vv-btn--ghost {
-  background: #ffffff;
+  background: transparent;
   color: var(--vv-fg);
-  border: none;
+  border: 1px solid var(--vv-line);
 }
 
 .vv-btn--ghost:hover {
@@ -180,8 +195,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.4rem 0.55rem;
-  border-radius: 999px;
-  background: #ffffff;
+  border-radius: var(--vv-radius);
+  background: var(--vv-surface);
   font-size: 0.875rem;
 }
 
@@ -201,9 +216,9 @@
   gap: 0.85rem;
   width: 100%;
   padding: 0.85rem;
-  border: none;
+  border: 1px solid var(--vv-line);
   border-radius: var(--vv-radius);
-  background: #ffffff;
+  background: var(--vv-surface);
   text-align: left;
   cursor: pointer;
   font: inherit;
@@ -216,9 +231,10 @@
 }
 
 .vv-rail[data-selected="true"] {
-  border: none;
-  background: var(--vv-brand);
-  color: var(--vv-brand-fg);
+  border-color: var(--vv-brand);
+  background: color-mix(in srgb, var(--vv-brand) 16%, var(--vv-surface));
+  color: var(--vv-fg);
+  box-shadow: inset 2px 0 0 var(--vv-brand);
 }
 
 .vv-rail-icon {
@@ -227,12 +243,13 @@
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 999px;
+  border-radius: var(--vv-radius);
   background: var(--vv-card);
 }
 
 .vv-rail[data-selected="true"] .vv-rail-icon {
-  background: color-mix(in srgb, var(--vv-brand-fg) 12%, transparent);
+  background: var(--vv-brand);
+  color: var(--vv-brand-fg);
 }
 
 .vv-rail-eta {
@@ -274,9 +291,9 @@
   text-align: center;
   font-size: 1.1rem;
   font-family: var(--vv-mono);
-  border: 1px solid #e5e5e5;
-  border-radius: 0.75rem;
-  background: #ffffff;
+  border: 1px solid var(--vv-line);
+  border-radius: var(--vv-radius);
+  background: var(--vv-surface);
 }
 
 .vv-steps {
@@ -297,13 +314,13 @@
 .vv-step-dot {
   width: 1.75rem;
   height: 1.75rem;
-  border-radius: 999px;
+  border-radius: var(--vv-radius);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.75rem;
   font-weight: 600;
-  background: #ffffff;
+  background: var(--vv-surface);
   color: var(--vv-muted);
 }
 
@@ -334,8 +351,8 @@
 
 .vv-skeleton {
   height: 1.1rem;
-  border-radius: 6px;
-  background: #e5e5e5;
+  border-radius: var(--vv-radius);
+  background: var(--vv-line);
 }
 
 .vv-stack {
@@ -369,7 +386,7 @@
 }
 
 .vv-disclosure {
-  border-radius: 8px;
+  border-radius: var(--vv-radius);
 }
 
 .vv-disclosure > summary {
@@ -460,4 +477,12 @@
     align-items: flex-start;
     font-size: 0.8rem;
   }
+}
+
+/* mono micro-label for the small caption above the amount */
+.vv-hero > .vv-muted {
+  font-family: var(--vv-mono);
+  font-size: 0.7rem !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }

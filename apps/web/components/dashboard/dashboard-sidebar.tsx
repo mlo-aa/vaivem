@@ -51,12 +51,12 @@ export function DashboardSidebar() {
                   : pathname.startsWith(item.href)
             const locked = item.needsFunds && createLocked
             const className = cn(
-              'flex w-full items-center gap-3 rounded-full px-4 py-2.5 text-left text-sm font-medium transition-colors duration-150',
+              'flex w-full items-center gap-3 rounded-md px-4 py-2.5 text-left text-sm font-medium transition-colors duration-150',
               locked
                 ? 'cursor-not-allowed text-muted-foreground/50'
                 : active
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-surface hover:text-foreground',
+                  ? 'bg-secondary text-foreground shadow-[inset_2px_0_0_var(--primary)]'
+                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
             )
             if (locked) {
               return (
@@ -81,10 +81,10 @@ export function DashboardSidebar() {
           })}
         </nav>
       </TooltipProvider>
-      <div className="border-t border-transparent p-3 dark:border-border">
+      <div className="border-t border-border p-3">
         <a
           href="mailto:support@vaivem.app"
-          className="flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-surface hover:text-foreground"
+          className="flex items-center gap-3 rounded-md px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-surface hover:text-foreground"
         >
           <LifeBuoy className="size-4.5 shrink-0" />
           {t('support')}

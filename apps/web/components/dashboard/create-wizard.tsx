@@ -208,7 +208,7 @@ export function CreateWizard() {
       <Card className="mx-auto max-w-lg">
         <CardContent className="flex flex-col gap-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <span className="flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <ShieldCheck className="size-5" />
             </span>
             <div>
@@ -234,7 +234,7 @@ export function CreateWizard() {
     return (
       <div className="mx-auto flex max-w-lg flex-col gap-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <span className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
+          <span className="flex size-14 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <CheckCircle2 className="size-7" />
           </span>
           <div>
@@ -268,7 +268,7 @@ export function CreateWizard() {
         <Stepper step={step} />
 
         {error && (
-          <div className="rounded-[1.25rem] bg-destructive/10 px-4 py-3 text-sm text-destructive dark:border dark:border-destructive/40">
+          <div className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive dark:border dark:border-destructive/40">
             {error}
           </div>
         )}
@@ -403,7 +403,7 @@ export function CreateWizard() {
                         type="button"
                         onClick={() => setProtection(p.value)}
                         className={cn(
-                          'flex items-start gap-3 rounded-[1.25rem] bg-surface p-3 text-left transition-colors duration-150 dark:border dark:border-border',
+                          'flex items-start gap-3 rounded-lg bg-surface p-3 text-left transition-colors duration-150 border border-border',
                           protection === p.value
                             ? 'bg-primary text-primary-foreground dark:border-transparent'
                             : 'hover:opacity-90',
@@ -411,7 +411,7 @@ export function CreateWizard() {
                       >
                         <span
                           className={cn(
-                            'mt-0.5 flex size-8 items-center justify-center rounded-full',
+                            'mt-0.5 flex size-8 items-center justify-center rounded-md',
                             protection === p.value
                               ? 'bg-primary-foreground/15 text-primary-foreground'
                               : 'bg-background text-muted-foreground',
@@ -556,28 +556,28 @@ export function CreateWizard() {
 
       {/* Live summary */}
       <div className="lg:sticky lg:top-24 lg:self-start">
-        <Card className="bg-primary text-primary-foreground dark:border-transparent">
+        <Card className="app-hatch bg-card">
           <CardContent className="flex flex-col gap-5 py-2">
-            <div className="flex items-center gap-2 text-primary-foreground/70">
-              <Sparkles className="size-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">{t('liveQuote')}</span>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Sparkles className="size-4 text-foreground" />
+              <span className="app-label">{t('liveQuote')}</span>
             </div>
             <div>
-              <p className="text-sm text-primary-foreground/70">{t('youLock')}</p>
+              <p className="text-sm text-muted-foreground">{t('youLock')}</p>
               {quoting ? (
-                <Skeleton className="mt-1 h-9 w-40 bg-primary-foreground/15" />
+                <Skeleton className="mt-1 h-9 w-40" />
               ) : (
-                <p className="text-3xl font-semibold tabular-nums tracking-[-0.02em] sm:text-4xl">
+                <p className="text-3xl font-medium tabular-nums tracking-[-0.04em] sm:text-4xl">
                   {formatUSDC(fundingUsdc ?? 0, locale)}
                 </p>
               )}
-              <p className="mt-1 text-sm text-primary-foreground/60">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {numericAmount > 0
                   ? formatDisplay(numericAmount, currency, locale)
                   : t('enterAmount')}
               </p>
             </div>
-            <div className="flex flex-col gap-2 border-t border-primary-foreground/15 pt-4 text-sm">
+            <div className="flex flex-col gap-2 border-t border-border pt-4 text-sm">
               <QuoteRow
                 label={t('referenceRate')}
                 value={
@@ -589,10 +589,10 @@ export function CreateWizard() {
               <QuoteRow label={t('cashOutFee')} value={t('cashOutFeeValue')} />
               <QuoteRow label={t('networkFee')} value={t('networkFeeValue')} />
             </div>
-            <div className="rounded-[1rem] bg-primary-foreground/10 p-3">
+            <div className="rounded-md border border-border bg-secondary p-3">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="size-4" />
-                <span className="text-xs text-primary-foreground/80">{t('lockedHint')}</span>
+                <span className="text-xs text-muted-foreground">{t('lockedHint')}</span>
               </div>
             </div>
           </CardContent>
@@ -616,7 +616,7 @@ function Stepper({ step }: { step: number }) {
             <div className="flex items-center gap-2">
               <span
                 className={cn(
-                  'flex size-7 items-center justify-center rounded-full text-xs font-medium',
+                  'flex size-7 items-center justify-center rounded-md text-xs font-medium',
                   done && 'bg-foreground text-background',
                   active && 'bg-primary text-primary-foreground',
                   !done && !active && 'bg-surface text-muted-foreground',
@@ -653,7 +653,7 @@ function MethodToggle({
   onChange: (v: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-[1.25rem] bg-surface p-3 dark:border dark:border-border">
+    <div className="flex items-center justify-between gap-4 rounded-lg bg-surface p-3 border border-border">
       <div className="flex flex-col">
         <span className="text-sm font-medium">{title}</span>
         <span className="text-xs text-muted-foreground">{description}</span>
@@ -675,7 +675,7 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 function QuoteRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-primary-foreground/60">{label}</span>
+      <span className="text-muted-foreground">{label}</span>
       <span className="font-medium tabular-nums">{value}</span>
     </div>
   )

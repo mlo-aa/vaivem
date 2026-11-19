@@ -125,7 +125,7 @@ export function ClaimsTable({ claims }: { claims: Claim[] }) {
           return (
             <Fragment key={claim.id}>
               {showBatchHeader && claim.batchId ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-full bg-surface px-4 py-2 dark:border dark:border-border">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface px-4 py-2 border border-border">
                   <span className="text-xs font-medium text-foreground">
                     {t('batchHeader', { count: batchPeers.length })} ·{' '}
                     <span className="font-mono text-muted-foreground">
@@ -139,7 +139,7 @@ export function ClaimsTable({ claims }: { claims: Claim[] }) {
               ) : null}
               <Link
                 href={`/dashboard/claims/${claim.token}`}
-                className="block rounded-[1.25rem] bg-surface p-6 transition-opacity duration-150 active:opacity-90 dark:border dark:border-border"
+                className="block rounded-lg bg-surface p-6 transition-opacity duration-150 active:opacity-90 border border-border"
                 aria-label={t('viewClaim', { token: claim.token })}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -152,7 +152,7 @@ export function ClaimsTable({ claims }: { claims: Claim[] }) {
                     {relativeTime(claim.createdAt, tTime)}
                   </span>
                   {claim.batchId ? (
-                    <span className="rounded-full bg-background px-2 py-0.5 font-mono text-[10px] text-muted-foreground dark:bg-foreground/5">
+                    <span className="rounded-md bg-background px-2 py-0.5 font-mono text-[10px] text-muted-foreground dark:bg-foreground/5">
                       {t('batchTag', { id: shortBatch(claim.batchId) })}
                     </span>
                   ) : null}
@@ -165,23 +165,23 @@ export function ClaimsTable({ claims }: { claims: Claim[] }) {
       </div>
 
       {/* Desktop table */}
-      <div className="hidden overflow-hidden rounded-[1.25rem] bg-surface md:block dark:border dark:border-border">
+      <div className="hidden overflow-hidden rounded-lg bg-surface md:block border border-border">
         <Table>
           <TableHeader>
             <TableRow className="border-transparent hover:bg-transparent dark:border-border">
-              <TableHead className="h-12 px-6 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <TableHead className="h-12 px-6 app-label">
                 {t('columns.recipient')}
               </TableHead>
-              <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <TableHead className="app-label">
                 {t('columns.purpose')}
               </TableHead>
-              <TableHead className="text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <TableHead className="text-right app-label">
                 {t('columns.amount')}
               </TableHead>
-              <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <TableHead className="app-label">
                 {t('columns.status')}
               </TableHead>
-              <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <TableHead className="app-label">
                 {t('columns.created')}
               </TableHead>
               <TableHead className="w-10" />
@@ -232,7 +232,7 @@ export function ClaimsTable({ claims }: { claims: Claim[] }) {
                       <div className="flex flex-col gap-1">
                         <span>{claim.purpose}</span>
                         {claim.batchId ? (
-                          <span className="w-fit rounded-full bg-background px-2 py-0.5 font-mono text-[10px] text-muted-foreground dark:bg-foreground/5">
+                          <span className="w-fit rounded-md bg-background px-2 py-0.5 font-mono text-[10px] text-muted-foreground dark:bg-foreground/5">
                             {t('batchTag', { id: shortBatch(claim.batchId) })}
                           </span>
                         ) : null}
@@ -251,7 +251,7 @@ export function ClaimsTable({ claims }: { claims: Claim[] }) {
                       <Link
                         href={`/dashboard/claims/${claim.token}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 hover:bg-background hover:text-foreground"
+                        className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-background hover:text-foreground"
                         aria-label={t('viewClaim', { token: claim.token })}
                       >
                         <ChevronRight className="size-4" />

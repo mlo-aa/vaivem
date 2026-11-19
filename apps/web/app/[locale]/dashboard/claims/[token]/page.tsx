@@ -11,7 +11,7 @@ export default async function ClaimDetailPage({
   return (
     <>
       <DashboardTopbar title="Claim details" />
-      <main className="flex-1 px-4 pb-10 sm:px-8">
+      <main className="flex-1 px-4 pt-6 pb-10 sm:px-8">
         <ClaimDetailLoader token={token} />
       </main>
     </>

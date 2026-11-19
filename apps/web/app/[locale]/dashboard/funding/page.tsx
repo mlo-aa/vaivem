@@ -278,10 +278,10 @@ export default function FundingPage() {
   return (
     <>
       <DashboardTopbar title={t('title')} />
-      <main className="flex-1 space-y-6 px-4 pb-10 sm:px-8">
+      <main className="flex-1 space-y-6 px-4 pt-6 pb-10 sm:px-8">
         <p className="text-sm text-muted-foreground">{tCustody('line')}</p>
 
-        <div className="rounded-[1.25rem] bg-surface px-4 py-3 text-sm dark:border dark:border-border sm:px-6">
+        <div className="rounded-lg bg-surface px-4 py-3 text-sm border border-border sm:px-6">
           <p className="font-medium">{t('sandboxTitle')}</p>
           <p className="mt-1 text-muted-foreground">
             {t('sandboxBody', { max: SANDBOX_FIAT_MAX })}
@@ -382,7 +382,7 @@ export default function FundingPage() {
                       </Button>
                     </div>
 
-                    <div className="flex flex-col items-center gap-2 rounded-[1.25rem] bg-background p-3 dark:border dark:border-border">
+                    <div className="flex flex-col items-center gap-2 rounded-lg bg-background p-3 border border-border">
                       <QRCodeSVG value={usdcInfo.address} size={160} bgColor="transparent" />
                       <p className="text-center text-xs text-muted-foreground">
                         {t('addressQrHint')}
@@ -399,7 +399,7 @@ export default function FundingPage() {
                     </Button>
 
                     {usdcCredits.length > 0 ? (
-                      <div className="rounded-[1rem] bg-surface p-3 dark:border dark:border-border">
+                      <div className="rounded-md bg-surface p-3 border border-border">
                         <p className="font-medium">{t('newlyCredited')}</p>
                         <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
                           {usdcCredits.map((c) => (
@@ -466,7 +466,7 @@ export default function FundingPage() {
                 </form>
 
                 {instructions ? (
-                  <div className="mt-4 space-y-3 rounded-[1.25rem] bg-surface p-3 text-sm dark:border dark:border-border sm:p-4">
+                  <div className="mt-4 space-y-3 rounded-lg bg-surface p-3 text-sm border border-border sm:p-4">
                     <p className="font-medium">
                       {instructions.rail === 'pix' ? t('pixDeposit') : t('speiDeposit')}
                     </p>
@@ -489,7 +489,7 @@ export default function FundingPage() {
                             <p className="text-xs font-medium text-muted-foreground">
                               {t('pixCopyTitle')}
                             </p>
-                            <p className="break-all rounded-[0.75rem] bg-background p-2 font-mono text-xs dark:border dark:border-border">
+                            <p className="break-all rounded-md bg-background p-2 font-mono text-xs border border-border">
                               {instructions.pixCopyPaste}
                             </p>
                             <Button
@@ -611,7 +611,7 @@ export default function FundingPage() {
                 {pendingOrders.map((row) => (
                   <div
                     key={row.orderId}
-                    className="rounded-[1.25rem] bg-background p-4 dark:border dark:border-border"
+                    className="rounded-lg bg-background p-4 border border-border"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -706,7 +706,7 @@ export default function FundingPage() {
                   {ledger.map((row) => (
                     <div
                       key={row.id}
-                      className="rounded-[1.25rem] bg-background p-4 dark:border dark:border-border"
+                      className="rounded-lg bg-background p-4 border border-border"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>

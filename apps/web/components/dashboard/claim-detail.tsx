@@ -204,7 +204,7 @@ export function ClaimDetail({ claim: initialClaim }: { claim: Claim }) {
               {claim.message && (
                 <div className="sm:col-span-2">
                   <p className="text-xs font-medium text-muted-foreground">{t('messageToRecipient')}</p>
-                  <p className="mt-1 rounded-[1.25rem] bg-surface p-3 text-sm dark:border dark:border-border">{claim.message}</p>
+                  <p className="mt-1 rounded-lg bg-surface p-3 text-sm border border-border">{claim.message}</p>
                 </div>
               )}
             </CardContent>

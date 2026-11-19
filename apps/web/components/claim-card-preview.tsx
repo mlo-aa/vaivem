@@ -8,13 +8,13 @@ export function ClaimCardPreview({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'w-full max-w-sm rounded-[1.5rem] bg-card p-6 dark:border dark:border-border',
+        'w-full max-w-sm rounded-lg bg-card p-6 border border-border',
         className,
       )}
     >
       <div className="flex items-center justify-between">
         <Logo className="h-6 sm:h-7" />
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-foreground dark:border dark:border-border">
+        <span className="inline-flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1 text-xs font-medium text-foreground border border-border">
           <ShieldCheck className="size-3.5" />
           Secure claim
         </span>
@@ -28,7 +28,7 @@ export function ClaimCardPreview({ className }: { className?: string }) {
         <p className="mt-1 text-sm text-muted-foreground">Approximately 99.10 USDC</p>
       </div>
 
-      <div className="mt-6 rounded-[1.25rem] bg-background p-4 dark:border dark:border-border">
+      <div className="mt-6 rounded-lg bg-background p-4 border border-border">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">From</span>
           <span className="font-medium">Acme Payments</span>
@@ -39,7 +39,7 @@ export function ClaimCardPreview({ className }: { className?: string }) {
         </div>
       </div>
 
-      <div className="mt-4 rounded-full bg-primary py-3 text-center text-sm font-semibold text-primary-foreground">
+      <div className="mt-4 rounded-md bg-primary py-3 text-center text-sm font-semibold text-primary-foreground">
         Claim funds
       </div>
       <p className="mt-3 text-center text-xs text-muted-foreground">

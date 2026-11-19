@@ -17,7 +17,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     return (
       <span
         className={cn(
-          'inline-flex size-9 shrink-0 rounded-full bg-surface',
+          'inline-flex size-9 shrink-0 rounded-md bg-surface',
           className,
         )}
         aria-hidden
@@ -32,8 +32,8 @@ export function ThemeToggle({ className }: { className?: string }) {
       type="button"
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
       className={cn(
-        'inline-flex size-9 items-center justify-center rounded-full bg-surface text-foreground transition-colors duration-150 hover:opacity-80',
-        'dark:border dark:border-border',
+        'inline-flex size-9 items-center justify-center rounded-md bg-surface text-foreground transition-colors duration-150 hover:opacity-80',
+        'border border-border',
         className,
       )}
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}

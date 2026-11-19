@@ -21,13 +21,13 @@ export default async function DevelopersPage({
         <section className="border-b border-border">
           <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-16 sm:px-8">
             <div className="flex items-center justify-between gap-3">
-              <p className="font-mono text-sm text-muted-foreground">{t("title")}</p>
-              <div className="flex items-center gap-2">
+              <p className="app-label">{t("title")}</p>
+              <div className="flex items-center gap-2 md:hidden">
                 <LanguageSwitcher compact />
                 <ThemeToggle />
               </div>
             </div>
-            <h1 className="max-w-2xl text-balance text-4xl font-semibold tracking-[-0.02em] text-foreground md:text-5xl">
+            <h1 className="max-w-2xl text-balance text-4xl font-medium tracking-[-0.04em] text-foreground md:text-6xl">
               {t("headline")}
             </h1>
             <p className="max-w-xl text-pretty text-[15px] text-muted-foreground md:text-base">

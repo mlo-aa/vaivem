@@ -22,7 +22,7 @@ export function MarketingHeader() {
   ]
 
   return (
-    <header className="sticky top-0 z-40 border-b border-transparent bg-background dark:border-border">
+    <header className="sticky top-0 z-40 border-b border-border bg-background">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-8">
         <Link href="/" aria-label="Vaivém home">
           <Logo />
@@ -33,7 +33,7 @@ export function MarketingHeader() {
             <Link
               key={item.href}
               href={item.href}
-              className="text-sm font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
+              className="app-label transition-colors duration-150 hover:text-foreground"
             >
               {item.label}
             </Link>

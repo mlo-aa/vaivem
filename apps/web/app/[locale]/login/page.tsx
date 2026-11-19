@@ -209,7 +209,7 @@ function LoginInner() {
             </div>
 
             {devCode ? (
-              <p className="rounded-[1.25rem] bg-surface px-3 py-2 text-sm dark:border dark:border-border">
+              <p className="rounded-lg bg-surface px-3 py-2 text-sm border border-border">
                 Dev mode — code:{' '}
                 <button
                   type="button"
@@ -265,7 +265,7 @@ function LoginInner() {
 
 export default function LoginPage() {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4 sm:px-8">
+    <div className="app-hatch relative flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4 sm:px-8">
       <div className="absolute right-4 top-4 flex items-center gap-2 sm:right-8 sm:top-6">
         <ThemeToggle />
       </div>
