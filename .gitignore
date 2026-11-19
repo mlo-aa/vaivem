@@ -32,3 +32,6 @@ CLAUDE.md
 
 # Leftover single-app dirs if OS file locks blocked the move
 _trash_*/
+
+# Private planning notes (not for the repo)
+docs/market-research-brief.md
