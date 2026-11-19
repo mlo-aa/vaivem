@@ -174,7 +174,11 @@
     "heroChip": "Pagamentos sem carteira na Stellar",
     "statusTag": "Sandbox · Testnet",
     "stepOf": "Passo",
-    "logos": "Construído sobre"
+    "logos": "Construído sobre",
+    "ctaDemo": "Testar o demo",
+    "demoStarting": "Iniciando…",
+    "demoBusy": "O demo está movimentado agora. Tente novamente mais tarde.",
+    "demoError": "Não foi possível iniciar o demo. Tente novamente."
   },
   "dashboard": {
     "title": "Resgates",

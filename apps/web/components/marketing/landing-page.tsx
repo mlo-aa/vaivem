@@ -12,6 +12,7 @@ import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/logo'
+import { DemoButton } from '@/components/marketing/demo-button'
 import { LandingNav } from '@/components/marketing/landing-nav'
 import { PixelField } from '@/components/marketing/pixel-field'
 import { TerrainField } from '@/components/marketing/terrain-field'
@@ -226,7 +227,7 @@ function Hero() {
             {t('heroBody')}
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
-            <Button href="/dashboard">{t('ctaCreate')}</Button>
+            <DemoButton />
             <Button href="/developers" variant="line">
               {t('ctaDevelopers')}
             </Button>
@@ -673,7 +674,7 @@ function FinalCta() {
           <h2 className="lp-h max-w-[16ch] text-[clamp(2.2rem,5vw,4.4rem)]">{t('ctaTitle')}</h2>
           <p className="mt-5 max-w-[44ch] text-[15px] leading-relaxed text-[var(--lp-muted)]">{t('ctaBody')}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button href="/dashboard">{t('ctaCreate')}</Button>
+            <DemoButton />
             <Button href="/dashboard" variant="line">
               {t('ctaSecondary')}
             </Button>

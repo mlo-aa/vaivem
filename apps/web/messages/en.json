@@ -174,7 +174,11 @@
     "heroChip": "Walletless payouts on Stellar",
     "statusTag": "Sandbox · Testnet",
     "stepOf": "Step",
-    "logos": "Built on"
+    "logos": "Built on",
+    "ctaDemo": "Try the demo",
+    "demoStarting": "Starting…",
+    "demoBusy": "The demo is busy right now. Please try again later.",
+    "demoError": "Could not start the demo. Please try again."
   },
   "dashboard": {
     "title": "Claims",

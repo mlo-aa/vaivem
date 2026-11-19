@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl'
 import { Link, usePathname, useRouter } from '@/i18n/navigation'
 import { Logo } from '@/components/logo'
+import { DemoButton } from '@/components/marketing/demo-button'
 import { routing, type AppLocale } from '@/i18n/routing'
 import { cn } from '@/lib/utils'
 
@@ -56,12 +57,7 @@ export function LandingNav() {
               </button>
             ))}
           </div>
-          <Link
-            href="/dashboard"
-            className="border border-[var(--lp-line-strong)] px-3.5 py-1.5 text-[13px] transition-colors hover:bg-white/5"
-          >
-            {t('ctaDashboard')}
-          </Link>
+          <DemoButton variant="nav" />
         </div>
       </div>
     </header>

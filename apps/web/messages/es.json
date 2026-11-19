@@ -174,7 +174,11 @@
     "heroChip": "Pagos sin billetera en Stellar",
     "statusTag": "Sandbox · Testnet",
     "stepOf": "Paso",
-    "logos": "Construido sobre"
+    "logos": "Construido sobre",
+    "ctaDemo": "Probar el demo",
+    "demoStarting": "Iniciando…",
+    "demoBusy": "El demo está muy concurrido ahora. Inténtalo más tarde.",
+    "demoError": "No se pudo iniciar el demo. Inténtalo de nuevo."
   },
   "dashboard": {
     "title": "Reclamos",
