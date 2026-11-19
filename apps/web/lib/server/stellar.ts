@@ -17,6 +17,7 @@ import {
   Transaction,
   FeeBumpTransaction,
   Memo,
+  StrKey,
 } from "@stellar/stellar-sdk"
 
 export const HORIZON_URL = "https://horizon-testnet.stellar.org"
@@ -169,6 +170,10 @@ export function getEtherfuseUsdcCodeIssuer(): { code: string; issuer: string } {
     code: asset.getCode(),
     issuer: asset.getIssuer() || ETHERFUSE_USDC_ISSUER,
   }
+}
+
+export function isValidStellarAddress(address: string): boolean {
+  return StrKey.isValidEd25519PublicKey(address)
 }
 
 export function getSponsorPublicKey(): string {

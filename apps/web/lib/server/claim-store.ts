@@ -9,6 +9,7 @@ import "server-only"
 
 import { kv } from "@vercel/kv"
 import { randomBytes } from "node:crypto"
+import { isDemoOwner } from "@/lib/server/demo"
 import type { ClaimStatus, PayoutMethod, ProtectionType } from "@/lib/types"
 
 const KEY_PREFIX = "claim:"
@@ -67,6 +68,8 @@ export type PublicClaim = Pick<
   | "expiresAt"
 > & {
   requiresCode: boolean
+  /** Created in the public demo: the recipient may claim to a throwaway testnet wallet. */
+  demo: boolean
 }
 
 const memory = new Map<string, StoredClaim>()
@@ -189,6 +192,7 @@ export function toPublicClaim(claim: StoredClaim): PublicClaim {
     recipientName: claim.recipientName,
     expiresAt: claim.expiresAt,
     requiresCode: claim.protectionType === "code",
+    demo: isDemoOwner(claim.ownerId),
   }
 }
 

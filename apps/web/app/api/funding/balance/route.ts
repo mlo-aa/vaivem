@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireOwnerId } from "@/lib/server/auth-session"
 import { getBalance, getLedger } from "@/lib/server/balance-store"
+import { isDemoOwner } from "@/lib/server/demo"
 import { reconcilePendingDeposits } from "@/lib/server/reconcile-funding"
 import { reconcileUsdcDeposits } from "@/lib/server/reconcile-usdc-deposits"
 
@@ -12,10 +13,13 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const [pending, usdcCredits] = await Promise.all([
-    reconcilePendingDeposits(who.ownerId),
-    reconcileUsdcDeposits(who.ownerId),
-  ])
+  // Demo sessions never poll the payment provider or Horizon.
+  const [pending, usdcCredits] = isDemoOwner(who.ownerId)
+    ? [[], []]
+    : await Promise.all([
+        reconcilePendingDeposits(who.ownerId),
+        reconcileUsdcDeposits(who.ownerId),
+      ])
 
   const [balance, ledger] = await Promise.all([
     getBalance(who.ownerId),

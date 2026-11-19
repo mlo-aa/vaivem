@@ -28,6 +28,7 @@ export const es: typeof en = {
     stellarDesc: "Enviar a una billetera digital",
     walletLabel: "Dirección de la billetera",
     walletPlaceholder: "Pega la dirección de tu billetera",
+    demoWalletHint: "Demo: deja este valor y crearemos una billetera de prueba desechable, o pega tu propia dirección.",
     invalidWallet: "Ingresa una dirección de billetera válida.",
     continue: "Continuar",
   },

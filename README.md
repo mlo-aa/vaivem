@@ -61,6 +61,25 @@ export default function Page() {
 
 See [docs/architecture.md](docs/architecture.md) for detail.
 
+## Public demo (portfolio mode)
+
+Anyone can open the app and click **Try the demo** on the login page — no email, on Stellar testnet.
+Each demo session gets a small test balance and can create claims that are paid into a throwaway
+testnet wallet. PIX/SPEI cash-out and fiat funding are disabled in demo sessions, and the limits
+below protect the shared sponsor wallet (all optional env vars):
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `DEMO_LOGIN` | on | Set to `off` to disable the demo button's API |
+| `NEXT_PUBLIC_DEMO_LOGIN` | on | Set to `off` to hide the button |
+| `DEMO_START_BALANCE` | 10 | Test USDC credited per session |
+| `DEMO_MAX_CLAIM_USDC` / `DEMO_MAX_CLAIMS` | 5 / 3 | Per claim and per session |
+| `DEMO_PER_IP_DAILY` / `DEMO_GLOBAL_DAILY` | 3 / 60 | New sessions per IP and in total, per day |
+
+To deploy: create a sponsor with `node apps/web/scripts/create-testnet-sponsor.mjs`, set the variables
+it prints plus `AUTH_SECRET` and Vercel KV, make sure Vercel **Deployment Protection** does not cover
+production, and check `GET /api/health`.
+
 ## Testnet setup checklist
 
 1. Create a Stellar **testnet** sponsor account (Friendbot) with a trustline to the USDC asset and some USDC; set `STELLAR_SPONSOR_SECRET` and `STELLAR_USDC_ISSUER`.

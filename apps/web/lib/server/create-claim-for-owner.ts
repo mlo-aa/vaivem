@@ -14,6 +14,8 @@ import {
 } from "@/lib/server/claim-store"
 import type { ProtectionType } from "@/lib/types"
 import { isBelowMinimum, minAmountMessage, MIN_AMOUNT_USDC } from "@/lib/limits"
+import { demoConfig, isDemoOwner } from "@/lib/server/demo"
+import { hit } from "@/lib/server/rate-limit"
 import { sendClaimEmail } from "@/lib/server/send-claim-email"
 import { hashAccessCode } from "@/lib/server/access-code"
 import { creditRefund, debitForClaim } from "@/lib/server/balance-store"
@@ -219,7 +221,34 @@ export async function createClaimForOwner(
     }
 
     let recipientPublicKey = ""
-    const expiresInSeconds = Math.floor(expirationDays * 86400)
+    let effectiveDays = expirationDays
+    if (isDemoOwner(owner.ownerId)) {
+      const cfg = demoConfig()
+      if (amount > cfg.maxClaimUsdc) {
+        return {
+          ok: false,
+          failure: {
+            error: "demo_amount_limit",
+            message: `The public demo is limited to ${cfg.maxClaimUsdc} USDC per claim.`,
+            status: 422,
+          },
+        }
+      }
+      const used = await hit(`demo-claims:${owner.ownerId}`, cfg.maxClaims, 86400)
+      if (!used.ok) {
+        return {
+          ok: false,
+          failure: {
+            error: "demo_claims_limit",
+            message: `The public demo allows ${cfg.maxClaims} claims per session.`,
+            status: 429,
+          },
+        }
+      }
+      // Short-lived escrow: the sponsor gets the funds back within a day.
+      effectiveDays = Math.min(expirationDays, 1)
+    }
+    const expiresInSeconds = Math.floor(effectiveDays * 86400)
     const amountStr = amount.toFixed(2)
     const token = generateClaimToken()
 

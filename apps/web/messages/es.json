@@ -34,7 +34,8 @@
     "newClaim": "Nuevo reclamo",
     "signOut": "Cerrar sesión",
     "viewPublicSite": "Ver sitio público",
-    "addFundsFirst": "Agrega fondos en la página de Fondos antes de crear un reclamo."
+    "addFundsFirst": "Agrega fondos en la página de Fondos antes de crear un reclamo.",
+    "demoBadge": "Demo · Testnet"
   },
   "custody": {
     "line": "Libro demo en una billetera sponsor compartida — no es custodia segregada."
@@ -56,7 +57,12 @@
       "request_failed": "No se pudo enviar el código. Intenta de nuevo.",
       "invalid_code": "Ese código no es válido o expiró.",
       "verify_failed": "No se pudo verificar el código."
-    }
+    },
+    "or": "o",
+    "demoCta": "Probar el demo",
+    "demoStarting": "Iniciando…",
+    "demoNote": "Acceso inmediato en la testnet de Stellar. Sin correo. Solo fondos de prueba.",
+    "demoBusy": "El demo está muy concurrido ahora. Inténtalo más tarde."
   },
   "landing": {
     "heroTitle": "Envía dinero. Ellos lo retiran a su banco.",

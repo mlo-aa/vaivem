@@ -28,6 +28,7 @@ export const ptBR: typeof en = {
     stellarDesc: "Para quem já usa uma carteira digital",
     walletLabel: "Endereço da carteira digital",
     walletPlaceholder: "Cole o endereço da sua carteira",
+    demoWalletHint: "Demo: mantenha este valor e criaremos uma carteira de teste descartável, ou cole seu próprio endereço.",
     invalidWallet: "Digite um endereço de carteira válido.",
     continue: "Continuar",
   },

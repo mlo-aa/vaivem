@@ -26,6 +26,7 @@ export const en = {
     stellarDesc: "Send to a digital wallet",
     walletLabel: "Wallet address",
     walletPlaceholder: "Paste your wallet address",
+    demoWalletHint: "Demo: keep this value and we will create a throwaway testnet wallet for you, or paste your own address.",
     invalidWallet: "Enter a valid wallet address.",
     continue: "Continue",
   },

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { COOKIE_NAME, verifySessionToken } from "@/lib/dashboard-session"
+import { isDemoOwner } from "@/lib/server/demo"
 import { sessionStore } from "@/lib/server/session-store"
 
 export const dynamic = "force-dynamic"
@@ -18,5 +19,6 @@ export async function GET() {
       email: payload.email,
       name: user?.name ?? payload.email.split("@")[0],
     },
+    demo: isDemoOwner(payload.email),
   })
 }

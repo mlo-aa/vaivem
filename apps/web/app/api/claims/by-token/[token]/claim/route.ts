@@ -15,11 +15,15 @@ import {
   claimAndForward,
   claimBalance,
   createClaimableBalance,
+  createSponsoredAccount,
+  generateRecipientKeypair,
   getSponsorPublicKey,
+  isValidStellarAddress,
   payAnchor,
   returnSponsoredUsdcToSponsor,
   StellarError,
 } from "@/lib/server/stellar"
+import { isDemoOwner } from "@/lib/server/demo"
 import { verifyAccessCode } from "@/lib/server/access-code"
 import { hit, tryLock } from "@/lib/server/rate-limit"
 import { recipientSecretsByBalanceId } from "@/lib/server/claim-secrets"
@@ -199,6 +203,17 @@ export async function POST(
     }
   }
 
+  const demoClaim = isDemoOwner(claim.ownerId)
+  if (demoClaim && rail === "pix") {
+    return NextResponse.json(
+      {
+        error: "demo_pix_disabled",
+        message: "Local cash-out is disabled in the public demo. Claim to a Stellar wallet instead.",
+      },
+      { status: 403 },
+    )
+  }
+
   const secret = await recipientSecretsByBalanceId.get(claim.balanceId)
   if (!secret) {
     return NextResponse.json(
@@ -245,7 +260,15 @@ export async function POST(
 
   try {
     if (rail === "stellar") {
-      const wallet = String(walletAddress ?? "").trim()
+      let wallet = String(walletAddress ?? "").trim()
+      let demoWallet: string | null = null
+      if (demoClaim && !isValidStellarAddress(wallet)) {
+        // Public demo: no wallet needed — pay into a throwaway sponsored testnet account.
+        const fresh = generateRecipientKeypair()
+        await createSponsoredAccount(fresh.publicKey, fresh.secret)
+        wallet = fresh.publicKey
+        demoWallet = fresh.publicKey
+      }
       if (wallet.length < 8) {
         await updateStoredClaim(token, { status: "shared" })
         return NextResponse.json(
@@ -272,6 +295,7 @@ export async function POST(
         payoutMethod: "stellar",
         txHash: hash,
         claim: updated,
+        ...(demoWallet ? { demoWallet } : {}),
       })
     }
 

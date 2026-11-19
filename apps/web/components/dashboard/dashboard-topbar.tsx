@@ -61,6 +61,7 @@ export function DashboardTopbar({ title }: { title: string }) {
   const [open, setOpen] = useState(false)
   const [displayName, setDisplayName] = useState('Sender')
   const [displayEmail, setDisplayEmail] = useState('')
+  const [isDemo, setIsDemo] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const { balance, funded, loading: balanceLoading } = useSenderBalance()
@@ -75,6 +76,7 @@ export function DashboardTopbar({ title }: { title: string }) {
           const data = await meRes.json()
           setDisplayName(String(data.user?.name || data.user?.email || 'Sender'))
           setDisplayEmail(String(data.user?.email || ''))
+          setIsDemo(data.demo === true)
         }
       } catch {
         // leave defaults
@@ -148,6 +150,11 @@ export function DashboardTopbar({ title }: { title: string }) {
           <h1 className="truncate text-3xl font-semibold tracking-[-0.02em] text-foreground sm:text-[2.75rem]">
             {title}
           </h1>
+          {isDemo ? (
+            <span className="hidden shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground sm:inline">
+              {t('demoBadge')}
+            </span>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">

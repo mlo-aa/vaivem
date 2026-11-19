@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { isValidEmail, normalizeEmail } from "@/lib/dashboard-session"
 import { clientIp, hit } from "@/lib/server/rate-limit"
+import { isDemoOwner } from "@/lib/server/demo"
 import { createAuthCode } from "@/lib/server/auth-code-store"
 import { sendLoginCode } from "@/lib/server/send-login-code"
 
@@ -16,6 +17,10 @@ export async function POST(req: Request) {
 
   const email = normalizeEmail(String(body.email ?? ""))
   if (!isValidEmail(email)) {
+    return NextResponse.json({ error: "Valid email required" }, { status: 400 })
+  }
+
+  if (isDemoOwner(email)) {
     return NextResponse.json({ error: "Valid email required" }, { status: 400 })
   }
 

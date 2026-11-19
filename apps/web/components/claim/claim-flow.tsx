@@ -15,6 +15,7 @@ export type PublicClaimView = {
   deadline: number
   protectionType: ProtectionType
   requiresCode: boolean
+  demo?: boolean
   displayCurrency?: "BRL" | "USD"
   displayAmount?: number
 }
@@ -43,6 +44,7 @@ export function ClaimFlow({ claim }: { claim: PublicClaimView }) {
       requiresCode={claim.requiresCode || claim.protectionType === "code"}
       showDemoCodeHint={demoMode && claim.protectionType === "code"}
       demoMode={demoMode}
+      demoWallet={claim.demo === true}
       apiBaseUrl=""
       onStatus={(status) => {
         void status

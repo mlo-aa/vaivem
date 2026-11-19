@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/input-otp'
 
 const RESEND_COOLDOWN_SECONDS = 60
+const showDemo = process.env.NEXT_PUBLIC_DEMO_LOGIN !== 'off'
 
 function LoginInner() {
   const t = useTranslations('login')
@@ -76,6 +77,26 @@ function LoginInner() {
     e.preventDefault()
     const ok = await requestCode(email)
     if (ok) setStep('code')
+  }
+
+  async function startDemo() {
+    if (pending) return
+    setPending(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/auth/demo', { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error === 'demo_busy' ? t('demoBusy') : te('unknown'))
+        return
+      }
+      router.replace(callbackUrl)
+      router.refresh()
+    } catch {
+      setError(te('network'))
+    } finally {
+      setPending(false)
+    }
   }
 
   async function onResend() {
@@ -139,6 +160,24 @@ function LoginInner() {
             <Button type="submit" disabled={pending}>
               {pending ? t('sending') : t('sendCode')}
             </Button>
+            {showDemo ? (
+              <>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground" aria-hidden>
+                  <span className="h-px flex-1 bg-border" />
+                  {t('or')}
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+                <Button
+                  type="button"
+                  className="bg-foreground text-background hover:opacity-90"
+                  disabled={pending}
+                  onClick={() => void startDemo()}
+                >
+                  {pending ? t('demoStarting') : t('demoCta')}
+                </Button>
+                <p className="text-xs text-muted-foreground">{t('demoNote')}</p>
+              </>
+            ) : null}
           </form>
         ) : (
           <div className="flex flex-col gap-4">

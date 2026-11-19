@@ -39,6 +39,11 @@ export type ClaimLinkProps = {
    * When true, RampWithdraw shows simulated KYC. Pass host NEXT_PUBLIC_DEMO_MODE.
    */
   demoMode?: boolean
+  /**
+   * Public testnet demo: preselect the Stellar rail and prefill a placeholder so the
+   * host can pay into a throwaway wallet. The recipient can still paste their own address.
+   */
+  demoWallet?: boolean
 }
 
 type Stage = "unlock" | "choose" | "withdraw" | "stellar-processing" | "stellar-done" | "failed"
@@ -61,6 +66,7 @@ export function ClaimLink({
   fiatAmount,
   claimToken,
   demoMode = false,
+  demoWallet = false,
 }: ClaimLinkProps) {
   const resolved = resolveMessages(locale, messages)
   return (
@@ -78,6 +84,7 @@ export function ClaimLink({
         fiatAmount={fiatAmount}
         claimToken={claimToken}
         demoMode={demoMode}
+        demoWallet={demoWallet}
       />
     </KitMessagesProvider>
   )
@@ -96,13 +103,14 @@ function ClaimLinkInner({
   fiatAmount,
   claimToken,
   demoMode = false,
+  demoWallet = false,
 }: Omit<ClaimLinkProps, "messages">) {
   const m = useKitMessages()
   const [stage, setStage] = useState<Stage>(requiresCode ? "unlock" : "choose")
   const [entered, setEntered] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [rail, setRail] = useState<Rail>("pix")
-  const [walletAddress, setWalletAddress] = useState("")
+  const [rail, setRail] = useState<Rail>(demoWallet ? "stellar" : "pix")
+  const [walletAddress, setWalletAddress] = useState(demoWallet ? "demo-wallet" : "")
   const [txHash, setTxHash] = useState<string | null>(null)
   const [failure, setFailure] = useState<{ code: PayoutFailureCode; message: string } | null>(
     null,
@@ -276,7 +284,7 @@ function ClaimLinkInner({
                 {country === "MX" ? t(m, "choose.speiEta") : t(m, "choose.pixEta")}
               </span>
             </button>
-            <details className="vv-disclosure">
+            <details className="vv-disclosure" open={demoWallet || undefined}>
               <summary>
                 <ChevronDown className="vv-icon-sm" />
                 {t(m, "choose.advanced")}
@@ -314,6 +322,7 @@ function ClaimLinkInner({
                 value={walletAddress}
                 onChange={(e) => setWalletAddress(e.target.value)}
               />
+              {demoWallet ? <p className="vv-hint">{t(m, "choose.demoWalletHint")}</p> : null}
             </div>
           ) : null}
           {error ? <p className="vv-error">{error}</p> : null}

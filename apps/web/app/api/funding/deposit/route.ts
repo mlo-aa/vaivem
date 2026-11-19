@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireOwnerId } from "@/lib/server/auth-session"
+import { isDemoOwner } from "@/lib/server/demo"
 import { savePendingDeposit } from "@/lib/server/balance-store"
 import {
   createOnrampOrder,
@@ -31,6 +32,16 @@ export async function POST(req: Request) {
   const who = await requireOwnerId()
   if (!who.ok) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  if (isDemoOwner(who.ownerId)) {
+    return NextResponse.json(
+      {
+        error: "demo_funding_disabled",
+        message: "Funding is disabled in the public demo: your session already has test funds.",
+      },
+      { status: 403 },
+    )
   }
 
   let body: { amount?: number; currency?: string }
